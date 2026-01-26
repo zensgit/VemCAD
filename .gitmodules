@@ -1,0 +1,3 @@
+[submodule "deps/cadgamefusion"]
+	path = deps/cadgamefusion
+	url = /Users/huazhou/Downloads/Github/CADGameFusion-legacy
