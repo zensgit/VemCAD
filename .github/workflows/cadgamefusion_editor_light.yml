@@ -63,6 +63,7 @@ jobs:
 
       - name: Upload editor light artifacts
         if: always()
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: cadgamefusion-editor-light-${{ github.run_id }}
