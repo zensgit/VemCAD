@@ -1,0 +1,72 @@
+name: cadgamefusion-editor-light
+
+on:
+  pull_request:
+    paths:
+      - "deps/cadgamefusion"
+      - "deps/cadgamefusion/tools/ci_editor_light.sh"
+      - "deps/cadgamefusion/tools/web_viewer/**"
+      - "deps/cadgamefusion/schemas/**"
+      - ".github/workflows/cadgamefusion_editor_light.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cadgamefusion-editor-light-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  editor-light:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install python deps
+        run: python3 -m pip install --upgrade pip jsonschema
+
+      - name: Editor light gate
+        env:
+          # GitHub runners do not have Codex Playwright wrapper; keep this workflow focused
+          # on command tests + round-trip smoke.
+          SKIP_EDITOR_UI_FLOW_SMOKE: "1"
+        run: bash deps/cadgamefusion/tools/ci_editor_light.sh
+
+      - name: Write CI artifact summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROUNDTRIP_SUMMARY="$(ls -1t deps/cadgamefusion/build/editor_roundtrip/*/summary.json 2>/dev/null | head -n 1 || true)"
+          python3 deps/cadgamefusion/tools/write_ci_artifact_summary.py \
+            --title "cadgamefusion-editor-light" \
+            --mode gate \
+            --roundtrip-summary "$ROUNDTRIP_SUMMARY" \
+            --out deps/cadgamefusion/build/ci_editor_light_summary.md \
+            --append-github-step-summary
+
+      - name: Upload editor light artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cadgamefusion-editor-light-${{ github.run_id }}
+          if-no-files-found: warn
+          path: |
+            deps/cadgamefusion/build/ci_editor_light_summary.md
+            deps/cadgamefusion/build/editor_roundtrip/**/summary.json
+            deps/cadgamefusion/build/editor_roundtrip/**/summary.md

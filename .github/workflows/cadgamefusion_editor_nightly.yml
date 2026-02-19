@@ -1,0 +1,132 @@
+name: cadgamefusion-editor-nightly
+
+on:
+  schedule:
+    - cron: "20 3 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "observe keeps workflow green; gate fails on gate decision"
+        required: false
+        default: "observe"
+        type: choice
+        options:
+          - observe
+          - gate
+      smoke_limit:
+        description: "editor roundtrip smoke case limit"
+        required: false
+        default: "8"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cadgamefusion-editor-nightly-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  editor-nightly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install python deps
+        run: python3 -m pip install --upgrade pip jsonschema
+
+      - name: Run editor gate (nightly lite)
+        id: gate
+        working-directory: deps/cadgamefusion
+        shell: bash
+        env:
+          WORKFLOW_MODE: ${{ github.event.inputs.mode }}
+          EDITOR_SMOKE_LIMIT_INPUT: ${{ github.event.inputs.smoke_limit }}
+          # Nightly on GitHub runner uses the lightweight editor gate path.
+          RUN_EDITOR_UI_FLOW_SMOKE: "0"
+          RUN_EDITOR_UI_FLOW_SMOKE_GATE: "0"
+          RUN_UI_FLOW_FAILURE_INJECTION_GATE: "0"
+          RUN_EDITOR_SMOKE_FAILURE_INJECTION_GATE: "0"
+          RUN_STEP166_GATE: "0"
+          EDITOR_SMOKE_NO_CONVERT: "1"
+          EDITOR_GATE_APPEND_REPORT: "0"
+          STEP176_APPEND_REPORT: "0"
+          SUMMARY_PATH: build/editor_gate_summary_nightly.json
+          HISTORY_DIR: build/editor_gate_history/nightly
+        run: |
+          set -euo pipefail
+
+          MODE="${WORKFLOW_MODE:-observe}"
+          LIMIT="${EDITOR_SMOKE_LIMIT_INPUT:-8}"
+          if [[ "$MODE" != "observe" && "$MODE" != "gate" ]]; then
+            echo "Invalid mode=$MODE (expected observe|gate)" >&2
+            exit 2
+          fi
+          if ! [[ "$LIMIT" =~ ^[0-9]+$ ]] || [[ "$LIMIT" -le 0 ]]; then
+            LIMIT=8
+          fi
+          export EDITOR_SMOKE_LIMIT="$LIMIT"
+
+          set +e
+          bash tools/editor_gate.sh
+          gate_rc=$?
+          set -e
+
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "gate_exit_code=$gate_rc" >> "$GITHUB_OUTPUT"
+          echo "gate_summary=build/editor_gate_summary_nightly.json" >> "$GITHUB_OUTPUT"
+
+          if [[ "$MODE" == "gate" ]]; then
+            exit "$gate_rc"
+          fi
+          exit 0
+
+      - name: Write CI artifact summary
+        if: always()
+        working-directory: deps/cadgamefusion
+        shell: bash
+        env:
+          WORKFLOW_MODE: ${{ steps.gate.outputs.mode }}
+          GATE_EXIT_CODE: ${{ steps.gate.outputs.gate_exit_code }}
+        run: |
+          set -euo pipefail
+          MODE="${WORKFLOW_MODE:-observe}"
+          ROUNDTRIP_SUMMARY="$(ls -1t build/editor_roundtrip/*/summary.json 2>/dev/null | head -n 1 || true)"
+          python3 tools/write_ci_artifact_summary.py \
+            --title "cadgamefusion-editor-nightly" \
+            --mode "$MODE" \
+            --gate-summary build/editor_gate_summary_nightly.json \
+            --roundtrip-summary "$ROUNDTRIP_SUMMARY" \
+            --out build/ci_editor_nightly_summary.md \
+            --append-github-step-summary
+
+          {
+            echo ""
+            echo "- nightly_gate_exit_code: \\`${GATE_EXIT_CODE:-n/a}\\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload nightly artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cadgamefusion-editor-nightly-${{ github.run_id }}
+          if-no-files-found: warn
+          path: |
+            deps/cadgamefusion/build/ci_editor_nightly_summary.md
+            deps/cadgamefusion/build/editor_gate_summary_nightly.json
+            deps/cadgamefusion/build/editor_gate_history/nightly/*.json
+            deps/cadgamefusion/build/editor_roundtrip/**/summary.json
+            deps/cadgamefusion/build/editor_roundtrip/**/summary.md
