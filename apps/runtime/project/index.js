@@ -15,7 +15,7 @@
 //   { ok: true,  value, diagnostics: [] }
 //   { ok: false, error_code, error, diagnostics: [] }
 
-import { isObject, compareStrings, compareIds, byId, validateUniqueRecordIds } from '../shared/ordering.js';
+import { isObject, compareStrings, compareIds, byId, sameId, validateUniqueRecordIds } from '../shared/ordering.js';
 
 export const PROJECT_FORMAT = 'VEMCAD-PROJECT';
 export const PROJECT_VERSION = 1;
@@ -74,7 +74,9 @@ function comparePassthroughEntities(a, b) {
 }
 
 function ensureDefaultLayer(layers) {
-  if (layers.some((layer) => layer?.id === DEFAULT_LAYER_ID)) return layers;
+  // sameId (not ===) so a string-typed "0" already occupies the id-0 slot and
+  // we do not insert a second default that the dedup rule sees as a duplicate.
+  if (layers.some((layer) => sameId(layer?.id, DEFAULT_LAYER_ID))) return layers;
   return [{ id: DEFAULT_LAYER_ID, name: DEFAULT_LAYER_NAME }, ...layers];
 }
 

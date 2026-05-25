@@ -25,6 +25,14 @@ export function byId(a, b) {
   return compareIds(a?.id, b?.id);
 }
 
+// True when two ids denote the same record under the ordering rule
+// (compareIds === 0, i.e. String(a) === String(b)). Use this for identity
+// checks ("does this id already exist?") so they agree with sorting and
+// duplicate detection — never a bare `===`, which would miss 0 vs "0".
+export function sameId(a, b) {
+  return compareIds(a, b) === 0;
+}
+
 // Validate that every record is an object with a present, unique id. Returns
 // null when sound, else { code, message }. The caller supplies `errorCode` so
 // each domain reports under its own code.

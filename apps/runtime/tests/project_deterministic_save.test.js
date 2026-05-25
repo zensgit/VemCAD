@@ -127,3 +127,19 @@ test('numeric and string ids that collide under ordering are treated as duplicat
   const collide = projectWith({ layers: [{ id: 0, name: 'a' }, { id: '0', name: 'b' }] });
   assert.equal(serializeProjectModel(collide).ok, false);
 });
+
+// A lone string-typed id-0 layer passes validation; ensureDefaultLayer must
+// recognize it as the id-0 slot (sameId, not ===) and NOT insert a second
+// default that would violate the uniqueness invariant after the fact.
+test('a string-typed id-0 layer does not trigger a duplicate default layer', () => {
+  const p = projectWith({ layers: [{ id: '0', name: 'string-zero' }] });
+  const norm = normalizeProjectModel(p);
+  assert.equal(norm.ok, true);
+  assert.equal(norm.value.layers.length, 1);
+  assert.equal(String(norm.value.layers[0].id), '0');
+
+  // uniqueness invariant holds: no two layers share a String(id)
+  const ids = norm.value.layers.map((l) => String(l.id));
+  assert.equal(new Set(ids).size, ids.length);
+  assert.equal(serializeProjectModel(p).ok, true);
+});
