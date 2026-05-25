@@ -189,11 +189,12 @@ node --test apps/runtime/tests/*.test.js apps/web/tests/*.test.js
 - [x] 结构校验（写边界）：错类型集合/对象 → `INVALID_PROJECT_FORMAT`（拒绝静默丢弃，P1）；Project-owned 集合要求 id 存在且唯一（消除重复/缺失 id 的排序歧义，P2）。缺失字段仍按默认补全；`parse` 保持 envelope-only，结构校验落在 `normalize`/`serialize`
 - **完成判据**：`project_schema_roundtrip.test.js`、`project_deterministic_save.test.js` 通过（21 runtime 用例全绿，与既有 web 测试合跑 38/38）
 
-### S2 — `constraint` / `feature` 桩
+### S2 — `constraint` / `feature` 桩 ✅ 2026-05-25
 
-- [ ] `constraint`：normalize + 诊断容器，不求解
-- [ ] `feature`：保存列表 + no-op rebuild plan
-- *（无独立测试；服务于序列化确定性，由 S3 黄金样本间接覆盖——故须早于 S3）*
+- [x] `constraint`（`apps/runtime/constraint/index.js`）：`normalizeConstraintSet()` — 校验 + 稳定排序 + 诊断容器（恒空，v0 不求解）
+- [x] `feature`（`apps/runtime/feature/index.js`）：`normalizeFeatureList()` + `buildRebuildPlan()`（确定性 no-op：稳定 id 序、`steps:[]`、`noop:true`）
+- [x] 抽出 `apps/runtime/shared/ordering.js`：单一权威排序/去重规则（`compareIds` 相等性 ⟺ 去重键），constraint/feature/project 三者共用，消除重复（P2 教训落到架构层）
+- **完成判据**：原计划无独立测试（由 S3 间接覆盖），实际加了 `runtime_constraint_feature.test.js` 烟雾测试（7 用例）；project 并入共享工具后全套 45/45 无回归
 
 ### S3 — 黄金序列化（起手3）
 

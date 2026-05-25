@@ -15,6 +15,8 @@
 //   { ok: true,  value, diagnostics: [] }
 //   { ok: false, error_code, error, diagnostics: [] }
 
+import { isObject, compareStrings, compareIds, byId, validateUniqueRecordIds } from '../shared/ordering.js';
+
 export const PROJECT_FORMAT = 'VEMCAD-PROJECT';
 export const PROJECT_VERSION = 1;
 
@@ -36,29 +38,12 @@ function fail(errorCode, error, diagnostics = []) {
 }
 
 // ---- small pure utilities ---------------------------------------------------
-
-function isObject(value) {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
+// isObject / compareStrings / compareIds / byId / validateUniqueRecordIds are
+// imported from ../shared/ordering.js — one authoritative ordering + id rule
+// shared with the constraint/feature modules.
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
-}
-
-// Deterministic, locale-independent string comparison (code-unit order).
-// NOTE: deliberately not `localeCompare`, which varies by environment locale.
-function compareStrings(a, b) {
-  return a < b ? -1 : a > b ? 1 : 0;
-}
-
-// Numeric ids compare numerically (layer 0,1,2,10); otherwise by string.
-function compareIds(a, b) {
-  if (typeof a === 'number' && typeof b === 'number') return a - b;
-  return compareStrings(String(a), String(b));
-}
-
-function byId(a, b) {
-  return compareIds(a?.id, b?.id);
 }
 
 // Recursively rebuild objects with alphabetically sorted keys so that
@@ -146,29 +131,8 @@ function validateStructure(project) {
     if (!Array.isArray(value)) {
       return { code: ERROR_INVALID_FORMAT, message: `${key} must be an array when present` };
     }
-    const seen = new Set();
-    for (const record of value) {
-      if (!isObject(record)) {
-        return { code: ERROR_INVALID_FORMAT, message: `${key} entries must be objects` };
-      }
-      const id = record.id;
-      const hasUsableId =
-        (typeof id === 'number' && Number.isFinite(id)) || (typeof id === 'string' && id.length > 0);
-      if (!hasUsableId) {
-        return {
-          code: ERROR_INVALID_FORMAT,
-          message: `${key} entries require a finite numeric or non-empty string id`,
-        };
-      }
-      // Dedup key matches the sort comparator's equality:
-      // compareIds(a, b) === 0  ⟺  String(a) === String(b).
-      // (so numeric 0 and string "0" collide, consistent with their ordering.)
-      const idKey = String(id);
-      if (seen.has(idKey)) {
-        return { code: ERROR_INVALID_FORMAT, message: `${key} has a duplicate id: ${JSON.stringify(id)}` };
-      }
-      seen.add(idKey);
-    }
+    const invalid = validateUniqueRecordIds(value, key, ERROR_INVALID_FORMAT);
+    if (invalid) return invalid;
   }
 
   if (project.meta !== undefined && !isObject(project.meta)) {
