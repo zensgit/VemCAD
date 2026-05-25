@@ -22,6 +22,7 @@ import { compareIds } from '../shared/ordering.js';
 
 export const ERROR_UNSUPPORTED_UNIT = 'UNSUPPORTED_PROJECT_UNIT';
 export const ERROR_INVALID_LAYER_ID = 'INVALID_LAYER_ID';
+export const ERROR_INVALID_CADGF_DOCUMENT = 'INVALID_CADGF_DOCUMENT';
 
 // Deriver-owned defaults. cadgf_version/schema_version describe what the deriver
 // PRODUCES (the target), never echoed from an imported source.
@@ -38,6 +39,10 @@ const KIND_TO_TYPE = {
   circle: 4,
   text: 7,
 };
+
+// Reverse of KIND_TO_TYPE (single source of truth). CADGF types not present
+// here (ellipse 5 / spline 6 / block 8 / unknown) are imported as passthrough.
+const TYPE_TO_KIND = Object.fromEntries(Object.entries(KIND_TO_TYPE).map(([kind, type]) => [type, kind]));
 
 // units → { unit_name, unit_scale } where unit_scale is millimetres per unit.
 const UNITS = {
@@ -433,4 +438,108 @@ export function deriveCadgfDocument(project, options = {}) {
   if (typeof schemaMigratedAt === 'string') doc.schema_migrated_at = schemaMigratedAt;
 
   return ok(doc, diagnostics);
+}
+
+// Lenient inverse of the derive unit table: resolve a project unit from a CADGF
+// metadata.unit_name (preferred) then settings.unit_scale; fall back to mm with
+// a diagnostic rather than rejecting. The original name/scale are preserved in
+// cadgfPassthrough.document so nothing is lost.
+function importUnits(unitName, unitScale, diagnostics) {
+  if (typeof unitName === 'string' && UNITS[unitName.trim().toLowerCase()]) {
+    return unitName.trim().toLowerCase();
+  }
+  if (isFiniteNum(unitScale)) {
+    for (const [unit, spec] of Object.entries(UNITS)) {
+      if (spec.unit_scale === unitScale) return unit;
+    }
+  }
+  diagnostics.push({ level: 'warn', code: 'UNIT_FALLBACK', message: `CADGF unit (name=${JSON.stringify(unitName)}, scale=${JSON.stringify(unitScale)}) not recognized; defaulted to mm (original kept in passthrough)` });
+  return 'mm';
+}
+
+// Import a CADGF Document into a VEMCAD-PROJECT. This is a DEGRADED, one-way
+// import — not the inverse of deriveCadgfDocument:
+//   - CADGF carries no VemCAD constraints/features -> they come back empty.
+//   - supported entity types are modeled; ellipse/spline/block/unknown are
+//     preserved verbatim in cadgfPassthrough.entities.
+//   - source document-level fields land in cadgfPassthrough.document so a later
+//     derive can restore passthrough-owned metadata/flags/version.
+// Re-uses the derive unit table, type<->kind map, and passthrough convention;
+// it does NOT cleanse fields — a later deriveCadgfDocument is the single place
+// that guarantees schema-valid output.
+export function importProjectFromCadgfDocument(cadgfDocument, options = {}) {
+  if (!isObject(cadgfDocument)) {
+    return fail(ERROR_INVALID_CADGF_DOCUMENT, 'cadgf document must be an object');
+  }
+  const doc = cadgfDocument;
+  const diagnostics = [];
+
+  const units = importUnits(doc.metadata?.unit_name, doc.settings?.unit_scale, diagnostics);
+
+  const stamp = options.clock?.now?.() ?? '';
+  const projectId = typeof doc.document_id === 'string' && doc.document_id.length > 0
+    ? doc.document_id
+    : (options.projectId ?? 'imported-project');
+  const name = typeof doc.metadata?.label === 'string' ? doc.metadata.label : '';
+
+  // Layers preserve their CADGF fields (id stays the integer; re-derive cleanses).
+  const layers = (Array.isArray(doc.layers) ? doc.layers : [])
+    .filter((l) => isObject(l))
+    .map((l) => ({ ...l }));
+
+  // Entities: supported type -> modeled (numeric id -> "e<id>", cadgfId kept);
+  // unsupported type -> verbatim passthrough.
+  const entities = [];
+  const passthroughEntities = [];
+  for (const e of Array.isArray(doc.entities) ? doc.entities : []) {
+    if (!isObject(e) || !isNonNegInt(e.id) || !Number.isInteger(e.type)) {
+      diagnostics.push({ level: 'warn', code: 'INVALID_CADGF_ENTITY', message: `CADGF entity ${JSON.stringify(e?.id)} is missing a valid id/type; skipped` });
+      continue;
+    }
+    const kind = TYPE_TO_KIND[e.type];
+    if (kind === undefined) {
+      passthroughEntities.push({ ...e });
+      diagnostics.push({ level: 'info', code: 'UNSUPPORTED_ENTITY_PASSTHROUGH', message: `CADGF entity ${e.id} (type ${e.type}) is not v0-modeled; preserved as passthrough` });
+      continue;
+    }
+    const { id, type, layer_id: layerIdRaw, name: entityName, ...rest } = e;
+    entities.push({
+      id: `e${id}`,
+      kind,
+      layerId: Number.isInteger(layerIdRaw) ? layerIdRaw : 0,
+      cadgfId: id,
+      name: typeof entityName === 'string' ? entityName : '',
+      ...rest,
+    });
+  }
+
+  // Source document-level fields -> cadgfPassthrough.document (complete set, so
+  // a later derive can restore passthrough-owned values).
+  const passthroughDocument = {};
+  for (const key of ['document_id', 'schema_migrated_at', 'cadgf_version', 'schema_version', 'feature_flags', 'metadata', 'settings']) {
+    if (doc[key] !== undefined) passthroughDocument[key] = doc[key];
+  }
+
+  diagnostics.push({
+    level: 'warn',
+    code: 'DEGRADED_IMPORT',
+    message: 'CADGF documents carry no VemCAD constraints/features; the imported project has none. Project save/load is the only lossless path.',
+  });
+
+  const project = {
+    header: { format: 'VEMCAD-PROJECT', version: 1 },
+    project: { id: projectId, name, units, createdAt: stamp, modifiedAt: stamp },
+    layers,
+    entities,
+    constraints: [],
+    features: [],
+    resources: { cadgfPassthrough: { document: passthroughDocument, entities: passthroughEntities } },
+    meta: {},
+  };
+
+  const normalized = normalizeProjectModel(project);
+  if (!normalized.ok) {
+    return { ...normalized, diagnostics: [...diagnostics, ...(normalized.diagnostics ?? [])] };
+  }
+  return ok(normalized.value, diagnostics);
 }

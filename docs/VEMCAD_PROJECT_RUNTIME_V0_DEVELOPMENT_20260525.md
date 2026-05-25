@@ -212,13 +212,14 @@ node --test apps/runtime/tests/*.test.js apps/web/tests/*.test.js
 - [x] passthrough 实体也校验 CADGF 四必填（id/type/layer_id/name）→ 不合格 diagnostic+跳过；id 分配（cadgfId 优先、最小未用非负整数、冲突 diagnostic+重分配）；entities/layers 按 id 排序
 - **完成判据**：`cadgf_document_meta_ownership.test.js`(8) + `cadgf_units_import_export.test.js`(派生半,2) + `cadgf_derive_entities.test.js`(6) 通过（全套 65/65）
 
-### S5 — `scene.importProjectFromCadgfDocument`（降级导入）
+### S5 — `scene.importProjectFromCadgfDocument`（降级导入）✅ 2026-05-25
 
-- [ ] 实体反向映射；unsupported → passthrough 不丢
-- [ ] 导入单位宽松降级（`unit_name` 归一化 → `unit_scale` 近似 → 回落 `mm` + diagnostic + 存原始）
-- [ ] 已有 `cadgfId` 保留、新建稳定分配、冲突报 diagnostic
-- [ ] 降级 diagnostics：`constraints/features` 不伪造；`document_id` 从无变有
-- **完成判据**：`cadgf_import_loss_diagnostics.test.js`、`cadgf_units_import_export.test.js`（导入半）、`cadgf_entity_vocab_mapping.test.js` 通过
+- [x] 反向映射复用同一套规则：`TYPE_TO_KIND` 由 `KIND_TO_TYPE` 反推、同一 `UNITS` 表反查；清洗只在 derive 出口做（import 只结构映射，畸形由 re-derive 兜底——不开第二套规则）
+- [x] 实体：supported type → 建模（数字 id → `e<id>`，**保留 `cadgfId`**，每个导入实体都带源 id）；`ellipse/spline/block/unknown` → `cadgfPassthrough.entities` 原样保留 + diagnostic
+- [x] 导入单位宽松降级（`unit_name` 大小写无关归一化 → `unit_scale` 近似 → 回落 `mm` + `UNIT_FALLBACK` diagnostic；原始值随源 metadata/settings 完整存入 passthrough）
+- [x] 源文档级字段（`document_id/schema_migrated_at/cadgf_version/schema_version/feature_flags/metadata/settings`）**完整落** `cadgfPassthrough.document`，供 derive 按归属取回
+- [x] 降级 diagnostics：`DEGRADED_IMPORT`（CADGF 不携带 constraints/features，恒 `[]` 不伪造）；`document_id` 缺失回落稳定默认 id
+- **完成判据**：`cadgf_import_loss_diagnostics.test.js`(5) + `cadgf_units_import_export.test.js`(导入半,3) + `cadgf_entity_vocab_mapping.test.js`(4) 通过（全套 91/91）。端到端验证：`derive→import→derive` 实体字节一致，再 derive 输出通过真实 `document.schema.json` 校验
 
 ### S6 — schema 独立校验（起手2，依赖 S4）
 
