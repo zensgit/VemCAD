@@ -70,14 +70,62 @@ function toBoolInt(value, fallback) {
 }
 
 // CADGF layer/entity color is an integer 0xRRGGBB. Accept an int in range or a
-// "#RRGGBB"/"RRGGBB" hex string; otherwise fall back (default white).
-function resolveColor(color, fallback = 16777215) {
+// "#RRGGBB"/"RRGGBB" hex string; return null if not a valid color.
+function coerceColor(color) {
   if (Number.isInteger(color) && color >= 0 && color <= 16777215) return color;
   if (typeof color === 'string') {
     const hex = color.trim().replace(/^#/, '');
     if (/^[0-9a-fA-F]{6}$/.test(hex)) return parseInt(hex, 16);
   }
-  return fallback;
+  return null;
+}
+
+// CADGF entity geometry field names (schema-defined). For a modeled kind, the
+// geometry field name equals the kind (point/line/polyline/circle/arc/text).
+const GEOMETRY_FIELDS = ['point', 'line', 'polyline', 'arc', 'circle', 'ellipse', 'spline', 'text'];
+
+function isFiniteNum(v) {
+  return typeof v === 'number' && Number.isFinite(v);
+}
+
+function isVec2(v) {
+  return Array.isArray(v) && v.length === 2 && isFiniteNum(v[0]) && isFiniteNum(v[1]);
+}
+
+function isBoolInt(v) {
+  return v === true || v === false || v === 0 || v === 1;
+}
+
+// Validate a modeled kind's geometry against the CADGF schema shape and return
+// a clean value containing ONLY schema-defined keys (object geometries are
+// additionalProperties:false), or null when missing/malformed. Reconstructing
+// rather than passing through prevents stray keys / wrong types from producing
+// a schema-invalid document.
+function buildGeometry(kind, e) {
+  switch (kind) {
+    case 'point':
+      return isVec2(e.point) ? e.point : null;
+    case 'line':
+      return Array.isArray(e.line) && e.line.length === 2 && e.line.every(isVec2) ? e.line : null;
+    case 'polyline':
+      return Array.isArray(e.polyline) && e.polyline.every(isVec2) ? e.polyline : null;
+    case 'circle':
+      return isObject(e.circle) && isVec2(e.circle.c) && isFiniteNum(e.circle.r)
+        ? { c: e.circle.c, r: e.circle.r }
+        : null;
+    case 'arc':
+      return isObject(e.arc) && isVec2(e.arc.c) && isFiniteNum(e.arc.r)
+        && isFiniteNum(e.arc.a0) && isFiniteNum(e.arc.a1) && isBoolInt(e.arc.cw)
+        ? { c: e.arc.c, r: e.arc.r, a0: e.arc.a0, a1: e.arc.a1, cw: e.arc.cw }
+        : null;
+    case 'text':
+      return isObject(e.text) && isVec2(e.text.pos) && isFiniteNum(e.text.h)
+        && isFiniteNum(e.text.rot) && typeof e.text.value === 'string'
+        ? { pos: e.text.pos, h: e.text.h, rot: e.text.rot, value: e.text.value }
+        : null;
+    default:
+      return null;
+  }
 }
 
 // CADGF layer ids are integers. Accept a non-negative integer or its canonical
@@ -125,7 +173,7 @@ function deriveLayer(layer) {
   const out = {
     id: toCadgfLayerId(layer.id),
     name: String(layer.name ?? ''),
-    color: resolveColor(layer.color),
+    color: coerceColor(layer.color) ?? 16777215,
     visible: toBoolInt(layer.visible, true),
     locked: toBoolInt(layer.locked, false),
     printable: toBoolInt(layer.printable, true),
@@ -264,13 +312,46 @@ export function deriveCadgfDocument(project, options = {}) {
   const entities = [];
   for (const e of modeled) {
     const { id, kind, layerId, name, cadgfId, ...rest } = e;
-    entities.push({
-      ...rest,
+
+    // Geometry is validated + reconstructed (schema keys only); malformed or
+    // missing geometry is skipped rather than emitted as a schema-invalid doc.
+    const geometry = buildGeometry(kind, e);
+    if (geometry === null) {
+      diagnostics.push({ level: 'warn', code: 'INVALID_ENTITY_GEOMETRY', message: `entity ${JSON.stringify(id)} (${kind}) has missing or malformed geometry; skipped` });
+      continue;
+    }
+
+    const out = {
       id: idFor.get(e),
       type: KIND_TO_TYPE[kind],
       layer_id: resolveEntityLayerId(layerId, id, diagnostics),
       name: typeof name === 'string' ? name : '',
-    });
+      [kind]: geometry,
+    };
+
+    // Known typed style fields: coerce/drop so the emitted entity stays valid.
+    if (rest.color !== undefined) {
+      const c = coerceColor(rest.color);
+      if (c !== null) out.color = c;
+      else diagnostics.push({ level: 'warn', code: 'ENTITY_FIELD_DROPPED', message: `entity ${JSON.stringify(id)} color ${JSON.stringify(rest.color)} is not a valid color; dropped` });
+    }
+    if (isFiniteNum(rest.line_weight)) out.line_weight = rest.line_weight;
+    if (Number.isInteger(rest.color_aci) && rest.color_aci >= 0 && rest.color_aci <= 255) out.color_aci = rest.color_aci;
+    if (typeof rest.line_type === 'string') out.line_type = rest.line_type;
+
+    // Pass through remaining keys. Foreign geometry fields are dropped (a line
+    // must not carry a circle); schema-known typed fields handled above are
+    // skipped; truly-unknown keys are allowed by the schema (additionalProperties).
+    for (const [k, v] of Object.entries(rest)) {
+      if (k === kind) continue; // this kind's geometry already emitted
+      if (GEOMETRY_FIELDS.includes(k)) {
+        diagnostics.push({ level: 'warn', code: 'FOREIGN_GEOMETRY_DROPPED', message: `entity ${JSON.stringify(id)} (${kind}) carried a ${k} field; dropped` });
+        continue;
+      }
+      if (k === 'color' || k === 'line_weight' || k === 'color_aci' || k === 'line_type') continue;
+      out[k] = v;
+    }
+    entities.push(out);
   }
   for (const e of passthrough) {
     entities.push({ ...e, id: idFor.get(e) });

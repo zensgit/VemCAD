@@ -123,3 +123,41 @@ test('an entity with an invalid layerId is defaulted to 0 with a diagnostic (rec
   assert.equal(res.value.entities[0].layer_id, 0);
   assert.ok(res.diagnostics.some((d) => d.code === 'ENTITY_LAYER_ID_DEFAULTED'));
 });
+
+test('malformed modeled geometry is skipped with a diagnostic, never emitted (P1)', () => {
+  const p = proj({
+    entities: [
+      { id: 'e1', kind: 'line', layerId: 0, line: 'not-a-line' }, // malformed
+      { id: 'e2', kind: 'circle', layerId: 0, circle: { c: [0, 0], r: 5 } }, // valid
+    ],
+  });
+  const res = deriveCadgfDocument(p);
+  assert.equal(res.ok, true);
+  assert.equal(res.value.entities.length, 1);
+  assert.equal(res.value.entities[0].type, 4);
+  assert.ok(res.diagnostics.some((d) => d.code === 'INVALID_ENTITY_GEOMETRY'));
+});
+
+test('object geometry is reconstructed to schema keys only (additionalProperties:false)', () => {
+  const p = proj({ entities: [{ id: 'e1', kind: 'circle', layerId: 0, circle: { c: [0, 0], r: 5, extra: 'nope' } }] });
+  const circle = deriveCadgfDocument(p).value.entities[0].circle;
+  assert.deepEqual(Object.keys(circle).sort(), ['c', 'r']);
+});
+
+test('entity color: invalid dropped with diagnostic, hex coerced to integer', () => {
+  const bad = proj({ entities: [{ id: 'e1', kind: 'line', layerId: 0, line: [[0, 0], [1, 1]], color: 'red' }] });
+  const resBad = deriveCadgfDocument(bad);
+  assert.equal('color' in resBad.value.entities[0], false);
+  assert.ok(resBad.diagnostics.some((d) => d.code === 'ENTITY_FIELD_DROPPED'));
+
+  const good = proj({ entities: [{ id: 'e1', kind: 'line', layerId: 0, line: [[0, 0], [1, 1]], color: '#ff0000' }] });
+  assert.equal(deriveCadgfDocument(good).value.entities[0].color, 0xff0000);
+});
+
+test('a foreign geometry field on a modeled entity is dropped with a diagnostic', () => {
+  const p = proj({ entities: [{ id: 'e1', kind: 'line', layerId: 0, line: [[0, 0], [1, 1]], circle: { c: [0, 0], r: 1 } }] });
+  const res = deriveCadgfDocument(p);
+  assert.equal('circle' in res.value.entities[0], false);
+  assert.ok(res.value.entities[0].line, 'kept its own line geometry');
+  assert.ok(res.diagnostics.some((d) => d.code === 'FOREIGN_GEOMETRY_DROPPED'));
+});
