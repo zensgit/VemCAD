@@ -181,12 +181,13 @@ node --test apps/runtime/tests/*.test.js apps/web/tests/*.test.js
 
 - [ ] 核实现有 Web 是否已有 `DocumentState → CADGF 数字快照` 导出方向（决定 S7 工作量；见 §6）。
 
-### S1 — `project` 模块（地基）
+### S1 — `project` 模块（地基）✅ 2026-05-25
 
-- [ ] `createProjectModel` / `parseProjectModel` / `normalizeProjectModel` / `serializeProjectModel` / `migrateProjectModel`
-- [ ] 确定性：normalize/serialize 不碰 `createdAt/modifiedAt`；`layers/entities/constraints/features/passthrough.entities` 全部按 id 稳定序列化
-- [ ] 未知未来版本拒绝；v1 migration no-op
-- **完成判据**：`project_schema_roundtrip.test.js`、`project_deterministic_save.test.js` 通过
+- [x] `createProjectModel` / `parseProjectModel` / `normalizeProjectModel` / `serializeProjectModel` / `migrateProjectModel`（`apps/runtime/project/index.js`）
+- [x] 确定性：normalize/serialize 不碰 `createdAt/modifiedAt`；`layers/entities/constraints/features/passthrough.entities` 全部按 id 稳定序列化
+- [x] 未知未来版本拒绝；v1 migration no-op
+- [x] 结构校验（写边界）：错类型集合/对象 → `INVALID_PROJECT_FORMAT`（拒绝静默丢弃，P1）；Project-owned 集合要求 id 存在且唯一（消除重复/缺失 id 的排序歧义，P2）。缺失字段仍按默认补全；`parse` 保持 envelope-only，结构校验落在 `normalize`/`serialize`
+- **完成判据**：`project_schema_roundtrip.test.js`、`project_deterministic_save.test.js` 通过（21 runtime 用例全绿，与既有 web 测试合跑 38/38）
 
 ### S2 — `constraint` / `feature` 桩
 
