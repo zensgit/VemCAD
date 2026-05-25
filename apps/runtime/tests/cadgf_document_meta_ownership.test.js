@@ -95,3 +95,10 @@ test('non-string passthrough metadata is coerced to string so the doc stays sche
   assert.equal(res.value.metadata.meta.ok, 'yes');
   assert.ok(res.diagnostics.some((d) => d.code === 'METADATA_VALUE_COERCED'));
 });
+
+test('schema_migrated_at must be a string; a non-string is dropped with a diagnostic (P2b)', () => {
+  const p = newProject(passthrough({ schema_version: TARGET_SCHEMA_VERSION, schema_migrated_at: 123 }));
+  const res = deriveCadgfDocument(p, { clock: CLOCK });
+  assert.equal('schema_migrated_at' in res.value, false);
+  assert.ok(res.diagnostics.some((d) => d.code === 'SCHEMA_MIGRATED_AT_DROPPED'));
+});

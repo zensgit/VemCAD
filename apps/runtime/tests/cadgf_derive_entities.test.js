@@ -161,3 +161,70 @@ test('a foreign geometry field on a modeled entity is dropped with a diagnostic'
   assert.ok(res.value.entities[0].line, 'kept its own line geometry');
   assert.ok(res.diagnostics.some((d) => d.code === 'FOREIGN_GEOMETRY_DROPPED'));
 });
+
+test('a known typed entity field with the wrong type is dropped, not emitted (P1a)', () => {
+  const p = proj({
+    entities: [{
+      id: 'e1', kind: 'line', layerId: 0, line: [[0, 0], [1, 1]],
+      line_type_scale: 'bad', text_halign: 1.5, attribute_invisible: 'yes',
+    }],
+  });
+  const res = deriveCadgfDocument(p);
+  const e = res.value.entities[0];
+  assert.equal('line_type_scale' in e, false); // schema wants number
+  assert.equal('text_halign' in e, false); // schema wants integer
+  assert.equal('attribute_invisible' in e, false); // schema wants boolean
+  assert.ok(res.diagnostics.some((d) => d.code === 'ENTITY_FIELD_DROPPED'));
+});
+
+test('valid known typed fields and truly-unknown fields are both kept', () => {
+  const p = proj({
+    entities: [{
+      id: 'e1', kind: 'line', layerId: 0, line: [[0, 0], [1, 1]],
+      line_type_scale: 2.5, line_type: 'DASHED', myCustom: { anything: true },
+    }],
+  });
+  const e = deriveCadgfDocument(p).value.entities[0];
+  assert.equal(e.line_type_scale, 2.5);
+  assert.equal(e.line_type, 'DASHED');
+  assert.deepEqual(e.myCustom, { anything: true }); // unknown -> passthrough (additionalProperties:true)
+});
+
+test('passthrough entity optional fields are cleansed too (P1b)', () => {
+  const p = proj({
+    entities: [{ id: 'e1', kind: 'line', layerId: 0, cadgfId: 1, line: [[0, 0], [1, 1]] }],
+    resources: {
+      cadgfPassthrough: {
+        document: {},
+        entities: [{ id: 9, type: 5, layer_id: 0, name: '', ellipse: { c: [0, 0], rx: 2, ry: 1, rot: 0, a0: 0, a1: 6 }, line_weight: 'bad' }],
+      },
+    },
+  });
+  const res = deriveCadgfDocument(p);
+  const pe = res.value.entities.find((e) => e.id === 9);
+  assert.ok(pe.ellipse, 'valid passthrough geometry kept');
+  assert.equal('line_weight' in pe, false, 'bad passthrough scalar dropped');
+  assert.ok(res.diagnostics.some((d) => d.code === 'PASSTHROUGH_FIELD_DROPPED'));
+});
+
+test('passthrough entity with malformed geometry drops the field but keeps the entity', () => {
+  const p = proj({
+    entities: [{ id: 'e1', kind: 'line', layerId: 0, cadgfId: 1, line: [[0, 0], [1, 1]] }],
+    resources: {
+      cadgfPassthrough: { document: {}, entities: [{ id: 9, type: 5, layer_id: 0, name: 'kept', ellipse: 'not-an-ellipse' }] },
+    },
+  });
+  const res = deriveCadgfDocument(p);
+  const pe = res.value.entities.find((e) => e.id === 9);
+  assert.ok(pe, 'entity kept despite bad optional geometry');
+  assert.equal('ellipse' in pe, false);
+  assert.equal(pe.name, 'kept');
+  assert.ok(res.diagnostics.some((d) => d.code === 'PASSTHROUGH_FIELD_DROPPED'));
+});
+
+test('layer line_weight rejects NaN/Infinity (P2a)', () => {
+  const p = proj({ layers: [{ id: 0, name: '0', line_weight: NaN }, { id: 1, name: 'L', line_weight: 0.5 }] });
+  const layers = deriveCadgfDocument(p).value.layers;
+  assert.equal('line_weight' in layers.find((l) => l.id === 0), false);
+  assert.equal(layers.find((l) => l.id === 1).line_weight, 0.5);
+});

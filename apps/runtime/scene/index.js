@@ -96,36 +96,96 @@ function isBoolInt(v) {
   return v === true || v === false || v === 0 || v === 1;
 }
 
-// Validate a modeled kind's geometry against the CADGF schema shape and return
-// a clean value containing ONLY schema-defined keys (object geometries are
-// additionalProperties:false), or null when missing/malformed. Reconstructing
-// rather than passing through prevents stray keys / wrong types from producing
-// a schema-invalid document.
-function buildGeometry(kind, e) {
-  switch (kind) {
+// Validate a geometry value against its CADGF schema shape and return a clean
+// value containing ONLY schema-defined keys (object geometries are
+// additionalProperties:false), or null when malformed. Covers every geometry
+// kind so it serves both modeled entities and passthrough.
+function buildGeometry(geomKind, value) {
+  switch (geomKind) {
     case 'point':
-      return isVec2(e.point) ? e.point : null;
+      return isVec2(value) ? value : null;
     case 'line':
-      return Array.isArray(e.line) && e.line.length === 2 && e.line.every(isVec2) ? e.line : null;
+      return Array.isArray(value) && value.length === 2 && value.every(isVec2) ? value : null;
     case 'polyline':
-      return Array.isArray(e.polyline) && e.polyline.every(isVec2) ? e.polyline : null;
+      return Array.isArray(value) && value.every(isVec2) ? value : null;
     case 'circle':
-      return isObject(e.circle) && isVec2(e.circle.c) && isFiniteNum(e.circle.r)
-        ? { c: e.circle.c, r: e.circle.r }
+      return isObject(value) && isVec2(value.c) && isFiniteNum(value.r)
+        ? { c: value.c, r: value.r }
         : null;
     case 'arc':
-      return isObject(e.arc) && isVec2(e.arc.c) && isFiniteNum(e.arc.r)
-        && isFiniteNum(e.arc.a0) && isFiniteNum(e.arc.a1) && isBoolInt(e.arc.cw)
-        ? { c: e.arc.c, r: e.arc.r, a0: e.arc.a0, a1: e.arc.a1, cw: e.arc.cw }
+      return isObject(value) && isVec2(value.c) && isFiniteNum(value.r)
+        && isFiniteNum(value.a0) && isFiniteNum(value.a1) && isBoolInt(value.cw)
+        ? { c: value.c, r: value.r, a0: value.a0, a1: value.a1, cw: value.cw }
+        : null;
+    case 'ellipse':
+      return isObject(value) && isVec2(value.c) && isFiniteNum(value.rx) && isFiniteNum(value.ry)
+        && isFiniteNum(value.rot) && isFiniteNum(value.a0) && isFiniteNum(value.a1)
+        ? { c: value.c, rx: value.rx, ry: value.ry, rot: value.rot, a0: value.a0, a1: value.a1 }
+        : null;
+    case 'spline':
+      return isObject(value) && Number.isInteger(value.degree)
+        && Array.isArray(value.control) && value.control.every(isVec2)
+        && Array.isArray(value.knots) && value.knots.every(isFiniteNum)
+        ? { degree: value.degree, control: value.control, knots: value.knots }
         : null;
     case 'text':
-      return isObject(e.text) && isVec2(e.text.pos) && isFiniteNum(e.text.h)
-        && isFiniteNum(e.text.rot) && typeof e.text.value === 'string'
-        ? { pos: e.text.pos, h: e.text.h, rot: e.text.rot, value: e.text.value }
+      return isObject(value) && isVec2(value.pos) && isFiniteNum(value.h)
+        && isFiniteNum(value.rot) && typeof value.value === 'string'
+        ? { pos: value.pos, h: value.h, rot: value.rot, value: value.value }
         : null;
     default:
       return null;
   }
+}
+
+// Schema-known NON-geometry entity field types (from document.schema.json's
+// entity properties). Every known field is validated/cleansed so derive never
+// emits a schema-invalid value; truly-unknown fields pass through unchanged
+// (the entity schema is additionalProperties:true). If the schema gains a typed
+// field this table doesn't cover, the worst case is derive emits no value for
+// it, and the independent schema validation step (S6) flags the drift.
+const SCALAR_FIELD_SPECS = {
+  line_type: 'string', color_source: 'string', text_kind: 'string',
+  attribute_tag: 'string', attribute_default: 'string', attribute_prompt: 'string',
+  dim_style: 'string', source_anchor_driver_type: 'string', source_anchor_driver_kind: 'string',
+  line_weight: 'number', line_type_scale: 'number', text_width: 'number',
+  text_width_factor: 'number', dim_text_rotation: 'number',
+  attribute_flags: 'int', text_attachment: 'int', text_halign: 'int', text_valign: 'int',
+  dim_type: 'int', source_bundle_id: 'int', source_anchor_driver_id: 'int',
+  color_aci: 'int:0:255',
+  attribute_invisible: 'boolean', attribute_constant: 'boolean', attribute_verify: 'boolean',
+  attribute_preset: 'boolean', attribute_lock_position: 'boolean',
+  dim_text_pos: 'vec2', source_anchor: 'vec2', leader_landing: 'vec2', leader_elbow: 'vec2',
+  color: 'color',
+};
+
+function scalarOk(spec, value) {
+  switch (spec) {
+    case 'string': return typeof value === 'string';
+    case 'number': return isFiniteNum(value);
+    case 'int': return Number.isInteger(value);
+    case 'int:0:255': return Number.isInteger(value) && value >= 0 && value <= 255;
+    case 'boolean': return typeof value === 'boolean';
+    case 'vec2': return isVec2(value);
+    default: return false;
+  }
+}
+
+// Cleanse one entity field: geometry is validated + reconstructed; color is
+// coerced (hex -> int); other typed fields are validated and dropped if the
+// wrong type; truly-unknown fields pass through. Returns { keep, value }.
+function sanitizeKnownField(name, value) {
+  if (GEOMETRY_FIELDS.includes(name)) {
+    const geometry = buildGeometry(name, value);
+    return geometry === null ? { keep: false } : { keep: true, value: geometry };
+  }
+  const spec = SCALAR_FIELD_SPECS[name];
+  if (!spec) return { keep: true, value };
+  if (spec === 'color') {
+    const c = coerceColor(value);
+    return c === null ? { keep: false } : { keep: true, value: c };
+  }
+  return scalarOk(spec, value) ? { keep: true, value } : { keep: false };
 }
 
 // CADGF layer ids are integers. Accept a non-negative integer or its canonical
@@ -181,7 +241,7 @@ function deriveLayer(layer) {
     construction: toBoolInt(layer.construction, false),
   };
   if (layer.line_type !== undefined) out.line_type = String(layer.line_type);
-  if (typeof layer.line_weight === 'number') out.line_weight = layer.line_weight;
+  if (isFiniteNum(layer.line_weight)) out.line_weight = layer.line_weight;
   return out;
 }
 
@@ -265,10 +325,15 @@ export function deriveCadgfDocument(project, options = {}) {
   // A fresh project carries an empty passthrough document ({}); only a real
   // imported source carries a schema_version, so gate on that (not truthiness)
   // to keep new projects from emitting a fake migration timestamp.
-  let schemaMigratedAt; // undefined → omit
+  let schemaMigratedAt; // string → emit, otherwise omit
   if (passDoc && passDoc.schema_version !== undefined) {
     if (passDoc.schema_version === targetSchemaVersion) {
-      schemaMigratedAt = passDoc.schema_migrated_at; // preserve (may be undefined)
+      const preserved = passDoc.schema_migrated_at;
+      if (typeof preserved === 'string') {
+        schemaMigratedAt = preserved;
+      } else if (preserved !== undefined) {
+        diagnostics.push({ level: 'warn', code: 'SCHEMA_MIGRATED_AT_DROPPED', message: `schema_migrated_at was ${typeof preserved}; dropped (must be a string)` });
+      }
     } else {
       diagnostics.push({
         level: 'warn',
@@ -313,9 +378,9 @@ export function deriveCadgfDocument(project, options = {}) {
   for (const e of modeled) {
     const { id, kind, layerId, name, cadgfId, ...rest } = e;
 
-    // Geometry is validated + reconstructed (schema keys only); malformed or
-    // missing geometry is skipped rather than emitted as a schema-invalid doc.
-    const geometry = buildGeometry(kind, e);
+    // A modeled entity must carry valid geometry for its kind; reconstruct it
+    // (schema keys only) and skip the entity if missing/malformed.
+    const geometry = buildGeometry(kind, e[kind]);
     if (geometry === null) {
       diagnostics.push({ level: 'warn', code: 'INVALID_ENTITY_GEOMETRY', message: `entity ${JSON.stringify(id)} (${kind}) has missing or malformed geometry; skipped` });
       continue;
@@ -328,33 +393,29 @@ export function deriveCadgfDocument(project, options = {}) {
       name: typeof name === 'string' ? name : '',
       [kind]: geometry,
     };
-
-    // Known typed style fields: coerce/drop so the emitted entity stays valid.
-    if (rest.color !== undefined) {
-      const c = coerceColor(rest.color);
-      if (c !== null) out.color = c;
-      else diagnostics.push({ level: 'warn', code: 'ENTITY_FIELD_DROPPED', message: `entity ${JSON.stringify(id)} color ${JSON.stringify(rest.color)} is not a valid color; dropped` });
-    }
-    if (isFiniteNum(rest.line_weight)) out.line_weight = rest.line_weight;
-    if (Number.isInteger(rest.color_aci) && rest.color_aci >= 0 && rest.color_aci <= 255) out.color_aci = rest.color_aci;
-    if (typeof rest.line_type === 'string') out.line_type = rest.line_type;
-
-    // Pass through remaining keys. Foreign geometry fields are dropped (a line
-    // must not carry a circle); schema-known typed fields handled above are
-    // skipped; truly-unknown keys are allowed by the schema (additionalProperties).
     for (const [k, v] of Object.entries(rest)) {
       if (k === kind) continue; // this kind's geometry already emitted
       if (GEOMETRY_FIELDS.includes(k)) {
         diagnostics.push({ level: 'warn', code: 'FOREIGN_GEOMETRY_DROPPED', message: `entity ${JSON.stringify(id)} (${kind}) carried a ${k} field; dropped` });
         continue;
       }
-      if (k === 'color' || k === 'line_weight' || k === 'color_aci' || k === 'line_type') continue;
-      out[k] = v;
+      const cleansed = sanitizeKnownField(k, v);
+      if (cleansed.keep) out[k] = cleansed.value;
+      else diagnostics.push({ level: 'warn', code: 'ENTITY_FIELD_DROPPED', message: `entity ${JSON.stringify(id)} field ${JSON.stringify(k)} failed its CADGF type; dropped` });
     }
     entities.push(out);
   }
   for (const e of passthrough) {
-    entities.push({ ...e, id: idFor.get(e) });
+    // Envelope was validated (id/type/layer_id/name). Cleanse every other field
+    // (geometry included) so a malformed optional field can't invalidate the doc.
+    const out = { id: idFor.get(e), type: e.type, layer_id: e.layer_id, name: e.name };
+    for (const [k, v] of Object.entries(e)) {
+      if (k === 'id' || k === 'type' || k === 'layer_id' || k === 'name') continue;
+      const cleansed = sanitizeKnownField(k, v);
+      if (cleansed.keep) out[k] = cleansed.value;
+      else diagnostics.push({ level: 'warn', code: 'PASSTHROUGH_FIELD_DROPPED', message: `passthrough entity ${JSON.stringify(e.id)} field ${JSON.stringify(k)} failed its CADGF type; dropped` });
+    }
+    entities.push(out);
   }
   entities.sort((a, b) => a.id - b.id);
 
@@ -369,7 +430,7 @@ export function deriveCadgfDocument(project, options = {}) {
     layers,
     entities,
   };
-  if (schemaMigratedAt !== undefined) doc.schema_migrated_at = schemaMigratedAt;
+  if (typeof schemaMigratedAt === 'string') doc.schema_migrated_at = schemaMigratedAt;
 
   return ok(doc, diagnostics);
 }
