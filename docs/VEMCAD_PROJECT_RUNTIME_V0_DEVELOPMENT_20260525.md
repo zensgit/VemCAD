@@ -196,10 +196,11 @@ node --test apps/runtime/tests/*.test.js apps/web/tests/*.test.js
 - [x] 抽出 `apps/runtime/shared/ordering.js`：单一权威排序/去重规则（`compareIds` 相等性 ⟺ 去重键），constraint/feature/project 三者共用，消除重复（P2 教训落到架构层）
 - **完成判据**：原计划无独立测试（由 S3 间接覆盖），实际加了 `runtime_constraint_feature.test.js` 烟雾测试（7 用例）；project 并入共享工具后全套 45/45 无回归
 
-### S3 — 黄金序列化（起手3）
+### S3 — 黄金序列化（起手3）✅ 2026-05-25
 
-- [ ] 提交固定输入的黄金 Project 文件（含 `constraints/features`，依赖 S2）
-- **完成判据**：`project_golden_serialization.test.js` 通过
+- [x] 提交固定输入的黄金 Project 文件 `apps/runtime/tests/fixtures/project_golden_v1.json`（覆盖 layers/entities/constraints/features/passthrough/meta）
+- [x] `project_golden_serialization.test.js`（3 用例）：黄金字节相等；黄金自身 parse→serialize 往返一致；乱序等价输入仍产出同一黄金。带 `UPDATE_GOLDEN=1` 逃生舱用于有意改格式后再生成
+- **完成判据**：`project_golden_serialization.test.js` 通过（全套 49/49）
 
 ### S4 — `scene.deriveCadgfDocument`（起手1）
 
