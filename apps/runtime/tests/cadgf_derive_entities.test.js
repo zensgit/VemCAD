@@ -108,3 +108,18 @@ test('layers gain CADGF-required fields with defaults; hex color is parsed to an
   assert.equal(red.frozen, 0);
   assert.equal(red.construction, 0);
 });
+
+test('a non-integer layer id fails derive instead of collapsing to 0 (P1)', () => {
+  const p = proj({ layers: [{ id: 0, name: '0' }, { id: 'abc', name: 'bad' }] });
+  const res = deriveCadgfDocument(p);
+  assert.equal(res.ok, false);
+  assert.equal(res.error_code, 'INVALID_LAYER_ID');
+});
+
+test('an entity with an invalid layerId is defaulted to 0 with a diagnostic (recoverable)', () => {
+  const p = proj({ entities: [{ id: 'e1', kind: 'line', layerId: 'nope', line: [[0, 0], [1, 1]] }] });
+  const res = deriveCadgfDocument(p);
+  assert.equal(res.ok, true);
+  assert.equal(res.value.entities[0].layer_id, 0);
+  assert.ok(res.diagnostics.some((d) => d.code === 'ENTITY_LAYER_ID_DEFAULTED'));
+});

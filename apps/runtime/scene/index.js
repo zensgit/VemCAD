@@ -21,6 +21,7 @@ import { normalizeProjectModel } from '../project/index.js';
 import { compareIds } from '../shared/ordering.js';
 
 export const ERROR_UNSUPPORTED_UNIT = 'UNSUPPORTED_PROJECT_UNIT';
+export const ERROR_INVALID_LAYER_ID = 'INVALID_LAYER_ID';
 
 // Deriver-owned defaults. cadgf_version/schema_version describe what the deriver
 // PRODUCES (the target), never echoed from an imported source.
@@ -79,13 +80,50 @@ function resolveColor(color, fallback = 16777215) {
   return fallback;
 }
 
-function deriveLayer(layer, diagnostics) {
-  const id = Number(layer.id);
-  if (!Number.isInteger(id)) {
-    diagnostics.push({ level: 'warn', code: 'LAYER_ID_COERCED', message: `layer id ${JSON.stringify(layer.id)} is not an integer` });
+// CADGF layer ids are integers. Accept a non-negative integer or its canonical
+// decimal string ("0","5"); reject "abc","05","-1","5.0" (returns null). Used to
+// fail derive loudly rather than silently collapse a bad id to 0 (which could
+// duplicate the default layer).
+function toCadgfLayerId(id) {
+  if (typeof id === 'number' && Number.isInteger(id) && id >= 0) return id;
+  if (typeof id === 'string' && /^(0|[1-9]\d*)$/.test(id)) return Number(id);
+  return null;
+}
+
+function resolveEntityLayerId(layerId, entityId, diagnostics) {
+  const id = toCadgfLayerId(layerId);
+  if (id !== null) return id;
+  diagnostics.push({ level: 'warn', code: 'ENTITY_LAYER_ID_DEFAULTED', message: `entity ${JSON.stringify(entityId)} layerId ${JSON.stringify(layerId)} is not a valid layer id; defaulted to 0` });
+  return 0;
+}
+
+// CADGF metadata scalars must be strings. Coerce non-strings (reporting it) so
+// the derived document validates even when passthrough carried a bad type.
+function asMetaString(value, field, diagnostics) {
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'string') return value;
+  diagnostics.push({ level: 'warn', code: 'METADATA_VALUE_COERCED', message: `metadata.${field} was ${typeof value}; coerced to string` });
+  return String(value);
+}
+
+// CADGF metadata.meta is a string->string map. Coerce non-string values.
+function sanitizeMeta(meta, diagnostics) {
+  if (!isObject(meta)) return {};
+  const out = {};
+  for (const [key, value] of Object.entries(meta)) {
+    if (typeof value === 'string') {
+      out[key] = value;
+    } else {
+      diagnostics.push({ level: 'warn', code: 'METADATA_VALUE_COERCED', message: `metadata.meta.${JSON.stringify(key)} was ${typeof value}; coerced to string` });
+      out[key] = String(value);
+    }
   }
+  return out;
+}
+
+function deriveLayer(layer) {
   const out = {
-    id: Number.isInteger(id) ? id : 0,
+    id: toCadgfLayerId(layer.id),
     name: String(layer.name ?? ''),
     color: resolveColor(layer.color),
     visible: toBoolInt(layer.visible, true),
@@ -156,15 +194,17 @@ export function deriveCadgfDocument(project, options = {}) {
   const passMeta = isObject(passDoc?.metadata) ? passDoc.metadata : {};
 
   // ---- metadata (project-owned label/unit_name; passthrough-owned rest) ----
+  // Timestamps: passthrough -> project -> injected clock -> '' (never Date.now()).
+  // Scalars are string-coerced and meta sanitized so the derived doc validates.
   const metadata = {
-    label: p.project.name ?? '',
-    author: passMeta.author ?? '',
-    company: passMeta.company ?? '',
-    comment: passMeta.comment ?? '',
-    created_at: passMeta.created_at ?? p.project.createdAt ?? '',
-    modified_at: passMeta.modified_at ?? p.project.modifiedAt ?? '',
+    label: asMetaString(p.project.name, 'label', diagnostics),
+    author: asMetaString(passMeta.author, 'author', diagnostics),
+    company: asMetaString(passMeta.company, 'company', diagnostics),
+    comment: asMetaString(passMeta.comment, 'comment', diagnostics),
+    created_at: asMetaString(passMeta.created_at ?? p.project.createdAt ?? clock?.now?.(), 'created_at', diagnostics),
+    modified_at: asMetaString(passMeta.modified_at ?? p.project.modifiedAt ?? clock?.now?.(), 'modified_at', diagnostics),
     unit_name: units.unit_name,
-    meta: isObject(passMeta.meta) ? passMeta.meta : {},
+    meta: sanitizeMeta(passMeta.meta, diagnostics),
   };
 
   // ---- feature_flags (passthrough-owned; safe default for a fresh project) ----
@@ -191,8 +231,13 @@ export function deriveCadgfDocument(project, options = {}) {
     }
   }
 
-  // ---- layers ----
-  const layers = p.layers.map((layer) => deriveLayer(layer, diagnostics)).sort((a, b) => a.id - b.id);
+  // ---- layers (CADGF layer id must be a non-negative integer; fail loudly) ----
+  for (const layer of p.layers) {
+    if (toCadgfLayerId(layer.id) === null) {
+      return fail(ERROR_INVALID_LAYER_ID, `layer id ${JSON.stringify(layer.id)} is not a non-negative integer; cannot derive a CADGF layer id`);
+    }
+  }
+  const layers = p.layers.map((layer) => deriveLayer(layer)).sort((a, b) => a.id - b.id);
 
   // ---- entities: modeled (translated) + passthrough (validated, verbatim) ----
   const modeled = [];
@@ -223,7 +268,7 @@ export function deriveCadgfDocument(project, options = {}) {
       ...rest,
       id: idFor.get(e),
       type: KIND_TO_TYPE[kind],
-      layer_id: Number.isInteger(Number(layerId)) ? Number(layerId) : 0,
+      layer_id: resolveEntityLayerId(layerId, id, diagnostics),
       name: typeof name === 'string' ? name : '',
     });
   }

@@ -77,3 +77,21 @@ test('derive is deterministic for the same project + options', () => {
   const b = deriveCadgfDocument(p, { clock: CLOCK }).value;
   assert.equal(JSON.stringify(a), JSON.stringify(b));
 });
+
+test('missing project timestamps fall back to the injected clock, not empty string (P2a)', () => {
+  const raw = { header: { format: 'VEMCAD-PROJECT', version: 1 }, project: { id: 'x', name: 'N', units: 'mm' } };
+  const res = deriveCadgfDocument(raw, { clock: CLOCK });
+  assert.equal(res.ok, true);
+  assert.equal(res.value.metadata.created_at, '2026-09-09T09:09:09.000Z');
+  assert.equal(res.value.metadata.modified_at, '2026-09-09T09:09:09.000Z');
+});
+
+test('non-string passthrough metadata is coerced to string so the doc stays schema-valid (P2b)', () => {
+  const p = newProject(passthrough({ metadata: { author: 42, meta: { bad: 7, ok: 'yes' } } }));
+  const res = deriveCadgfDocument(p, { clock: CLOCK });
+  assert.equal(res.ok, true);
+  assert.equal(res.value.metadata.author, '42');
+  assert.equal(res.value.metadata.meta.bad, '7');
+  assert.equal(res.value.metadata.meta.ok, 'yes');
+  assert.ok(res.diagnostics.some((d) => d.code === 'METADATA_VALUE_COERCED'));
+});
