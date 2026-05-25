@@ -202,14 +202,15 @@ node --test apps/runtime/tests/*.test.js apps/web/tests/*.test.js
 - [x] `project_golden_serialization.test.js`（3 用例）：黄金字节相等；黄金自身 parse→serialize 往返一致；乱序等价输入仍产出同一黄金。带 `UPDATE_GOLDEN=1` 逃生舱用于有意改格式后再生成
 - **完成判据**：`project_golden_serialization.test.js` 通过（全套 49/49）
 
-### S4 — `scene.deriveCadgfDocument`（起手1）
+### S4 — `scene.deriveCadgfDocument`（起手1）✅ 2026-05-25
 
-- [ ] 唯一实体映射表（kind ↔ numeric type）：`point/line/polyline/circle/arc/text` 跑通，其余进 passthrough
-- [ ] deriver-owned 三字段：`cadgf_version`/`schema_version` 写目标版本；`schema_migrated_at` 条件（源≠目标→注入时钟）
-- [ ] project-owned / passthrough-owned 合成；**可注入 `clock`，禁 `Date.now()`**
-- [ ] 派生单位严格枚举（`mm/cm/m/in/ft`；未知 → `ok:false`）
-- [ ] `passthrough.document` 输出按目标 schema 过滤 key
-- **完成判据**：`cadgf_document_meta_ownership.test.js`、`cadgf_units_import_export.test.js`（派生半）通过
+- [x] 唯一实体映射表（kind ↔ numeric type，`apps/runtime/scene/index.js`）：`point=1/line=2/polyline=0/arc=3/circle=4/text=7` 建模翻译，其余经 passthrough 原样 emit；几何按 CADGF 形状透传，信封字段（id→numeric、kind→type、layerId→layer_id、补 name）翻译
+- [x] deriver-owned 三字段：`cadgf_version`/`schema_version` 写目标；`schema_migrated_at` **三态**（无源→省略 / 源==目标→保留 / 源≠目标→`clock.now()`+diagnostic）
+- [x] project-owned / passthrough-owned 合成（passthrough 读**嵌套** `document.metadata.*`）；新建时间戳取 `project.*`，**可注入 `clock`，禁 `Date.now()`**
+- [x] 派生单位严格枚举（`mm/cm/m/in/ft` → unit_name+unit_scale；未知 → `ok:false UNSUPPORTED_PROJECT_UNIT`）
+- [x] passthrough.document key 过滤：derive 只读 schema-known 字段并合成，未知 root key 不吐回（留在 Project 文件）
+- [x] passthrough 实体也校验 CADGF 四必填（id/type/layer_id/name）→ 不合格 diagnostic+跳过；id 分配（cadgfId 优先、最小未用非负整数、冲突 diagnostic+重分配）；entities/layers 按 id 排序
+- **完成判据**：`cadgf_document_meta_ownership.test.js`(8) + `cadgf_units_import_export.test.js`(派生半,2) + `cadgf_derive_entities.test.js`(6) 通过（全套 65/65）
 
 ### S5 — `scene.importProjectFromCadgfDocument`（降级导入）
 
