@@ -154,11 +154,15 @@ node --test apps/runtime/tests/*.test.js apps/web/tests/*.test.js
 | `cadgf_import_loss_diagnostics.test.js` | CADGF 导入产生降级 diagnostics，constraints/features 不伪造 |
 | `runtime_web_bridge.test.js` | 在确认 Web 导出方向存在后，验证 Web CADGF snapshot → Project → CADGF snapshot 基础可视实体稳定，unsupported passthrough 不丢 |
 
-### Schema 校验（独立验收步骤）
+### Schema 校验（独立验收步骤，已实现 S6）
 
-- Node 测试或 fixture 脚本生成 CADGF fixture 到临时目录，fixture 时间戳由固定时钟产生，保证可复现。
-- 独立命令使用 CADGameFusion 现有 Python 校验模式，或新增轻量 `validate_cadgf_document.py`，校验 `deps/cadgamefusion/schemas/document.schema.json`。
-- **Python 依赖缺失只影响 schema 验收步骤，不污染纯 Node runtime 测试。**
+```bash
+bash apps/runtime/tools/run_schema_acceptance.sh
+```
+
+- `emit_cadgf_fixtures.mjs`（Node）从代表性 project 派生 CADGF 到临时目录，时间戳由固定时钟产生，保证可复现（rich / edge-malformed / round-trip 三份）。
+- `validate_cadgf_document.py` 用 `deps/cadgamefusion/schemas/document.schema.json` + Python `jsonschema` 校验。
+- **不进 `node --test`**；Python 依赖缺失只让本步失败（退出码 3 + 安装提示），不污染纯 Node runtime 测试。
 
 ## Assumptions
 
@@ -221,12 +225,12 @@ node --test apps/runtime/tests/*.test.js apps/web/tests/*.test.js
 - [x] 降级 diagnostics：`DEGRADED_IMPORT`（CADGF 不携带 constraints/features，恒 `[]` 不伪造）；`document_id` 缺失回落稳定默认 id
 - **完成判据**：`cadgf_import_loss_diagnostics.test.js`(5) + `cadgf_units_import_export.test.js`(导入半,3) + `cadgf_entity_vocab_mapping.test.js`(4) 通过（全套 91/91）。端到端验证：`derive→import→derive` 实体字节一致，再 derive 输出通过真实 `document.schema.json` 校验
 
-### S6 — schema 独立校验（起手2，依赖 S4）
+### S6 — schema 独立校验（起手2，依赖 S4）✅ 2026-05-25
 
-- [ ] `validate_cadgf_document.py`（或复用现有 Python 校验模式）
-- [ ] Node/fixture 脚本生成 CADGF fixture 到临时目录，时间戳走固定时钟
-- [ ] Python 依赖缺失只影响本步，不污染 `node --test`
-- **完成判据**：派生 CADGF Document 通过 `deps/cadgamefusion/schemas/document.schema.json` 校验
+- [x] `apps/runtime/tools/validate_cadgf_document.py`：按真实 `document.schema.json` 校验给定 JSON；缺 `jsonschema` → 退出码 3 + 明确安装提示
+- [x] `apps/runtime/tools/emit_cadgf_fixtures.mjs`：从代表性 project 派生 CADGF（rich / edge-malformed / round-trip 三份），固定时钟、写临时目录
+- [x] `apps/runtime/tools/run_schema_acceptance.sh`：node 生成 → python 校验；**不进 `node --test`**，Python 缺失只让本步失败
+- **完成判据**：三份派生文档（含全 6 实体、passthrough、被清洗的畸形 edge、derive→import→derive 往返）全部通过 `deps/cadgamefusion/schemas/document.schema.json` 校验；`node --test` 仍 95/95 纯 Node
 
 ### S7 — Web bridge（依赖 P0 结论、S4、S5）
 
