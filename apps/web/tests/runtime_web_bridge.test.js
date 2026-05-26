@@ -8,9 +8,9 @@ const CLOCK = { now: () => '2026-05-25T00:00:00.000Z' };
 function seededDocument() {
   const ds = new DocumentState();
   ds.addEntities([
-    { type: 'line', layerId: 0, a: [0, 0], b: [10, 0] },
-    { type: 'circle', layerId: 0, center: [5, 5], radius: 3 },
-    { type: 'text', layerId: 0, position: [1, 1], text: 'hi', height: 2 },
+    { type: 'line', layerId: 0, start: { x: 0, y: 0 }, end: { x: 10, y: 0 } },
+    { type: 'circle', layerId: 0, center: { x: 5, y: 5 }, radius: 3 },
+    { type: 'text', layerId: 0, position: { x: 1, y: 1 }, value: 'hi', height: 2 },
   ]);
   return ds;
 }
@@ -26,7 +26,24 @@ test('exportRuntimeProjectFromDocumentState bridges through CADGF (kinds + cadgf
   assert.ok(res.diagnostics.some((d) => d.code === 'DEGRADED_IMPORT'));
 });
 
-test('DocumentState -> Project -> DocumentState round-trips the visible entities', () => {
+test('export is deterministic across calls when a clock is injected', () => {
+  const ds = seededDocument();
+  const a = exportRuntimeProjectFromDocumentState(ds, { clock: CLOCK }).value;
+  const b = exportRuntimeProjectFromDocumentState(ds, { clock: CLOCK }).value;
+  assert.equal(JSON.stringify(a), JSON.stringify(b));
+  // neither of the adapter's wall-clock sources may leak: metadata timestamps...
+  assert.equal(a.resources.cadgfPassthrough.document.metadata.created_at, '2026-05-25T00:00:00.000Z');
+  assert.equal(a.resources.cadgfPassthrough.document.metadata.modified_at, '2026-05-25T00:00:00.000Z');
+  // ...nor the `web-${Date.now()}` default document_id (project.id is pinned).
+  assert.equal(a.project.id, 'web-export');
+});
+
+test('a caller-supplied documentId becomes the project id', () => {
+  const res = exportRuntimeProjectFromDocumentState(seededDocument(), { clock: CLOCK, documentId: 'proj-42' });
+  assert.equal(res.value.project.id, 'proj-42');
+});
+
+test('DocumentState -> Project -> DocumentState round-trips entities, layers and geometry', () => {
   const src = seededDocument();
   const exported = exportRuntimeProjectFromDocumentState(src, { clock: CLOCK });
   assert.equal(exported.ok, true);
@@ -35,10 +52,20 @@ test('DocumentState -> Project -> DocumentState round-trips the visible entities
   const imported = importRuntimeProjectToDocumentState(dst, exported.value, { clock: CLOCK });
   assert.equal(imported.ok, true);
 
+  assert.equal(dst.listEntities().length, src.listEntities().length);
+  assert.equal(dst.listLayers().length, src.listLayers().length);
   assert.deepEqual(
     dst.listEntities().map((e) => e.type).sort(),
     src.listEntities().map((e) => e.type).sort(),
   );
+
+  // geometry sample: the line endpoints survive the round-trip (not degenerate)
+  const srcLine = src.listEntities().find((e) => e.type === 'line');
+  const dstLine = dst.listEntities().find((e) => e.type === 'line');
+  assert.deepEqual(dstLine.start, srcLine.start);
+  assert.deepEqual(dstLine.end, srcLine.end);
+  assert.deepEqual(dstLine.start, { x: 0, y: 0 });
+  assert.deepEqual(dstLine.end, { x: 10, y: 0 });
 });
 
 test('the bridge rejects a non-DocumentState argument', () => {

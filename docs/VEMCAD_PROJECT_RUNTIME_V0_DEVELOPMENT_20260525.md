@@ -235,7 +235,9 @@ bash apps/runtime/tools/run_schema_acceptance.sh
 ### S7 — Web bridge（依赖 P0 结论、S4、S5）✅ 2026-05-25
 
 - [x] `apps/web/shared/runtime_bridge.js`：`exportRuntimeProjectFromDocumentState`（`exportCadgfDocument` → `importProjectFromCadgfDocument`）与 `importRuntimeProjectToDocumentState`（`deriveCadgfDocument` → `resolveEditorImportPayload`/`applyResolvedEditorImport`）。**纯组合现有 adapter，全程走 CADGF**，Runtime 不耦合编辑器内部实体形状
-- **完成判据**：`runtime_web_bridge.test.js`(4) 通过；端到端 `DocumentState → Project → DocumentState` 可视实体往返一致（line/circle/text），非法入参与 derive 失败均正确返回
+- [x] 确定性：`exportCadgfDocument` 注入 wall-clock 两处（metadata 时间戳 + `web-${Date.now()}` document_id）；注入 `clock` 时桥把两者都钉死（document_id 取 `options.documentId` 或固定默认），无 clock 则继承 wall-clock（已注明非确定）
+- [x] 单一契约：编辑器 import adapter 对坏输入会 throw → 桥 try/catch 转 `BRIDGE_LOAD_FAILED`，不破坏 `{ok,...}` 契约
+- **完成判据**：`runtime_web_bridge.test.js`(6) 通过；端到端 `DocumentState → Project → DocumentState` 往返实体数/图层数/类型/**几何**（line 端点 `[0,0]→[10,0]`）一致；注入 clock 时跨 8ms 间隔字节一致；非法入参与 derive 失败均正确返回
 
 ### 全绿验收 ✅ 2026-05-25
 
