@@ -95,6 +95,20 @@ test('validateV1ConstraintSet drops a value-type missing its value with CONSTRAI
   assert.ok(d && d.level === 'warn');
 });
 
+test('validateV1ConstraintSet drops a NON-value type carrying a value with CONSTRAINT_UNEXPECTED_VALUE (warn)', () => {
+  // horizontal takes no value; a stray value must be surfaced, not silently dropped
+  // downstream by the adapter (which emits no value for a non-value type).
+  const res = validateV1ConstraintSet([{ id: 'h', type: 'horizontal', value: 123, refs: [semref('L1', 'start'), semref('L1', 'end')] }], ENTS);
+  assert.deepEqual(res.value, []);
+  const d = res.diagnostics.find((x) => x.code === 'CONSTRAINT_UNEXPECTED_VALUE');
+  assert.ok(d && d.level === 'warn');
+  // value: null / undefined is "absent" (not "provided") — a non-value type stays valid
+  assert.deepEqual(
+    validateV1ConstraintSet([{ id: 'h2', type: 'horizontal', value: null, refs: [semref('L1', 'start'), semref('L1', 'end')] }], ENTS).value.map((c) => c.id),
+    ['h2'],
+  );
+});
+
 test('validateV1ConstraintSet drops an illegal role for the entity kind — exactly one CONSTRAINT_REF_UNRESOLVED', () => {
   // a line exposes start/end, never center
   const res = validateV1ConstraintSet([{ id: 'h', type: 'horizontal', refs: [semref('L1', 'center'), semref('L1', 'end')] }], ENTS);

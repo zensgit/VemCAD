@@ -91,6 +91,10 @@ export function validateV1ConstraintSet(constraints, entities) {
       diagnostics.push({ level: 'warn', code: 'CONSTRAINT_MISSING_VALUE', message: `constraint ${JSON.stringify(c.id)} (${c.type}) requires a numeric value; skipped` });
       continue;
     }
+    if (!spec.value && c.value !== undefined && c.value !== null) {
+      diagnostics.push({ level: 'warn', code: 'CONSTRAINT_UNEXPECTED_VALUE', message: `constraint ${JSON.stringify(c.id)} (${c.type}) takes no value but one was provided; skipped (the adapter would otherwise silently drop the value)` });
+      continue;
+    }
     let refBad = false;
     for (const ref of refs) {
       const roles = ENTITY_ROLES[kindById.get(ref?.entity)];

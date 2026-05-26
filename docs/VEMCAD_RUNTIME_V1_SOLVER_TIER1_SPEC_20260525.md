@@ -79,7 +79,9 @@
 
 ### D5 — rebuild = solve（feature 槽位）
 
-v0 `feature/index.js` 的 no-op `buildRebuildPlan` 升级为"跑 solver"：`(entities seed + constraints) → solve → evaluatedGeometry → buildEvaluatedProjectView → deriveCadgfDocument`。constraints/seed 是真相，evaluated 是 rebuild 产物（经临时 view 进 derive，不持久化）。
+rebuild 即 solve。`feature/index.js` 暴露 `rebuildProject(project)` 作为面向宿主的 rebuild 入口，对 v1 约束草图委托 solver：`(entities seed + constraints) → solve → evaluatedGeometry → buildEvaluatedProjectView → deriveCadgfDocument`。constraints/seed 是真相，evaluated 是 rebuild 产物（经临时 view 进 derive，不持久化）。
+
+**实现修正（PR #5）**：no-op `buildRebuildPlan` **不**改作"跑 solver"——它保留为（未来的）**特征执行序**计划（feature ids 稳定序、零可执行步），与约束求解是两条独立轴；rebuild=solve 由**新增**的 `rebuildProject` 承担，二者将在特征树落地时于此处汇合。约束的**语义校验**（类型/arity/value/角色合法性，§D1b）由 `constraint/index.js` 的 `V1_CONSTRAINT_VOCABULARY` / `validateV1ConstraintSet` 拥有，adapter 消费之（只保留 SemRef→VarRef 展开）。
 
 ### D6 — 确定性验收
 
