@@ -115,6 +115,17 @@ test('out-of-scope constraint types are skipped with a diagnostic, never emitted
   assert.ok(res.diagnostics.some((d) => d.code === 'CONSTRAINT_NOT_SUPPORTED'));
 });
 
+test('a non-value constraint carrying a value is dropped, never emitted sans value (no silent loss)', () => {
+  // horizontal takes no value; emitting it without the value would silently lose
+  // the user's input. §D1b rejects it up front instead.
+  const res = buildSolverProject(projectWith({
+    entities: [{ id: 'L1', kind: 'line', layerId: 0, line: [[0, 0], [10, 5]] }],
+    constraints: [{ id: 'h', type: 'horizontal', value: 123, refs: [{ entity: 'L1', at: 'start' }, { entity: 'L1', at: 'end' }] }],
+  }));
+  assert.deepEqual(res.value.cadgfProject.scene.constraints, []);
+  assert.ok(res.diagnostics.some((d) => d.code === 'CONSTRAINT_UNEXPECTED_VALUE'));
+});
+
 test('non-solvable entity kinds are excluded from the solve scene with a diagnostic', () => {
   const res = buildSolverProject(projectWith({
     entities: [
@@ -142,6 +153,19 @@ test('a constraint ref to a non-solvable entity is skipped with a diagnostic', (
     constraints: [{ id: 'c1', type: 'horizontal', refs: [{ entity: 'T1', at: 'start' }, { entity: 'T1', at: 'end' }] }],
   }));
   assert.deepEqual(res.value.cadgfProject.scene.constraints, []);
+  assert.ok(res.diagnostics.some((d) => d.code === 'CONSTRAINT_REF_UNRESOLVED'));
+});
+
+test('a legal SemRef whose entity was excluded for bad geometry is unresolved at the adapter layer', () => {
+  // L1 is a line (legal kind + start/end roles, so §D1b validation in the constraint
+  // module passes the constraint) but is malformed — missing its end point — so the
+  // adapter excludes it and mints no point. The unresolved-ref path is the adapter's.
+  const res = buildSolverProject(projectWith({
+    entities: [{ id: 'L1', kind: 'line', layerId: 0, line: [[0, 0]] }],
+    constraints: [{ id: 'h', type: 'horizontal', refs: [{ entity: 'L1', at: 'start' }, { entity: 'L1', at: 'end' }] }],
+  }));
+  assert.deepEqual(res.value.cadgfProject.scene.constraints, []);
+  assert.ok(res.diagnostics.some((d) => d.code === 'ENTITY_BAD_GEOMETRY'));
   assert.ok(res.diagnostics.some((d) => d.code === 'CONSTRAINT_REF_UNRESOLVED'));
 });
 
