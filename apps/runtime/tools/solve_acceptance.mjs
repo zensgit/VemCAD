@@ -6,6 +6,8 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { createProjectModel } from '../project/index.js';
 import { solveProject, solveAndDeriveScene } from '../solver/index.js';
 import { createCliSolveRunner } from '../solver/runner.js';
@@ -125,6 +127,34 @@ for (const c of cases) {
   }
 }
 
+// --- exit-code contract via the solve_cli.mjs subprocess (input error vs solve failure) ---
+const cliPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'solve_cli.mjs');
+const cliExit = (input) => spawnSync(process.execPath, [cliPath, '-'], {
+  input: typeof input === 'string' ? input : JSON.stringify(input),
+  env: process.env,
+  encoding: 'utf8',
+}).status;
+const badUnit = createProjectModel({ id: 'u', name: 'u', units: 'league', createdAt: FIXED, modifiedAt: FIXED }).value;
+const exitCases = [
+  { name: 'solve_cli exit 0 (solved)', input: project([line('L1', [0, 0], [10, 5])], [{ id: 'h', type: 'horizontal', refs: endpoints('L1') }]), expect: 0 },
+  {
+    name: 'solve_cli exit 1 (unsatisfied)',
+    input: project([point('P1', [0, 0]), point('P2', [3, 0])], [
+      { id: 'a', type: 'distance', value: 10, refs: [{ entity: 'P1', at: 'self' }, { entity: 'P2', at: 'self' }] },
+      { id: 'b', type: 'distance', value: 20, refs: [{ entity: 'P1', at: 'self' }, { entity: 'P2', at: 'self' }] },
+    ]),
+    expect: 1,
+  },
+  { name: 'solve_cli exit 2 (bad unit)', input: badUnit, expect: 2 },
+  { name: 'solve_cli exit 2 (invalid envelope)', input: { hello: 'world' }, expect: 2 },
+  { name: 'solve_cli exit 2 (malformed json)', input: 'not json at all', expect: 2 },
+];
+for (const ec of exitCases) {
+  const code = cliExit(ec.input);
+  if (code === ec.expect) console.log(`OK   ${ec.name}`);
+  else { console.error(`FAIL ${ec.name}: expected exit ${ec.expect}, got ${code}`); failed += 1; }
+}
+
 console.log(`output dir: ${outDir}`);
-console.log(`solver acceptance: ${cases.length - failed}/${cases.length} ok`);
+console.log(`solver acceptance: ${(cases.length + exitCases.length) - failed}/${cases.length + exitCases.length} ok`);
 process.exit(failed ? 1 : 0);
