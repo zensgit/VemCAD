@@ -1,0 +1,125 @@
+{
+  "header": {
+    "format": "VEMCAD-PROJECT",
+    "version": 1
+  },
+  "project": {
+    "id": "proj-golden-001",
+    "name": "Golden Sample",
+    "units": "mm",
+    "createdAt": "2026-01-02T03:04:05.000Z",
+    "modifiedAt": "2026-03-04T05:06:07.000Z"
+  },
+  "layers": [
+    {
+      "id": 0,
+      "name": "0"
+    },
+    {
+      "color": "#202020",
+      "id": 1,
+      "name": "Outline",
+      "visible": true
+    },
+    {
+      "color": "#ff0000",
+      "id": 2,
+      "name": "Dimensions",
+      "visible": true
+    }
+  ],
+  "entities": [
+    {
+      "a": [
+        0,
+        0
+      ],
+      "b": [
+        100,
+        0
+      ],
+      "id": "e1",
+      "kind": "line",
+      "layerId": 0
+    },
+    {
+      "center": [
+        50,
+        25
+      ],
+      "id": "e2",
+      "kind": "circle",
+      "layerId": 1,
+      "radius": 10
+    },
+    {
+      "height": 2.5,
+      "id": "e3",
+      "kind": "text",
+      "layerId": 1,
+      "text": "D20",
+      "x": 5,
+      "y": 7
+    }
+  ],
+  "constraints": [
+    {
+      "id": "c1",
+      "kind": "coincident",
+      "of": [
+        "e1",
+        "e2"
+      ]
+    },
+    {
+      "between": [
+        "e1",
+        "e2"
+      ],
+      "id": "c2",
+      "kind": "distance",
+      "value": 25
+    }
+  ],
+  "features": [
+    {
+      "id": "f1",
+      "kind": "noop",
+      "label": "first"
+    },
+    {
+      "id": "f2",
+      "kind": "noop",
+      "label": "second"
+    }
+  ],
+  "resources": {
+    "cadgfPassthrough": {
+      "document": {
+        "cadgf_version": "0.4.0",
+        "feature_flags": {
+          "clipper2": true,
+          "earcut": true
+        },
+        "schema_version": 1
+      },
+      "entities": [
+        {
+          "cadgfId": 3,
+          "note": "spline passthrough",
+          "type": 9
+        },
+        {
+          "cadgfId": 7,
+          "note": "ellipse passthrough",
+          "type": 11
+        }
+      ]
+    }
+  },
+  "meta": {
+    "alpha": "1",
+    "beta": "2",
+    "gamma": "3"
+  }
+}
