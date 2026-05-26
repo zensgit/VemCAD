@@ -230,7 +230,7 @@ bash apps/runtime/tools/run_schema_acceptance.sh
 - [x] `apps/runtime/tools/validate_cadgf_document.py`：按真实 `document.schema.json` 校验给定 JSON；缺 `jsonschema` → 退出码 3 + 明确安装提示
 - [x] `apps/runtime/tools/emit_cadgf_fixtures.mjs`：从代表性 project 派生 CADGF（rich / edge-malformed / round-trip 三份），固定时钟、写临时目录
 - [x] `apps/runtime/tools/run_schema_acceptance.sh`：node 生成 → python 校验；**不进 `node --test`**，Python 缺失只让本步失败
-- **完成判据**：三份派生文档（含全 6 实体、passthrough、被清洗的畸形 edge、derive→import→derive 往返）全部通过 `deps/cadgamefusion/schemas/document.schema.json` 校验；`node --test` 仍 95/95 纯 Node
+- **完成判据**：三份派生文档（含全 6 实体、passthrough、被清洗的畸形 edge、derive→import→derive 往返）全部通过 `deps/cadgamefusion/schemas/document.schema.json` 校验；`node --test` 仍为纯 Node 且全绿
 
 ### S7 — Web bridge（依赖 P0 结论、S4、S5）✅ 2026-05-25
 
@@ -241,7 +241,7 @@ bash apps/runtime/tools/run_schema_acceptance.sh
 
 ### 全绿验收 ✅ 2026-05-25
 
-- [x] `node --test apps/runtime/tests/*.test.js apps/web/tests/*.test.js` 全绿（99/99）
+- [x] `node --test apps/runtime/tests/*.test.js apps/web/tests/*.test.js` 全绿（85/85，基于 `origin/main` 干净基线）
 - [x] schema 独立校验步骤通过（`bash apps/runtime/tools/run_schema_acceptance.sh` → PASS）
 
 ---

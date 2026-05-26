@@ -27,10 +27,18 @@ function invalidDocumentState() {
 // or a fixed default) so the export is reproducible. WITHOUT a clock the bridge
 // inherits that wall-clock and is NOT deterministic across calls.
 export function exportRuntimeProjectFromDocumentState(documentState, options = {}) {
-  if (!documentState || typeof documentState.listEntities !== 'function') {
+  // exportCadgfDocument reads both listEntities() and listLayers(); require both.
+  if (!documentState || typeof documentState.listEntities !== 'function' || typeof documentState.listLayers !== 'function') {
     return invalidDocumentState();
   }
-  const cadgfDocument = exportCadgfDocument(documentState, { baseCadgfJson: options.baseCadgfJson ?? null });
+  let cadgfDocument;
+  try {
+    cadgfDocument = exportCadgfDocument(documentState, { baseCadgfJson: options.baseCadgfJson ?? null });
+  } catch (err) {
+    // Keep the single {ok,...} contract even if the adapter throws on a
+    // half-shaped DocumentState (symmetric to BRIDGE_LOAD_FAILED on import).
+    return { ok: false, error_code: 'BRIDGE_EXPORT_FAILED', error: err?.message ?? String(err), diagnostics: [] };
+  }
   if (options.clock && typeof options.clock.now === 'function') {
     const now = options.clock.now();
     if (cadgfDocument.metadata && typeof cadgfDocument.metadata === 'object') {

@@ -70,7 +70,16 @@ test('DocumentState -> Project -> DocumentState round-trips entities, layers and
 
 test('the bridge rejects a non-DocumentState argument', () => {
   assert.equal(exportRuntimeProjectFromDocumentState(null).error_code, 'INVALID_DOCUMENT_STATE');
+  // half-shaped: has listEntities but not listLayers (which exportCadgfDocument needs)
+  assert.equal(exportRuntimeProjectFromDocumentState({ listEntities: () => [] }).error_code, 'INVALID_DOCUMENT_STATE');
   assert.equal(importRuntimeProjectToDocumentState({}, {}).error_code, 'INVALID_DOCUMENT_STATE');
+});
+
+test('export keeps the {ok:false} contract when the adapter throws', () => {
+  const throwingState = { listEntities: () => [], listLayers: () => { throw new Error('boom'); } };
+  const res = exportRuntimeProjectFromDocumentState(throwingState, { clock: CLOCK });
+  assert.equal(res.ok, false);
+  assert.equal(res.error_code, 'BRIDGE_EXPORT_FAILED');
 });
 
 test('importRuntimeProjectToDocumentState propagates a derive failure', () => {
