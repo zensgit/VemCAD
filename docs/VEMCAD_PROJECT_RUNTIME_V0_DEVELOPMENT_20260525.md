@@ -181,9 +181,9 @@ bash apps/runtime/tools/run_schema_acceptance.sh
 
 > 规则：**完成判据 = 对应测试通过**，不是主观勾选。顺序含依赖；`(起手N)` 标注对应上节"建议起手顺序"。S1 是其余阶段的隐式地基。
 
-### P0 — 动工前预检
+### P0 — 动工前预检 ✅ 2026-05-25
 
-- [ ] 核实现有 Web 是否已有 `DocumentState → CADGF 数字快照` 导出方向（决定 S7 工作量；见 §6）。
+- [x] 核实现有 Web 导出方向：`deps/cadgamefusion/tools/web_viewer/adapters/cadgf_document_adapter.js` 已提供 `exportCadgfDocument(documentState)`（DocumentState → CADGF 数字快照）与 `importCadgfDocument`；`editor_import_adapter.js` 提供 `resolveEditorImportPayload`/`applyResolvedEditorImport` 加载路径。→ **S7 桥是薄适配**，无需新写 CADGF export adapter。
 
 ### S1 — `project` 模块（地基）✅ 2026-05-25
 
@@ -232,15 +232,15 @@ bash apps/runtime/tools/run_schema_acceptance.sh
 - [x] `apps/runtime/tools/run_schema_acceptance.sh`：node 生成 → python 校验；**不进 `node --test`**，Python 缺失只让本步失败
 - **完成判据**：三份派生文档（含全 6 实体、passthrough、被清洗的畸形 edge、derive→import→derive 往返）全部通过 `deps/cadgamefusion/schemas/document.schema.json` 校验；`node --test` 仍 95/95 纯 Node
 
-### S7 — Web bridge（依赖 P0 结论、S4、S5）
+### S7 — Web bridge（依赖 P0 结论、S4、S5）✅ 2026-05-25
 
-- [ ] `exportRuntimeProjectFromDocumentState` / `importRuntimeProjectToDocumentState` 薄桥，走 CADGF 语义
-- **完成判据**：`runtime_web_bridge.test.js` 通过
+- [x] `apps/web/shared/runtime_bridge.js`：`exportRuntimeProjectFromDocumentState`（`exportCadgfDocument` → `importProjectFromCadgfDocument`）与 `importRuntimeProjectToDocumentState`（`deriveCadgfDocument` → `resolveEditorImportPayload`/`applyResolvedEditorImport`）。**纯组合现有 adapter，全程走 CADGF**，Runtime 不耦合编辑器内部实体形状
+- **完成判据**：`runtime_web_bridge.test.js`(4) 通过；端到端 `DocumentState → Project → DocumentState` 可视实体往返一致（line/circle/text），非法入参与 derive 失败均正确返回
 
-### 全绿验收
+### 全绿验收 ✅ 2026-05-25
 
-- [ ] `node --test apps/runtime/tests/*.test.js apps/web/tests/*.test.js` 全绿
-- [ ] schema 独立校验步骤通过
+- [x] `node --test apps/runtime/tests/*.test.js apps/web/tests/*.test.js` 全绿（99/99）
+- [x] schema 独立校验步骤通过（`bash apps/runtime/tools/run_schema_acceptance.sh` → PASS）
 
 ---
 
