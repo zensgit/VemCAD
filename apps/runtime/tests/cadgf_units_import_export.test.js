@@ -52,6 +52,17 @@ test('import falls back to unit_scale when unit_name is unknown', () => {
   assert.equal(res.value.project.units, 'in'); // 25.4 mm/unit -> inches
 });
 
+test('import matches unit_scale approximately (float near-miss resolves, not mm)', () => {
+  const res = importProjectFromCadgfDocument(unitDoc('Inches', 25.4000000001));
+  assert.equal(res.value.project.units, 'in');
+});
+
+test('import does not mis-map a genuinely different scale to the nearest unit', () => {
+  const res = importProjectFromCadgfDocument(unitDoc('weird', 500));
+  assert.equal(res.value.project.units, 'mm'); // 500 is not near any unit -> fallback
+  assert.ok(res.diagnostics.some((d) => d.code === 'UNIT_FALLBACK'));
+});
+
 test('import falls back to mm + diagnostic when neither name nor scale is recognized', () => {
   const res = importProjectFromCadgfDocument(unitDoc('league', 999));
   assert.equal(res.value.project.units, 'mm');

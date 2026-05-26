@@ -449,9 +449,14 @@ function importUnits(unitName, unitScale, diagnostics) {
     return unitName.trim().toLowerCase();
   }
   if (isFiniteNum(unitScale)) {
+    // Nearest unit_scale within a relative tolerance — absorbs float near-misses
+    // (e.g. 25.4000000001 -> in) without mis-mapping genuinely different scales.
+    let best = null;
     for (const [unit, spec] of Object.entries(UNITS)) {
-      if (spec.unit_scale === unitScale) return unit;
+      const rel = Math.abs(unitScale - spec.unit_scale) / spec.unit_scale;
+      if (best === null || rel < best.rel) best = { unit, rel };
     }
+    if (best && best.rel <= 1e-6) return best.unit;
   }
   diagnostics.push({ level: 'warn', code: 'UNIT_FALLBACK', message: `CADGF unit (name=${JSON.stringify(unitName)}, scale=${JSON.stringify(unitScale)}) not recognized; defaulted to mm (original kept in passthrough)` });
   return 'mm';
@@ -491,6 +496,7 @@ export function importProjectFromCadgfDocument(cadgfDocument, options = {}) {
   // unsupported type -> verbatim passthrough.
   const entities = [];
   const passthroughEntities = [];
+  const usedProjectIds = new Set();
   for (const e of Array.isArray(doc.entities) ? doc.entities : []) {
     if (!isObject(e) || !isNonNegInt(e.id) || !Number.isInteger(e.type)) {
       diagnostics.push({ level: 'warn', code: 'INVALID_CADGF_ENTITY', message: `CADGF entity ${JSON.stringify(e?.id)} is missing a valid id/type; skipped` });
@@ -503,8 +509,20 @@ export function importProjectFromCadgfDocument(cadgfDocument, options = {}) {
       continue;
     }
     const { id, type, layer_id: layerIdRaw, name: entityName, ...rest } = e;
+    // Project entity ids must be unique. CADGF entity ids are NOT guaranteed
+    // unique (the schema has no uniqueItems), so a degraded import assigns a
+    // unique project id on collision and keeps the original cadgfId — a later
+    // derive resolves the duplicate cadgfId via its own collision handling.
+    let projectId = `e${id}`;
+    if (usedProjectIds.has(projectId)) {
+      let n = 2;
+      while (usedProjectIds.has(`e${id}-${n}`)) n += 1;
+      projectId = `e${id}-${n}`;
+      diagnostics.push({ level: 'warn', code: 'IMPORT_ID_COLLISION', message: `CADGF entity id ${id} appears more than once; assigned project id ${projectId} (cadgfId kept as ${id})` });
+    }
+    usedProjectIds.add(projectId);
     entities.push({
-      id: `e${id}`,
+      id: projectId,
       kind,
       layerId: Number.isInteger(layerIdRaw) ? layerIdRaw : 0,
       cadgfId: id,

@@ -60,6 +60,20 @@ test('round-trip derive(import(doc)) preserves modeled + passthrough entities an
   assert.deepEqual(line.line, [[0, 0], [1, 1]]);
 });
 
+test('duplicate CADGF entity ids degrade gracefully (unique project ids + diagnostic), not abort', () => {
+  const doc = cadgfDoc([
+    { id: 1, type: 2, layer_id: 0, name: '', line: [[0, 0], [1, 1]] },
+    { id: 1, type: 4, layer_id: 0, name: '', circle: { c: [0, 0], r: 2 } }, // same numeric id
+  ]);
+  const res = importProjectFromCadgfDocument(doc, { clock: CLOCK });
+  assert.equal(res.ok, true); // does NOT fail the whole import
+  assert.equal(res.value.entities.length, 2); // both entities kept
+  const ids = res.value.entities.map((e) => e.id);
+  assert.equal(new Set(ids).size, 2); // project ids are unique
+  assert.deepEqual(res.value.entities.map((e) => e.cadgfId).sort(), [1, 1]); // cadgfId preserved
+  assert.ok(res.diagnostics.some((d) => d.code === 'IMPORT_ID_COLLISION'));
+});
+
 test('the single type<->kind mapping is mutually consistent (no second rule set)', () => {
   // import a doc that has one entity of each modeled type, re-derive, and check
   // every modeled entity kept its numeric type.
