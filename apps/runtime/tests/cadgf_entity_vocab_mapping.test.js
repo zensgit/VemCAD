@@ -74,6 +74,20 @@ test('duplicate CADGF entity ids degrade gracefully (unique project ids + diagno
   assert.ok(res.diagnostics.some((d) => d.code === 'IMPORT_ID_COLLISION'));
 });
 
+test('duplicate CADGF layer ids degrade gracefully (keep first + diagnostic), not abort', () => {
+  const doc = cadgfDoc([{ id: 1, type: 2, layer_id: 0, name: '', line: [[0, 0], [1, 1]] }]);
+  doc.layers = [
+    { id: 0, name: '0', color: 16777215, visible: 1, locked: 0, printable: 1, frozen: 0, construction: 0 },
+    { id: 0, name: 'dup', color: 0, visible: 1, locked: 0, printable: 1, frozen: 0, construction: 0 },
+  ];
+  const res = importProjectFromCadgfDocument(doc, { clock: CLOCK });
+  assert.equal(res.ok, true); // not aborted
+  assert.equal(res.value.layers.length, 1); // duplicate dropped, first kept
+  assert.equal(res.value.layers[0].name, '0');
+  assert.equal(res.value.entities.length, 1); // entity referencing layer 0 survives
+  assert.ok(res.diagnostics.some((d) => d.code === 'IMPORT_LAYER_ID_COLLISION'));
+});
+
 test('the single type<->kind mapping is mutually consistent (no second rule set)', () => {
   // import a doc that has one entity of each modeled type, re-derive, and check
   // every modeled entity kept its numeric type.

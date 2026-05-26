@@ -488,9 +488,22 @@ export function importProjectFromCadgfDocument(cadgfDocument, options = {}) {
   const name = typeof doc.metadata?.label === 'string' ? doc.metadata.label : '';
 
   // Layers preserve their CADGF fields (id stays the integer; re-derive cleanses).
-  const layers = (Array.isArray(doc.layers) ? doc.layers : [])
-    .filter((l) => isObject(l))
-    .map((l) => ({ ...l }));
+  // CADGF layer ids are NOT guaranteed unique (no uniqueItems), so a degraded
+  // import keeps the first layer for an id and drops later duplicates rather
+  // than aborting. Entity layerId references stay valid (the id still exists via
+  // the kept layer). Dedup key matches normalize's identity rule (String(id)).
+  const layers = [];
+  const seenLayerIds = new Set();
+  for (const l of Array.isArray(doc.layers) ? doc.layers : []) {
+    if (!isObject(l)) continue;
+    const key = String(l.id);
+    if (seenLayerIds.has(key)) {
+      diagnostics.push({ level: 'warn', code: 'IMPORT_LAYER_ID_COLLISION', message: `CADGF layer id ${JSON.stringify(l.id)} appears more than once; kept the first, dropped the duplicate` });
+      continue;
+    }
+    seenLayerIds.add(key);
+    layers.push({ ...l });
+  }
 
   // Entities: supported type -> modeled (numeric id -> "e<id>", cadgfId kept);
   // unsupported type -> verbatim passthrough.
