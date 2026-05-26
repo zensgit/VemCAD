@@ -145,6 +145,19 @@ test('a constraint ref to a non-solvable entity is skipped with a diagnostic', (
   assert.ok(res.diagnostics.some((d) => d.code === 'CONSTRAINT_REF_UNRESOLVED'));
 });
 
+test('a legal SemRef whose entity was excluded for bad geometry is unresolved at the adapter layer', () => {
+  // L1 is a line (legal kind + start/end roles, so §D1b validation in the constraint
+  // module passes the constraint) but is malformed — missing its end point — so the
+  // adapter excludes it and mints no point. The unresolved-ref path is the adapter's.
+  const res = buildSolverProject(projectWith({
+    entities: [{ id: 'L1', kind: 'line', layerId: 0, line: [[0, 0]] }],
+    constraints: [{ id: 'h', type: 'horizontal', refs: [{ entity: 'L1', at: 'start' }, { entity: 'L1', at: 'end' }] }],
+  }));
+  assert.deepEqual(res.value.cadgfProject.scene.constraints, []);
+  assert.ok(res.diagnostics.some((d) => d.code === 'ENTITY_BAD_GEOMETRY'));
+  assert.ok(res.diagnostics.some((d) => d.code === 'CONSTRAINT_REF_UNRESOLVED'));
+});
+
 // --- per-type expansion (complete the 6-type set) ---
 
 test('vertical expands to [start.x, end.x]', () => {

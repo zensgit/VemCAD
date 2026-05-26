@@ -4,23 +4,28 @@
 // per the frozen Tier 1 spec (docs/VEMCAD_RUNTIME_V1_SOLVER_TIER1_SPEC_20260525.md):
 //   - decompose inline-coord entities into minted points (deterministic, dot-free
 //     INTERNAL ids + a reversible map back to (entityId, role));
-//   - expand SEMANTIC constraints into solver VarRefs in the exact order each
-//     constraint's residual expects (appendix table, read from solver.cpp);
+//   - expand the SEMANTIC constraints the constraint module accepts (§D1b) into
+//     solver VarRefs in the exact order each residual expects (appendix table);
 //   - units in->inch; out-of-scope / malformed entities + constraints -> diagnostic.
 //
 // The Project truth speaks SEMANTIC SemRefs ({entity, at:role}) only; VarRefs and
-// minted point ids are transient adapter products. v1 supported set = 6 types
-// (equal/coincident/concentric excluded — see spec). Only point coords are solver
-// variables (circle radius / arc angles are fixed params).
+// minted point ids are transient adapter products. The v1 type set, ref arity,
+// value requirement, and role legality are owned by the constraint module's
+// V1_CONSTRAINT_VOCABULARY / validateV1ConstraintSet (single source); this adapter
+// CONSUMES them and keeps only the SemRef->VarRef expansion. Only point coords are
+// solver variables (circle radius / arc angles are fixed params).
 import { normalizeProjectModel } from '../project/index.js';
+import { V1_CONSTRAINT_VOCABULARY, validateV1ConstraintSet } from '../constraint/index.js';
 
 export const ERROR_UNSUPPORTED_UNIT = 'UNSUPPORTED_PROJECT_UNIT';
 
 // VEMCAD project unit -> CADGF-PROJ unit enum (mm/cm/m/inch/ft — note `inch`).
 const UNIT_MAP = { mm: 'mm', cm: 'cm', m: 'm', in: 'inch', ft: 'ft' };
 
-// Which points each solvable VEMCAD entity kind contributes, in mint order.
-const ENTITY_POINTS = {
+// Which points each solvable VEMCAD entity kind contributes, in mint order. The
+// role list per kind MUST mirror the constraint module's ENTITY_ROLES (enforced by
+// a test); here each role also carries how to extract its coord from the entity.
+export const ENTITY_POINTS = {
   point: [{ role: 'self', coord: (e) => e.point }],
   line: [
     { role: 'start', coord: (e) => e.line?.[0] },
@@ -30,15 +35,17 @@ const ENTITY_POINTS = {
   arc: [{ role: 'center', coord: (e) => e.arc?.c }],
 };
 
-// v1 supported constraint types. `pointRefs` = number of point-SemRefs; `coords`
-// = per-SemRef coordinate keys to emit IN ORDER (matches the solver residual).
-const CONSTRAINT_SPECS = {
-  horizontal: { pointRefs: 2, value: false, coords: [['y'], ['y']] },
-  vertical: { pointRefs: 2, value: false, coords: [['x'], ['x']] },
-  distance: { pointRefs: 2, value: true, coords: [['x', 'y'], ['x', 'y']] },
-  parallel: { pointRefs: 4, value: false, coords: [['x', 'y'], ['x', 'y'], ['x', 'y'], ['x', 'y']] },
-  perpendicular: { pointRefs: 4, value: false, coords: [['x', 'y'], ['x', 'y'], ['x', 'y'], ['x', 'y']] },
-  angle: { pointRefs: 4, value: true, coords: [['x', 'y'], ['x', 'y'], ['x', 'y'], ['x', 'y']] },
+// Per-type SemRef->VarRef expansion: the coordinate keys to emit for each point
+// SemRef IN ORDER (matches the solver residual). The type set / ref arity / value
+// flag are NOT redeclared here — they live in the constraint module's
+// V1_CONSTRAINT_VOCABULARY, which this table is keyed in lockstep with.
+const CONSTRAINT_COORDS = {
+  horizontal: [['y'], ['y']],
+  vertical: [['x'], ['x']],
+  distance: [['x', 'y'], ['x', 'y']],
+  parallel: [['x', 'y'], ['x', 'y'], ['x', 'y'], ['x', 'y']],
+  perpendicular: [['x', 'y'], ['x', 'y'], ['x', 'y'], ['x', 'y']],
+  angle: [['x', 'y'], ['x', 'y'], ['x', 'y'], ['x', 'y']],
 };
 
 function isVec2(v) {
@@ -130,37 +137,31 @@ export function buildSolverProject(project, options = {}) {
   }
 
   // ---- constraint expansion: SemRef -> VarRef per the residual-pinned table ----
+  // Semantic validation (type / arity / value / role legality) is owned by the
+  // constraint module (§D1b). Here we only EXPAND the constraints it accepts and
+  // resolve their SemRefs to the points minted above. The lone resolution failure
+  // left for this layer: a legal SemRef whose entity was excluded from the solve
+  // scene (e.g. malformed geometry) and so has no minted point.
   const sceneConstraints = [];
-  for (const c of p.constraints) {
-    const spec = CONSTRAINT_SPECS[c.type];
-    if (!spec) {
-      diagnostics.push({ level: 'info', code: 'CONSTRAINT_NOT_SUPPORTED', message: `constraint ${JSON.stringify(c.id)} type ${JSON.stringify(c.type)} is not in the v1 supported set; skipped` });
-      continue;
-    }
-    const refs = Array.isArray(c.refs) ? c.refs : [];
-    if (refs.length !== spec.pointRefs) {
-      diagnostics.push({ level: 'warn', code: 'CONSTRAINT_BAD_ARITY', message: `constraint ${JSON.stringify(c.id)} (${c.type}) needs ${spec.pointRefs} point refs, got ${refs.length}; skipped` });
-      continue;
-    }
-    if (spec.value && !Number.isFinite(c.value)) {
-      diagnostics.push({ level: 'warn', code: 'CONSTRAINT_MISSING_VALUE', message: `constraint ${JSON.stringify(c.id)} (${c.type}) requires a numeric value; skipped` });
-      continue;
-    }
+  const validated = validateV1ConstraintSet(p.constraints, p.entities);
+  diagnostics.push(...validated.diagnostics);
+  for (const c of validated.value) {
+    const coords = CONSTRAINT_COORDS[c.type];
     const varRefs = [];
     let resolveOk = true;
-    for (let i = 0; i < refs.length; i += 1) {
-      const ref = refs[i];
-      const mintedId = pointByEntityRole.get(`${ref?.entity} ${ref?.at}`);
+    for (let i = 0; i < c.refs.length; i += 1) {
+      const ref = c.refs[i];
+      const mintedId = pointByEntityRole.get(`${ref.entity} ${ref.at}`);
       if (!mintedId) {
-        diagnostics.push({ level: 'warn', code: 'CONSTRAINT_REF_UNRESOLVED', message: `constraint ${JSON.stringify(c.id)} ref {entity:${JSON.stringify(ref?.entity)}, at:${JSON.stringify(ref?.at)}} does not resolve to a solvable point; skipped` });
+        diagnostics.push({ level: 'warn', code: 'CONSTRAINT_REF_UNRESOLVED', message: `constraint ${JSON.stringify(c.id)} ref {entity:${JSON.stringify(ref.entity)}, at:${JSON.stringify(ref.at)}} is a legal SemRef but its entity was excluded from the solve scene; skipped` });
         resolveOk = false;
         break;
       }
-      for (const key of spec.coords[i]) varRefs.push(`${mintedId}.${key}`);
+      for (const key of coords[i]) varRefs.push(`${mintedId}.${key}`);
     }
     if (!resolveOk) continue;
     const out = { id: c.id, type: c.type, refs: varRefs };
-    if (spec.value) out.value = c.value;
+    if (V1_CONSTRAINT_VOCABULARY[c.type].value) out.value = c.value;
     sceneConstraints.push(out);
   }
 
