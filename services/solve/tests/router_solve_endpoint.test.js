@@ -81,6 +81,20 @@ test('a spawn failure (bogus node command) -> 500 ROUTER_SPAWN_FAILED', () => wi
   assert.equal((await res.json()).error_code, 'ROUTER_SPAWN_FAILED');
 }));
 
+test('exit 0 but envelope.ok!==true (CLI drift) -> 500 ROUTER_BAD_CLI_OUTPUT, never 200+failed body', () => withServer(FAKE, async (base) => {
+  const res = await post(base, { exit: 0, stdout: { ok: false, error_code: 'SOLVE_UNSATISFIED' } });
+  assert.equal(res.status, 500);
+  const body = await res.json();
+  assert.equal(body.error_code, 'ROUTER_BAD_CLI_OUTPUT');
+  assert.equal(body.envelope.error_code, 'SOLVE_UNSATISFIED'); // original kept for debugging
+}));
+
+test('failure exit but envelope.ok===true (the other drift direction) -> 500 ROUTER_BAD_CLI_OUTPUT', () => withServer(FAKE, async (base) => {
+  const res = await post(base, { exit: 1, stdout: { ok: true } });
+  assert.equal(res.status, 500);
+  assert.equal((await res.json()).error_code, 'ROUTER_BAD_CLI_OUTPUT');
+}));
+
 test('GET /health -> 200 {ok:true}; wrong method -> 405; unknown path -> 404', () => withServer(FAKE, async (base) => {
   const health = await fetch(`${base}/health`);
   assert.equal(health.status, 200);

@@ -36,10 +36,15 @@ sketch is unsolvable" (422, fixable client-side) from "the server failed" (500).
 # point at the real solver binary + libcore (passed straight through to solve_cli)
 export VEMCAD_SOLVE_BIN=…/deps/cadgamefusion/build/tools/solve_from_project
 export VEMCAD_SOLVE_LIBPATH=…/deps/cadgamefusion/build/core
-PORT=8787 node services/solve/main.mjs
+PORT=8787 node services/solve/main.mjs            # binds 127.0.0.1 by default
+HOST=0.0.0.0 PORT=8787 node services/solve/main.mjs  # opt in to expose on all NICs
 
 curl -s -XPOST localhost:8787/solve -H 'content-type: application/json' --data-binary @project.json
 ```
+
+Binds **loopback (`127.0.0.1`) by default** — this prototype has no auth / limits and
+spawns the solver per request, so exposing it on all interfaces is an explicit opt-in
+via `HOST=0.0.0.0`.
 
 ## Test
 

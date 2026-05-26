@@ -102,6 +102,14 @@ export function createSolveServer(options = {}) {
         } catch {
           return sendJson(res, 500, { ok: false, error_code: 'ROUTER_BAD_CLI_OUTPUT', error: 'solve CLI did not emit JSON', stderr: (r.stderr || '').slice(0, 500), diagnostics: [] });
         }
+        // Self-consistency guard: solve_cli's contract is "exit 0 iff ok". If the
+        // exit code and envelope.ok disagree (CLI/host drift), don't return a
+        // 200+{ok:false} (or a failure status + ok:true) — treat the contradiction
+        // as a server-side anomaly, like non-JSON output. Original envelope kept for
+        // debugging.
+        if ((r.code === 0) !== (envelope?.ok === true)) {
+          return sendJson(res, 500, { ok: false, error_code: 'ROUTER_BAD_CLI_OUTPUT', error: `solve CLI exit code ${r.code} disagrees with envelope.ok=${JSON.stringify(envelope?.ok)}`, envelope, diagnostics: [] });
+        }
         return sendJson(res, statusForResult(r.code, envelope), envelope);
       }
 
