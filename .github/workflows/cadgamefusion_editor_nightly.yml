@@ -30,6 +30,28 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Preflight - verify CADGAMEFUSION_PAT
+        env:
+          CADGAMEFUSION_PAT: ${{ secrets.CADGAMEFUSION_PAT }}
+        run: |
+          # Fail clearly BEFORE checkout if the PAT is missing/expired/under-scoped,
+          # instead of the cryptic "could not read Username for github.com" from the
+          # private-submodule fetch. The token needs read access to zensgit/CADGameFusion.
+          if [ -z "${CADGAMEFUSION_PAT:-}" ]; then
+            echo "::error title=CADGAMEFUSION_PAT missing::token invalid/expired or lacks CADGameFusion access - the CADGAMEFUSION_PAT secret is empty. Renew: gh secret set CADGAMEFUSION_PAT --repo zensgit/VemCAD"
+            exit 1
+          fi
+          code="$(curl -sS -o /dev/null -w '%{http_code}' \
+            -H "Authorization: Bearer ${CADGAMEFUSION_PAT}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/zensgit/CADGameFusion || true)"
+          if [ "${code}" != "200" ]; then
+            echo "::error title=CADGAMEFUSION_PAT invalid::token invalid/expired or lacks zensgit/CADGameFusion access (GitHub API HTTP ${code:-none}). Renew: gh secret set CADGAMEFUSION_PAT --repo zensgit/VemCAD"
+            exit 1
+          fi
+          echo "CADGAMEFUSION_PAT OK - can read zensgit/CADGameFusion (HTTP 200)."
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
