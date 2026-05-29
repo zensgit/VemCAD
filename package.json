@@ -1,0 +1,12 @@
+{
+  "name": "vemcad",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "VemCAD product-layer runtime, web workbench, and services (consumes CADGameFusion as deps/cadgamefusion).",
+  "scripts": {
+    "test": "node --test apps/runtime/tests/*.test.js services/solve/tests/*.test.js",
+    "test:web": "node --test apps/web/tests/*.test.js",
+    "test:all": "npm test && npm run test:web"
+  }
+}
