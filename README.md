@@ -33,3 +33,17 @@ Local build helper:
 ```
 ./scripts/dev_build.sh
 ```
+
+## Design Docs
+- `docs/ARCHITECTURE.md`: current top-level layer view.
+- `docs/VEMCAD_MODULE_DESIGN.md`: module boundaries and target product architecture.
+- `docs/VEMCAD_DEVELOPMENT_PLAN.md`: phased execution plan from current repo state.
+- `docs/VEMCAD_PROJECT_RUNTIME.md`: product runtime boundary and `Project -> Document` derivation model.
+- `docs/VEMCAD_ROUTER_CONTRACT.md`: minimum product-layer Router HTTP contract.
+- `docs/VEMCAD_WORKBENCH_SPLIT_PLAN.md`: Web workbench split and migration plan.
+- `docs/VEMCAD_VERIFICATION_PLAN.md`: validation matrix and gate strategy.
+
+## Product-layer Web facades
+- `apps/web/app.js`: product-layer Web bootstrap facade for editor/preview mode switching.
+- `apps/web/workbench/contracts/index.js`: stable workbench contract exports.
+- `apps/web/preview/runtime/contracts/index.js`: stable preview runtime contract exports.
