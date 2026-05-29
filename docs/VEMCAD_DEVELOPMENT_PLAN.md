@@ -1,5 +1,12 @@
 # VemCAD 开发推进计划
 
+> **执行现状与治理（2026-05-29）** — 进度、风险登记与排序建议见
+> [`VEMCAD_PLAN_PROGRESS_STATUS_20260528.md`](./VEMCAD_PLAN_PROGRESS_STATUS_20260528.md)（living register）。
+> 两点事实需先知道：(1) **Phase 2/3 的真实拆分发生在 `deps/cadgamefusion` 子模块内**，每步是
+> CADGameFusion PR + VemCAD gitlink 指针 bump（A→C 发布纪律），不是纯产品仓文件重构——按此估算成本。
+> (2) 一次对抗评审判定本方案 **sound-with-fixable-gaps**（架构扎实，缺口在交付管线+排序）；其中排序建议
+> （如 P4 先于 P2、推迟 fillet/chamfer）为**建议、待 owner 拍板**，下方 P0–P5 优先级尚未更改。
+
 ## 文档目的
 
 在 `docs/VEMCAD_MODULE_DESIGN.md` 的总体判断基础上，把建议收敛成可以逐步执行的开发路线，避免架构结论停留在原则层。

@@ -111,5 +111,33 @@ submodule-native"的那块。→ **继续 Phase 2 = 一项跨子模块、~12.8k 
 **S2（Phase 4 收尾）：** 把 `plm_router_service.py` 逻辑产品化进 `services/router/`，补 `/manifest` 缺口；
 GPL/LibreDWG 隔离的独立仓拆分（REPO_POINTER）另议。
 
+## 7. 方案体检 / 风险登记（living register, 2026-05-29）
+
+> 对抗式评审（4 子代理 + steelman 裁决者）对整套开发方案的判定：**SOUND-WITH-FIXABLE-GAPS**——
+> 核心架构扎实（数据边界四分、约束为真相、OCCT gating、兼容面冻结，且非"文档秀"：代码真实且绿，
+> runtime 128/128 + web 24/24）。缺陷不在架构，而在**交付管线**与**排序**两类，均为机械/治理可修。
+
+### 存活的真问题（裁决后，按影响排序）
+
+| # | 级别 | 问题 | 处置 |
+|---|---|---|---|
+| 1 | 🔴 | 规划MD/验证计划/拆分计划/进度核对全 untracked，`git clean -fd` 即失 | 版本控制半已由 **PR #11** 落地；本节即 living register |
+| 2 | 🔴 | 产品测试零 CI + 无标准入口 | **已修：PR #13**（root package.json + product_tests.yml，CI 可见、非强制门禁） |
+| 3 | 🔴 | P2（12.8k 行上帝文件拆分）排最前——最高回归风险、零用户价值、无安全网；护城河相关 P4 排最后 | 见下"排序建议（待拍板）" |
+| 4 | 🟠 | A→C 子模块成本在计划中缺失 → P2/P3 低估 | 已在本节 + 两份计划 banner 标注（事实） |
+| 5 | 🟠 | 拆分计划固定顺序 vs post-v0"需求驱动"冲突，从未对账 | 已在拆分计划 banner 标注；重排列为建议（待拍板） |
+| 6 | 🟠 | "VERIFICATION" 漂移成本地 run-log（PHASE5 带超时+校验失败仍判完成） | 已在验证计划补"通过定义"；PR #13 为首个 CI 可见落点 |
+| 7 | 🟠 | D1b 被 v1 coincident 变通违反（solver 形态写进真相）；线已收口 = 永久天花板 | **待你拍板**（子模块 schema 改 + 重开收口线） |
+
+### 排序建议（RECOMMENDATION，待 owner 拍板；未改既定 P0–P5 优先级）
+
+- 动上帝文件拆分前先：(a) 给 3 个上帝文件 + `?manifest/?gltf` smoke 补 golden/characterization 测试，作为 P2 真前置；(b) 把产品仓原生、用户可见的 router 产品化（`plm_router_service.py` → `services/router`，补 `/manifest`）提到拆分**前面**。
+- P2 改为**需求驱动**（按 solver 集成需要抽），fillet/chamfer + break/join **推迟**到有具体需求；保留"不加新功能"冻结。
+- 以上是建议，非已生效的优先级变更——需你确认后才改 `VEMCAD_DEVELOPMENT_PLAN.md` 的 P0–P5。
+
+### 已驳回（避免误导）
+
+`services/solve` 的 `/solve` HTTP **已在 main**（PR #6），非"零代码"；`packages/`-vs-`apps/runtime` 仅文档漂移（P1 已收口）；"solver 不够用"多为 spec 已诚实声明的 prototype 范围外（radius/angle 是 C++ 改动）。
+
 ---
-*本报告由只读 survey（4 并行子代理读 ~12.8k 行 + 服务层盘点）+ origin/main 校准生成；未改代码。*
+*本报告由只读 survey（4 并行子代理读 ~12.8k 行 + 服务层盘点）+ origin/main 校准生成；§7 为 2026-05-29 方案体检追加。未改代码。*

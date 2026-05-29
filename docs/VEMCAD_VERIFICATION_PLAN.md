@@ -4,6 +4,23 @@
 
 把 VemCAD 后续演进的验证方式从“模块各自有测试”收敛成“按产品流验证”。重点不是穷举所有测试，而是明确每一层该证明什么。
 
+## VERIFICATION 通过的定义（gate, not run-log）
+
+> 加于 2026-05-29：一次方案体检发现"VERIFICATION"在实践中漂移成了"本地跑了命令、贴了日志"——曾有阶段
+> 带着 smoke 超时 + 校验失败仍被判为"已验证/完成"。为此钉死"通过"的含义：
+
+一个阶段/特性算 **已验证**，必须同时满足：
+
+- **针对具名验收标准给出显式 pass/fail**，不是粘贴 run-log。任一项 failing/partial → 阶段保持 OPEN，
+  挂可追踪缺陷，不得标完成。
+- **从可移植入口运行**：`npm test`（root `package.json`）或 CI workflow；禁止硬编码绝对路径（如
+  `/Users/...`）、禁止临时 symlink 等单机手跑特征。run-log 归档到构建产物，文档只留"标准 + 判定"。
+- **产品代码须落在 main 且有 CI 可见**：见 `.github/workflows/product_tests.yml`（core = 无子模块、
+  PAT-free；web-integration = 子模块 + PAT）。注意 VemCAD 为 free-tier、无分支保护，CI 是**可见性、非强制门禁**。
+
+当前缺口：下方 Level 1/2/3 矩阵对**产品代码**（apps/**, services/**）尚未在 CI 落地；`product_tests.yml`
+是第一步，其余（`router_contract_smoke`、`project_schema_roundtrip` 等）仍待补。
+
 ## 验证原则
 
 ### 1. 先验证边界，再验证功能

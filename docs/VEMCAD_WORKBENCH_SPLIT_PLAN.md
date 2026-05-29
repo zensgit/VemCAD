@@ -1,5 +1,12 @@
 # VemCAD Web Workbench 拆分计划
 
+> **治理标注（2026-05-29）** — (事实) 本计划 Phase 1–3 在 `deps/cadgamefusion/tools/web_viewer/`
+> **子模块内**执行，每步走 A→C 发布纪律（CADGameFusion PR + VemCAD 指针 bump）；`apps/web` 当前的
+> facade 是 Phase 0 边界标记（纯转发、无隔离），不等于拆分已开始。(事实) `VEMCAD_POST_V0_DIRECTION_EVALUATION`
+> 冻结了"拆分应由 solver 集成需求**驱动**，而非投机式全量按序拆"。(建议·待 owner 拍板) 据此把本计划的固定
+> 全文件顺序视为**排序待修订**：先按需求抽（如 solver/bridge），**推迟 fillet/chamfer 与 break/join** 等
+> 几何密集块。详见 [`VEMCAD_PLAN_PROGRESS_STATUS_20260528.md`](./VEMCAD_PLAN_PROGRESS_STATUS_20260528.md)。
+
 ## 文档目标
 
 把 Web workbench 的拆分从“知道要拆”推进到“知道先拆什么、拆到哪一层、每一阶段如何收口”。
