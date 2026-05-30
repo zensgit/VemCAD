@@ -1,4 +1,5 @@
 import { createSolveWorkbenchPanel } from '../panels/solve_panel.js';
+import { normalizeProjectModel } from '../../../runtime/project/index.js';
 import { createSolveDemoFetch } from './demo_fetch.js';
 import { SOLVE_WORKBENCH_DEMOS } from './demo_projects.js';
 import { renderCadgfPreviewCanvas } from './preview_canvas.js';
@@ -7,6 +8,7 @@ import { createSolveWorkbenchController } from './solve_workbench.js';
 const STYLE_ID = 'vemcad-solve-demo-styles';
 const DEMO_ORDER = ['solvableLine', 'conflictingLine', 'passthroughUnsupported'];
 const DEFAULT_DEMO_ID = DEMO_ORDER[0];
+const IMPORTED_DEMO_ID = 'importedProject';
 
 const DEMO_LABELS = Object.freeze({
   solvableLine: 'Solvable',
@@ -40,9 +42,9 @@ function ensureSolveDemoStyles(document) {
     .vemcad-solve-panel__status[data-status="blocked"],.vemcad-solve-panel__status[data-status="failed"]{background:#fff3df;color:#8a4b00}
     .vemcad-solve-panel__status[data-status="solving"]{background:#eaf1ff;color:#1f4f91}
     .vemcad-solve-panel__details,.vemcad-solve-panel__preview,.vemcad-solve-demo__summary{margin:0 0 12px;color:#3d485c;line-height:1.45}
-    .vemcad-solve-demo__export{min-height:34px;margin:0 0 6px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
-    .vemcad-solve-demo__export:disabled{cursor:progress;opacity:.65}
-    .vemcad-solve-demo__export-status{min-height:22px;margin:0 0 12px;color:#5b6679;line-height:1.45}
+    .vemcad-solve-demo__export,.vemcad-solve-demo__import{min-height:34px;margin:0 0 6px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
+    .vemcad-solve-demo__export:disabled,.vemcad-solve-demo__import:disabled{cursor:progress;opacity:.65}
+    .vemcad-solve-demo__export-status,.vemcad-solve-demo__import-status{min-height:22px;margin:0 0 12px;color:#5b6679;line-height:1.45}
     .vemcad-solve-demo__share{display:block;margin:0 0 8px;color:#114d7a;line-height:1.35;overflow-wrap:anywhere}
     .vemcad-solve-demo__copy{min-height:34px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
     .vemcad-solve-demo__copy:disabled{cursor:progress;opacity:.65}
@@ -175,6 +177,50 @@ async function defaultExportProjectJson(project, key, root) {
   }
 }
 
+async function defaultImportProjectJson(root) {
+  const doc = root.ownerDocument;
+  if (!doc?.body || typeof doc.createElement !== 'function') {
+    throw new Error('file picker is unavailable');
+  }
+  return new Promise((resolve, reject) => {
+    const input = doc.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.style.position = 'fixed';
+    input.style.opacity = '0';
+    input.style.pointerEvents = 'none';
+    let settled = false;
+
+    function cleanup() {
+      if (input.parentNode) input.parentNode.removeChild(input);
+    }
+
+    function finish(fn, value) {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      fn(value);
+    }
+
+    input.addEventListener('change', async () => {
+      try {
+        const file = input.files?.[0];
+        if (!file || typeof file.text !== 'function') {
+          throw new Error('no project file selected');
+        }
+        finish(resolve, JSON.parse(await file.text()));
+      } catch (err) {
+        finish(reject, err);
+      }
+    });
+    input.addEventListener?.('cancel', () => {
+      finish(reject, new Error('project import canceled'));
+    });
+    doc.body.appendChild(input);
+    input.click();
+  });
+}
+
 function resolveInitialDemo(initialDemo, demos) {
   if (initialDemo && Object.prototype.hasOwnProperty.call(demos, initialDemo)) {
     return initialDemo;
@@ -207,6 +253,7 @@ export async function mountSolveWorkbenchDemo({
   fetchImpl = createSolveDemoFetch(),
   copyText = defaultCopyText,
   exportProjectJson = defaultExportProjectJson,
+  importProjectJson = defaultImportProjectJson,
 } = {}) {
   if (!root || typeof root.appendChild !== 'function') {
     throw new TypeError('root element is required');
@@ -247,6 +294,16 @@ export async function mountSolveWorkbenchDemo({
     text: 'Ready to export project.',
   });
   exportStatus.setAttribute?.('aria-live', 'polite');
+  const importButton = append(meta, 'button', {
+    type: 'button',
+    text: 'Import Project JSON',
+    className: 'vemcad-solve-demo__import',
+  });
+  const importStatus = append(meta, 'p', {
+    className: 'vemcad-solve-demo__import-status',
+    text: 'Ready to import project.',
+  });
+  importStatus.setAttribute?.('aria-live', 'polite');
   append(meta, 'h2', { text: 'Share' });
   const shareLink = append(meta, 'a', { className: 'vemcad-solve-demo__share' });
   shareLink.target = '_blank';
@@ -273,25 +330,58 @@ export async function mountSolveWorkbenchDemo({
   let previewUnsubscribe = null;
   let currentShareUrl = '';
   let currentProject = null;
+  const projectsByKey = { ...demos };
+
+  function ensureImportedButton() {
+    if (buttons[IMPORTED_DEMO_ID]) return buttons[IMPORTED_DEMO_ID];
+    const button = append(nav, 'button', {
+      type: 'button',
+      text: 'Imported',
+      className: 'vemcad-solve-demo__tab',
+    });
+    button.dataset.demoId = IMPORTED_DEMO_ID;
+    button.addEventListener('click', () => {
+      select(IMPORTED_DEMO_ID).catch((err) => {
+        projectSummary.textContent = err?.message ?? String(err);
+      });
+    });
+    buttons[IMPORTED_DEMO_ID] = button;
+    return button;
+  }
+
+  function updateShare(key) {
+    if (key === IMPORTED_DEMO_ID) {
+      currentShareUrl = '';
+      shareLink.removeAttribute?.('href');
+      shareLink.href = '';
+      shareLink.textContent = 'Imported project is local. Export JSON to share.';
+      copyButton.disabled = true;
+      copyStatus.textContent = 'No share link for imported project.';
+      return;
+    }
+    const demoUrl = demoUrlFor(root, key);
+    currentShareUrl = demoUrl;
+    shareLink.href = demoUrl;
+    shareLink.setAttribute?.('href', demoUrl);
+    shareLink.textContent = demoUrl;
+    copyButton.disabled = false;
+    copyStatus.textContent = 'Ready to copy link.';
+  }
 
   async function select(key) {
-    if (!demos[key]) {
+    if (!projectsByKey[key]) {
       throw new Error(`unknown solve demo: ${key}`);
     }
     panelHandle?.destroy?.();
     previewUnsubscribe?.();
     selectedKey = key;
     setActiveButton(buttons, key);
-    const project = demos[key];
+    const project = projectsByKey[key];
     currentProject = project;
     projectSummary.textContent = summarizeProject(project);
     exportStatus.textContent = 'Ready to export project.';
-    const demoUrl = demoUrlFor(root, key);
-    currentShareUrl = demoUrl;
-    shareLink.href = demoUrl;
-    shareLink.setAttribute?.('href', demoUrl);
-    shareLink.textContent = demoUrl;
-    copyStatus.textContent = 'Ready to copy link.';
+    importStatus.textContent = 'Ready to import project.';
+    updateShare(key);
     controller = createSolveWorkbenchController({ fetchImpl });
     previewUnsubscribe = controller.subscribe((state) => {
       renderCadgfPreviewCanvas({ root: previewRoot, cadgfDocument: state.previewDocument });
@@ -311,6 +401,10 @@ export async function mountSolveWorkbenchDemo({
   }
 
   copyButton.addEventListener('click', async () => {
+    if (!currentShareUrl) {
+      copyStatus.textContent = 'No share link for imported project.';
+      return;
+    }
     copyButton.disabled = true;
     try {
       await copyText(currentShareUrl, root);
@@ -331,6 +425,26 @@ export async function mountSolveWorkbenchDemo({
       exportStatus.textContent = 'Export unavailable.';
     } finally {
       exportButton.disabled = false;
+    }
+  });
+
+  importButton.addEventListener('click', async () => {
+    importButton.disabled = true;
+    try {
+      const rawProject = await importProjectJson(root);
+      const normalized = normalizeProjectModel(rawProject);
+      if (!normalized.ok) {
+        throw new Error(normalized.error ?? normalized.error_code ?? 'invalid project');
+      }
+      projectsByKey[IMPORTED_DEMO_ID] = normalized.value;
+      ensureImportedButton();
+      await select(IMPORTED_DEMO_ID);
+      importStatus.textContent = 'Project JSON imported.';
+      if (autoSolve) await panelHandle.solve();
+    } catch {
+      importStatus.textContent = 'Import failed.';
+    } finally {
+      importButton.disabled = false;
     }
   });
 

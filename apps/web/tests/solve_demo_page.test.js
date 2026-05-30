@@ -102,6 +102,28 @@ function findByClass(root, className) {
   return null;
 }
 
+function importedLineProject() {
+  return {
+    header: { format: 'VEMCAD-PROJECT', version: 1 },
+    project: {
+      id: 'imported-line',
+      name: 'Imported line',
+      units: 'mm',
+      createdAt: '2026-05-25T00:00:00.000Z',
+      modifiedAt: '2026-05-25T00:00:00.000Z',
+    },
+    layers: [{ id: 0, name: 'Default' }],
+    entities: [{ id: 'L1', kind: 'line', layerId: 0, line: [[1, 2], [9, 4]] }],
+    constraints: [
+      { id: 'c-horizontal', type: 'horizontal', refs: [{ entity: 'L1', at: 'start' }, { entity: 'L1', at: 'end' }] },
+      { id: 'c-distance', type: 'distance', refs: [{ entity: 'L1', at: 'start' }, { entity: 'L1', at: 'end' }], value: 8 },
+    ],
+    features: [],
+    resources: { cadgfPassthrough: { document: {}, entities: [] } },
+    meta: {},
+  };
+}
+
 test('mountSolveWorkbenchDemo mounts selectable demos and solves without a live /solve service', async () => {
   const document = makeDocument();
   const root = makeElement('div', document);
@@ -120,6 +142,7 @@ test('mountSolveWorkbenchDemo mounts selectable demos and solves without a live 
   assert.equal(findByClass(root, 'vemcad-solve-demo__solve-summary').textContent, 'No solve has run yet.');
   assert.equal(findByClass(root, 'vemcad-solve-demo__diagnostic-count').textContent, 'diagnostics=0');
   assert.equal(findByClass(root, 'vemcad-solve-demo__export-status').textContent, 'Ready to export project.');
+  assert.equal(findByClass(root, 'vemcad-solve-demo__import-status').textContent, 'Ready to import project.');
 
   await demo.solve();
   assert.equal(demo.getPanelState().status, 'solved');
@@ -270,6 +293,69 @@ test('export project button reports unavailable when export fails', async () => 
 
   await findByClass(root, 'vemcad-solve-demo__export').click();
   assert.equal(findByClass(root, 'vemcad-solve-demo__export-status').textContent, 'Export unavailable.');
+});
+
+test('import project button selects an imported VEMCAD-PROJECT and keeps it local-only', async () => {
+  const document = makeDocument();
+  const root = makeElement('div', document);
+
+  const demo = await mountSolveWorkbenchDemo({
+    root,
+    importProjectJson: async () => importedLineProject(),
+    fetchImpl: async (_url, init) => {
+      const project = JSON.parse(init.body);
+      return {
+        ok: true,
+        status: 200,
+        async json() {
+          return {
+            ok: true,
+            value: {
+              evaluatedView: project,
+              evaluatedGeometry: {},
+              solve: { ok: true, iterations: 1, finalError: 0 },
+            },
+            diagnostics: [],
+          };
+        },
+      };
+    },
+  });
+  const importButton = findByClass(root, 'vemcad-solve-demo__import');
+  const importStatus = findByClass(root, 'vemcad-solve-demo__import-status');
+  const copyButton = findByClass(root, 'vemcad-solve-demo__copy');
+
+  await importButton.click();
+
+  assert.equal(demo.selectedKey, 'importedProject');
+  assert.equal(demo.buttons.importedProject.disabled, true);
+  assert.equal(demo.buttons.importedProject.textContent, 'Imported');
+  assert.match(findByClass(root, 'vemcad-solve-demo__summary').textContent, /id=imported-line/);
+  assert.equal(findByClass(root, 'vemcad-solve-demo__share').textContent, 'Imported project is local. Export JSON to share.');
+  assert.equal(findByClass(root, 'vemcad-solve-demo__copy-status').textContent, 'No share link for imported project.');
+  assert.equal(copyButton.disabled, true);
+  assert.equal(importStatus.textContent, 'Project JSON imported.');
+
+  await demo.solve();
+  assert.equal(demo.getPanelState().status, 'solved');
+  assert.equal(demo.getPanelState().previewDocument.document_id, 'imported-line');
+});
+
+test('import project button reports failure for an invalid project', async () => {
+  const document = makeDocument();
+  const root = makeElement('div', document);
+
+  const demo = await mountSolveWorkbenchDemo({
+    root,
+    importProjectJson: async () => ({ header: { format: 'NOT-VEMCAD', version: 1 }, project: { id: 'bad' } }),
+  });
+
+  await findByClass(root, 'vemcad-solve-demo__import').click();
+
+  assert.equal(demo.selectedKey, 'solvableLine');
+  assert.equal(demo.buttons.importedProject, undefined);
+  assert.equal(findByClass(root, 'vemcad-solve-demo__import-status').textContent, 'Import failed.');
+  assert.match(findByClass(root, 'vemcad-solve-demo__summary').textContent, /id=demo-solvable-line/);
 });
 
 test('mountSolveWorkbenchDemo can select and auto-run a requested initial demo', async () => {
