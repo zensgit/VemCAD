@@ -317,6 +317,47 @@ test('bootstrapVemcadWebApp schedules product offline cache after editor bootstr
   cleanupDomStubs();
 });
 
+test('bootstrapVemcadWebApp mounts solve demo mode without starting preview or workspace', async () => {
+  const { elements } = installDomStubs({ search: '?mode=solve-demo' });
+  const moduleUrl = pathToFileURL(path.join(repoRoot, 'apps/web/app.js')).href;
+  const appModule = await import(`${moduleUrl}?solve-demo-mode`);
+
+  appModule.resetVemcadWebAppBootstrapState();
+  const scheduled = [];
+  let mounted = null;
+
+  const result = await appModule.bootstrapVemcadWebApp({
+    params: new URLSearchParams('mode=solve-demo'),
+    previewBootstrap: async () => {
+      throw new Error('preview should not start in solve-demo mode');
+    },
+    ensureWorkspaceBootstrappedImpl: async () => {
+      throw new Error('workspace should not start in solve-demo mode');
+    },
+    scheduleOfflineCaching: (context) => {
+      scheduled.push(context);
+      return Promise.resolve({ ok: true });
+    },
+    loadSolveDemoModule: async () => ({
+      async mountSolveWorkbenchDemo(args) {
+        mounted = args;
+        return { kind: 'solve-demo-handle' };
+      },
+    }),
+  });
+
+  assert.equal(result.mode, 'solve-demo');
+  assert.deepEqual(result.demo, { kind: 'solve-demo-handle' });
+  assert.equal(mounted.root.id, 'cad-editor-root');
+  assert.equal(typeof mounted.appBridge.mountSolvePanel, 'function');
+  assert.equal(elements.get('preview-root').classList.contains('is-hidden'), true);
+  assert.equal(elements.get('cad-editor-root').classList.contains('is-hidden'), false);
+  assert.deepEqual(scheduled, [{ mode: 'solve-demo' }]);
+
+  appModule.resetVemcadWebAppBootstrapState();
+  cleanupDomStubs();
+});
+
 test('bootstrapLegacyWebViewerApp wires preview mode and editor handoff contract', { skip: SUBMODULE_ENTRY_SKIP }, async () => {
   installDomStubs({ search: '' });
   const moduleUrl = pathToFileURL(path.join(repoRoot, 'deps/cadgamefusion/tools/web_viewer/legacy_app_bootstrap.js')).href;
