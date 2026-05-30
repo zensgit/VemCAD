@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VemCAD Web</title>
+    <style>
+      :root {
+        color-scheme: light;
+        background: #f5f7fb;
+        color: #1d2433;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+      }
+
+      .is-hidden {
+        display: none !important;
+      }
+
+      #preview-root,
+      #cad-editor-root {
+        min-height: 100vh;
+      }
+
+      #bootstrap-error {
+        margin: 24px;
+        padding: 16px;
+        border: 1px solid #f0c4c4;
+        border-radius: 8px;
+        background: #fff6f6;
+        color: #832323;
+        font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="preview-root"></div>
+    <div id="cad-editor-root" class="is-hidden" aria-hidden="true"></div>
+    <script type="module">
+      import { bootstrapVemcadWebApp } from "./app.js";
+
+      try {
+        await bootstrapVemcadWebApp();
+      } catch (error) {
+        const box = document.createElement("pre");
+        box.id = "bootstrap-error";
+        box.textContent = error?.stack || error?.message || String(error);
+        document.body.appendChild(box);
+        throw error;
+      }
+    </script>
+  </body>
+</html>
