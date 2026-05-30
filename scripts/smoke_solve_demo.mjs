@@ -153,6 +153,7 @@ try {
   assertIncludes(demoPageJs, 'VemCAD Solve Workbench', 'demo_page.js');
   assertIncludes(demoPageJs, 'renderCadgfPreviewCanvas', 'demo_page.js');
   assertIncludes(demoPageJs, 'Import Project JSON', 'demo_page.js');
+  assertIncludes(demoPageJs, 'Export Solve Result JSON', 'demo_page.js');
   assertIncludes(demoPageJs, 'Export CADGF Preview JSON', 'demo_page.js');
 
   const previewCanvasJs = await fetchText(`${base}/apps/web/workbench/solver/preview_canvas.js`);

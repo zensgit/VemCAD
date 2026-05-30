@@ -143,6 +143,8 @@ test('mountSolveWorkbenchDemo mounts selectable demos and solves without a live 
   assert.equal(findByClass(root, 'vemcad-solve-demo__diagnostic-count').textContent, 'diagnostics=0');
   assert.equal(findByClass(root, 'vemcad-solve-demo__export-status').textContent, 'Ready to export project.');
   assert.equal(findByClass(root, 'vemcad-solve-demo__import-status').textContent, 'Ready to import project.');
+  assert.equal(findByClass(root, 'vemcad-solve-demo__solve-export').disabled, true);
+  assert.equal(findByClass(root, 'vemcad-solve-demo__solve-export-status').textContent, 'Run solve to export result.');
   assert.equal(findByClass(root, 'vemcad-solve-demo__preview-export').disabled, true);
   assert.equal(
     findByClass(root, 'vemcad-solve-demo__preview-export-status').textContent,
@@ -152,6 +154,8 @@ test('mountSolveWorkbenchDemo mounts selectable demos and solves without a live 
   await demo.solve();
   assert.equal(demo.getPanelState().status, 'solved');
   assert.equal(demo.getPanelState().previewDocument.document_id, 'demo-solvable-line');
+  assert.equal(findByClass(root, 'vemcad-solve-demo__solve-export').disabled, false);
+  assert.equal(findByClass(root, 'vemcad-solve-demo__solve-export-status').textContent, 'Ready to export solve result.');
   assert.equal(findByClass(root, 'vemcad-solve-demo__preview-export').disabled, false);
   assert.equal(
     findByClass(root, 'vemcad-solve-demo__preview-export-status').textContent,
@@ -166,6 +170,8 @@ test('mountSolveWorkbenchDemo mounts selectable demos and solves without a live 
   assert.equal(demo.selectedKey, 'conflictingLine');
   assert.equal(demo.getPanelState().status, 'blocked');
   assert.equal(demo.getPanelState().previewDocument, null);
+  assert.equal(findByClass(root, 'vemcad-solve-demo__solve-export').disabled, false);
+  assert.equal(findByClass(root, 'vemcad-solve-demo__solve-export-status').textContent, 'Ready to export solve result.');
   assert.equal(findByClass(root, 'vemcad-solve-demo__preview-export').disabled, true);
   assert.equal(findByClass(root, 'vemcad-solve-demo__preview-export-status').textContent, 'No CADGF preview to export.');
   assert.equal(
@@ -305,6 +311,71 @@ test('export project button reports unavailable when export fails', async () => 
 
   await findByClass(root, 'vemcad-solve-demo__export').click();
   assert.equal(findByClass(root, 'vemcad-solve-demo__export-status').textContent, 'Export unavailable.');
+});
+
+test('export solve result button exports blocked and solved solver envelopes', async () => {
+  const document = makeDocument();
+  const root = makeElement('div', document);
+  const exported = [];
+
+  const demo = await mountSolveWorkbenchDemo({
+    root,
+    exportSolveResultJson: async (envelope, project, key) => {
+      exported.push({
+        key,
+        projectId: project.project.id,
+        ok: envelope.ok,
+        errorCode: envelope.error_code ?? null,
+        state: envelope.summary?.structuralState ?? null,
+      });
+    },
+  });
+  const solveExportButton = findByClass(root, 'vemcad-solve-demo__solve-export');
+  const solveExportStatus = findByClass(root, 'vemcad-solve-demo__solve-export-status');
+
+  solveExportButton.click();
+  assert.equal(solveExportStatus.textContent, 'No solve result to export.');
+
+  await demo.solve();
+  await solveExportButton.click();
+
+  await demo.select('conflictingLine');
+  await demo.solve();
+  await solveExportButton.click();
+
+  assert.deepEqual(exported, [
+    {
+      key: 'solvableLine',
+      projectId: 'demo-solvable-line',
+      ok: true,
+      errorCode: null,
+      state: 'underconstrained',
+    },
+    {
+      key: 'conflictingLine',
+      projectId: 'demo-conflicting-line',
+      ok: false,
+      errorCode: 'SOLVE_UNSATISFIED',
+      state: 'overconstrained',
+    },
+  ]);
+  assert.equal(solveExportStatus.textContent, 'Solve result JSON exported.');
+});
+
+test('export solve result button reports unavailable when result export fails', async () => {
+  const document = makeDocument();
+  const root = makeElement('div', document);
+
+  const demo = await mountSolveWorkbenchDemo({
+    root,
+    exportSolveResultJson: async () => {
+      throw new Error('download denied');
+    },
+  });
+
+  await demo.solve();
+  await findByClass(root, 'vemcad-solve-demo__solve-export').click();
+  assert.equal(findByClass(root, 'vemcad-solve-demo__solve-export-status').textContent, 'Solve result export unavailable.');
 });
 
 test('export preview button exports the solved CADGF preview document', async () => {

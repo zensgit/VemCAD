@@ -16,6 +16,7 @@ const CASES = [
     summary: /state=underconstrained/,
     diagnostics: /^diagnostics=1$/,
     preview: 'svg',
+    solveExportStatus: 'Ready to export solve result.',
     previewExportStatus: 'Ready to export CADGF preview.',
   },
   {
@@ -25,7 +26,9 @@ const CASES = [
     summary: /state=overconstrained/,
     diagnostics: /^diagnostics=1$/,
     preview: 'empty',
+    solveExportStatus: 'Ready to export solve result.',
     previewExportStatus: 'No CADGF preview to export.',
+    downloadSolveResult: true,
   },
   {
     id: 'passthroughUnsupported',
@@ -34,6 +37,7 @@ const CASES = [
     summary: /iters=0/,
     diagnostics: /^diagnostics=2$/,
     preview: 'empty',
+    solveExportStatus: 'Ready to export solve result.',
     previewExportStatus: 'Ready to export CADGF preview.',
   },
 ];
@@ -123,6 +127,8 @@ async function verifyCase({ page, base, screenshotDir, spec }) {
   await assertText(page, '.vemcad-solve-demo__export-status', 'Ready to export project.', `${spec.id} export status`);
   await assertText(page, '.vemcad-solve-demo__import', 'Import Project JSON', `${spec.id} import button`);
   await assertText(page, '.vemcad-solve-demo__import-status', 'Ready to import project.', `${spec.id} import status`);
+  await assertText(page, '.vemcad-solve-demo__solve-export', 'Export Solve Result JSON', `${spec.id} solve export button`);
+  await assertText(page, '.vemcad-solve-demo__solve-export-status', spec.solveExportStatus, `${spec.id} solve export status`);
   await assertText(page, '.vemcad-solve-demo__preview-export', 'Export CADGF Preview JSON', `${spec.id} preview export button`);
   await assertText(page, '.vemcad-solve-demo__preview-export-status', spec.previewExportStatus, `${spec.id} preview export status`);
   await assertText(page, '.vemcad-solve-demo__copy', 'Copy link', `${spec.id} copy button`);
@@ -131,6 +137,21 @@ async function verifyCase({ page, base, screenshotDir, spec }) {
   await assertVisibleBox(page, '.vemcad-solve-demo__content', `${spec.id} content`);
   if (spec.preview === 'svg') {
     await assertVisibleBox(page, '.vemcad-preview-canvas', `${spec.id} preview`);
+  }
+  if (spec.downloadSolveResult) {
+    const downloadPromise = page.waitForEvent('download', { timeout: 5000 });
+    await page.locator('.vemcad-solve-demo__solve-export').click();
+    const download = await downloadPromise;
+    const suggested = download.suggestedFilename();
+    if (suggested !== 'demo-conflicting-line.solve-result.json') {
+      throw new Error(`${spec.id} solve result filename: expected demo-conflicting-line.solve-result.json, got ${suggested}`);
+    }
+    const filePath = await download.path();
+    const envelope = JSON.parse(await fs.readFile(filePath, 'utf8'));
+    if (envelope?.ok !== false || envelope?.error_code !== 'SOLVE_UNSATISFIED') {
+      throw new Error(`${spec.id} solve result payload did not preserve blocked envelope`);
+    }
+    await assertText(page, '.vemcad-solve-demo__solve-export-status', 'Solve result JSON exported.', `${spec.id} solve export completion`);
   }
   return maybeScreenshot(page, screenshotDir, spec.id);
 }
@@ -155,6 +176,7 @@ async function verifyImportProject({ page, base, screenshotDir }) {
   await assertText(page, '.vemcad-solve-demo__share', 'Imported project is local. Export JSON to share.', 'imported share text');
   await assertText(page, '.vemcad-solve-demo__copy-status', 'No share link for imported project.', 'imported copy status');
   await assertText(page, '.vemcad-solve-panel__status', 'Solved', 'imported solve status');
+  await assertText(page, '.vemcad-solve-demo__solve-export-status', 'Ready to export solve result.', 'imported solve export status');
   await assertText(page, '.vemcad-solve-demo__preview-export-status', 'Ready to export CADGF preview.', 'imported preview export status');
   await assertPreview(page, 'svg', 'imported project preview');
 
