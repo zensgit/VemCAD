@@ -42,9 +42,9 @@ function ensureSolveDemoStyles(document) {
     .vemcad-solve-panel__status[data-status="blocked"],.vemcad-solve-panel__status[data-status="failed"]{background:#fff3df;color:#8a4b00}
     .vemcad-solve-panel__status[data-status="solving"]{background:#eaf1ff;color:#1f4f91}
     .vemcad-solve-panel__details,.vemcad-solve-panel__preview,.vemcad-solve-demo__summary{margin:0 0 12px;color:#3d485c;line-height:1.45}
-    .vemcad-solve-demo__export,.vemcad-solve-demo__import,.vemcad-solve-demo__preview-export{min-height:34px;margin:0 0 6px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
-    .vemcad-solve-demo__export:disabled,.vemcad-solve-demo__import:disabled,.vemcad-solve-demo__preview-export:disabled{cursor:progress;opacity:.65}
-    .vemcad-solve-demo__export-status,.vemcad-solve-demo__import-status,.vemcad-solve-demo__preview-export-status{min-height:22px;margin:0 0 12px;color:#5b6679;line-height:1.45}
+    .vemcad-solve-demo__export,.vemcad-solve-demo__import,.vemcad-solve-demo__solve-export,.vemcad-solve-demo__preview-export{min-height:34px;margin:0 0 6px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
+    .vemcad-solve-demo__export:disabled,.vemcad-solve-demo__import:disabled,.vemcad-solve-demo__solve-export:disabled,.vemcad-solve-demo__preview-export:disabled{cursor:progress;opacity:.65}
+    .vemcad-solve-demo__export-status,.vemcad-solve-demo__import-status,.vemcad-solve-demo__solve-export-status,.vemcad-solve-demo__preview-export-status{min-height:22px;margin:0 0 12px;color:#5b6679;line-height:1.45}
     .vemcad-solve-demo__share{display:block;margin:0 0 8px;color:#114d7a;line-height:1.35;overflow-wrap:anywhere}
     .vemcad-solve-demo__copy{min-height:34px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
     .vemcad-solve-demo__copy:disabled{cursor:progress;opacity:.65}
@@ -160,6 +160,12 @@ function filenameForPreviewDocument(document, key) {
   return `${safe}.cadgf-document.json`;
 }
 
+function filenameForSolveResult(envelope, project, key) {
+  const raw = project?.project?.id || envelope?.value?.evaluatedView?.project?.id || key || 'vemcad-solve-result';
+  const safe = String(raw).replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'vemcad-solve-result';
+  return `${safe}.solve-result.json`;
+}
+
 async function downloadJson(value, filename, root) {
   const doc = root.ownerDocument;
   const win = doc?.defaultView ?? globalThis.window;
@@ -189,6 +195,10 @@ async function defaultExportProjectJson(project, key, root) {
 
 async function defaultExportPreviewJson(previewDocument, key, root) {
   await downloadJson(previewDocument, filenameForPreviewDocument(previewDocument, key), root);
+}
+
+async function defaultExportSolveResultJson(envelope, project, key, root) {
+  await downloadJson(envelope, filenameForSolveResult(envelope, project, key), root);
 }
 
 async function defaultImportProjectJson(root) {
@@ -268,6 +278,7 @@ export async function mountSolveWorkbenchDemo({
   copyText = defaultCopyText,
   exportProjectJson = defaultExportProjectJson,
   exportPreviewJson = defaultExportPreviewJson,
+  exportSolveResultJson = defaultExportSolveResultJson,
   importProjectJson = defaultImportProjectJson,
 } = {}) {
   if (!root || typeof root.appendChild !== 'function') {
@@ -336,6 +347,16 @@ export async function mountSolveWorkbenchDemo({
   append(meta, 'h2', { text: 'Solve summary' });
   const solveSummary = append(meta, 'p', { className: 'vemcad-solve-demo__solve-summary' });
   const diagnosticsSummary = append(meta, 'p', { className: 'vemcad-solve-demo__diagnostic-count' });
+  const solveExportButton = append(meta, 'button', {
+    type: 'button',
+    text: 'Export Solve Result JSON',
+    className: 'vemcad-solve-demo__solve-export',
+  });
+  const solveExportStatus = append(meta, 'p', {
+    className: 'vemcad-solve-demo__solve-export-status',
+    text: 'Run solve to export result.',
+  });
+  solveExportStatus.setAttribute?.('aria-live', 'polite');
   append(meta, 'h2', { text: 'Preview' });
   const previewExportButton = append(meta, 'button', {
     type: 'button',
@@ -355,6 +376,7 @@ export async function mountSolveWorkbenchDemo({
   let previewUnsubscribe = null;
   let currentShareUrl = '';
   let currentProject = null;
+  let currentSolveEnvelope = null;
   let currentPreviewDocument = null;
   const projectsByKey = { ...demos };
 
@@ -404,19 +426,29 @@ export async function mountSolveWorkbenchDemo({
     setActiveButton(buttons, key);
     const project = projectsByKey[key];
     currentProject = project;
+    currentSolveEnvelope = null;
     currentPreviewDocument = null;
     projectSummary.textContent = summarizeProject(project);
     exportStatus.textContent = 'Ready to export project.';
     importStatus.textContent = 'Ready to import project.';
+    solveExportButton.disabled = true;
+    solveExportStatus.textContent = 'Run solve to export result.';
     previewExportButton.disabled = true;
     previewExportStatus.textContent = 'Run solve to export CADGF preview.';
     updateShare(key);
     controller = createSolveWorkbenchController({ fetchImpl });
     previewUnsubscribe = controller.subscribe((state) => {
+      currentSolveEnvelope = state.envelope ?? null;
       currentPreviewDocument = state.previewDocument ?? null;
       renderCadgfPreviewCanvas({ root: previewRoot, cadgfDocument: state.previewDocument });
       solveSummary.textContent = summarizeSolveState(state);
       diagnosticsSummary.textContent = diagnosticCountText(state);
+      solveExportButton.disabled = !currentSolveEnvelope;
+      solveExportStatus.textContent = currentSolveEnvelope
+        ? 'Ready to export solve result.'
+        : state.status === 'solving'
+          ? 'Solving before export.'
+          : 'Run solve to export result.';
       previewExportButton.disabled = !currentPreviewDocument;
       previewExportStatus.textContent = currentPreviewDocument
         ? 'Ready to export CADGF preview.'
@@ -488,6 +520,22 @@ export async function mountSolveWorkbenchDemo({
       importStatus.textContent = 'Import failed.';
     } finally {
       importButton.disabled = false;
+    }
+  });
+
+  solveExportButton.addEventListener('click', async () => {
+    if (!currentSolveEnvelope) {
+      solveExportStatus.textContent = 'No solve result to export.';
+      return;
+    }
+    solveExportButton.disabled = true;
+    try {
+      await exportSolveResultJson(currentSolveEnvelope, currentProject, selectedKey, root);
+      solveExportStatus.textContent = 'Solve result JSON exported.';
+    } catch {
+      solveExportStatus.textContent = 'Solve result export unavailable.';
+    } finally {
+      solveExportButton.disabled = false;
     }
   });
 
