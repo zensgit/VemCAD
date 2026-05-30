@@ -41,6 +41,11 @@ const server = http.createServer((req, res) => {
 server.on('error', () => process.exit(1));
 server.listen(port, '127.0.0.1');
 
-if (!hasFlag('--ignore-sigterm')) {
+if (hasFlag('--ignore-sigterm')) {
+  // Install a NO-OP handler so SIGTERM is genuinely ignored (overriding node's default
+  // terminate-on-SIGTERM) — only SIGKILL can stop us. Simulates a stuck child so the
+  // launcher's SIGTERM->SIGKILL escalation is actually exercised.
+  process.on('SIGTERM', () => { /* deliberately ignored */ });
+} else {
   process.on('SIGTERM', () => server.close(() => process.exit(0)));
 }

@@ -132,6 +132,26 @@ test('/health never ready within startTimeout -> ROUTER_START_TIMEOUT, and the c
   await launcher.stop(); // idempotent cleanup
 });
 
+test('ROUTER_START_TIMEOUT force-kills an ignore-SIGTERM child (no orphan, without stop())', async () => {
+  // Regression guard: the timeout path must use the SAME SIGTERM->SIGKILL escalation as
+  // stop(); a child that ignores SIGTERM must still be gone after the timeout WITHOUT the
+  // caller invoking stop(). (Retry loop only skips the rare port-bind race.)
+  let launcher;
+  let err;
+  for (let i = 0; i < 4; i++) {
+    const port = await freePort();
+    launcher = launchFake(['--health-delay-ms', '60000', '--ignore-sigterm'], { port, startTimeoutMs: 250 });
+    err = await launcher.ready().then(() => null, (e) => e);
+    if (err instanceof RouterLaunchError && err.code === 'ROUTER_START_TIMEOUT') break;
+    await launcher.stop();
+    err = null;
+  }
+  assert.ok(err instanceof RouterLaunchError && err.code === 'ROUTER_START_TIMEOUT', 'expected ROUTER_START_TIMEOUT');
+  // No stop() on this launcher — proves the timeout path alone force-killed the child.
+  assert.ok(await waitGone(launcher.pid, 3000), 'ignore-SIGTERM child force-killed on timeout (no orphan)');
+  await launcher.stop(); // idempotent cleanup (already gone)
+});
+
 test('stop() force-kills a child that ignores SIGTERM, and is idempotent', async () => {
   const launcher = await launchReady(['--ignore-sigterm'], { startTimeoutMs: 4000 });
   const p1 = launcher.stop();

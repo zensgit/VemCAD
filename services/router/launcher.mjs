@@ -93,6 +93,29 @@ export function startRouterLauncher(options = {}) {
     child.once('error', (error) => { exited = true; exitInfo = exitInfo || { code: null, signal: null, error }; resolve(exitInfo); });
   });
 
+  // Terminate the child via SIGTERM, escalating to SIGKILL after stopTimeoutMs so a child
+  // that ignores SIGTERM cannot orphan. Memoized (idempotent) and SHARED by both stop() and
+  // the ready() timeout path, so timeout cleanup uses the exact same escalation as stop().
+  let terminating = null;
+  function terminate() {
+    if (!terminating) {
+      terminating = (async () => {
+        if (exited) return exitInfo;
+        try {
+          child.kill(stopSignal);
+        } catch {
+          return exitInfo || { code: null, signal: null };
+        }
+        const escalate = delay(stopTimeoutMs).then(() => {
+          if (!exited) { try { child.kill('SIGKILL'); } catch { /* gone */ } }
+        });
+        escalate.catch(() => {});
+        return exitPromise;
+      })();
+    }
+    return terminating;
+  }
+
   const readyPromise = (async () => {
     const deadline = Date.now() + startTimeoutMs;
     while (Date.now() < deadline) {
@@ -108,30 +131,13 @@ export function startRouterLauncher(options = {}) {
       // Wake immediately if the child exits during the wait, else after the interval.
       await Promise.race([delay(healthIntervalMs), exitPromise]);
     }
-    if (!exited) { try { child.kill(stopSignal); } catch { /* already gone */ } }
+    // Timed out: tear the child down via the SAME SIGTERM->SIGKILL escalation as stop(), so
+    // an ignore-SIGTERM child cannot orphan when a caller relies on timeout cleanup. Fire it
+    // and forget — we reject now, but the SIGKILL still lands after stopTimeoutMs.
+    terminate();
     throw new RouterLaunchError('ROUTER_START_TIMEOUT', `router /health not ready within ${startTimeoutMs}ms at ${url}`);
   })();
   readyPromise.catch(() => {}); // suppress unhandled rejection if caller only stop()s
 
-  let stopPromise = null;
-  function stop() {
-    if (!stopPromise) {
-      stopPromise = (async () => {
-        if (exited) return exitInfo;
-        try {
-          child.kill(stopSignal);
-        } catch {
-          return exitInfo || { code: null, signal: null };
-        }
-        const escalate = delay(stopTimeoutMs).then(() => {
-          if (!exited) { try { child.kill('SIGKILL'); } catch { /* gone */ } }
-        });
-        escalate.catch(() => {});
-        return exitPromise;
-      })();
-    }
-    return stopPromise;
-  }
-
-  return { url, pid: child.pid, ready: () => readyPromise, stop };
+  return { url, pid: child.pid, ready: () => readyPromise, stop: terminate };
 }
