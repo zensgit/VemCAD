@@ -104,26 +104,36 @@ function installSmokeDom(search) {
   return { document, elements };
 }
 
-async function smokeBootstrapSolveDemo() {
-  installSmokeDom('?mode=solve-demo');
-  const app = await import(`../apps/web/app.js?smoke=${Date.now()}`);
-  app.resetVemcadWebAppBootstrapState();
-  const result = await app.bootstrapVemcadWebApp({
-    params: new URLSearchParams('mode=solve-demo'),
-    previewBootstrap: async () => {
-      throw new Error('preview must not start in solve-demo smoke');
-    },
-    scheduleOfflineCaching: () => ({ ok: true }),
-  });
-  if (result.mode !== 'solve-demo') {
-    throw new Error(`expected solve-demo mode, got ${result.mode}`);
+async function smokeBootstrapSolveDemo({
+  search = '?mode=solve-demo',
+  expectedDemo = 'solvableLine',
+  expectedStatus = 'solved',
+} = {}) {
+  installSmokeDom(search);
+  const app = await import(`../apps/web/app.js?smoke=${Date.now()}-${expectedDemo}`);
+  try {
+    app.resetVemcadWebAppBootstrapState();
+    const result = await app.bootstrapVemcadWebApp({
+      params: new URLSearchParams(search.startsWith('?') ? search.slice(1) : search),
+      previewBootstrap: async () => {
+        throw new Error('preview must not start in solve-demo smoke');
+      },
+      scheduleOfflineCaching: () => ({ ok: true }),
+    });
+    if (result.mode !== 'solve-demo') {
+      throw new Error(`expected solve-demo mode, got ${result.mode}`);
+    }
+    if (result.demo.selectedKey !== expectedDemo) {
+      throw new Error(`expected demo ${expectedDemo}, got ${result.demo.selectedKey}`);
+    }
+    if (result.demo.getPanelState()?.status !== expectedStatus) {
+      throw new Error(`expected auto-solved demo state ${expectedStatus}, got ${result.demo.getPanelState()?.status}`);
+    }
+  } finally {
+    app.resetVemcadWebAppBootstrapState();
+    delete globalThis.document;
+    delete globalThis.window;
   }
-  if (result.demo.getPanelState()?.status !== 'solved') {
-    throw new Error(`expected auto-solved demo state, got ${result.demo.getPanelState()?.status}`);
-  }
-  app.resetVemcadWebAppBootstrapState();
-  delete globalThis.document;
-  delete globalThis.window;
 }
 
 const started = await startStaticServer({ host: '127.0.0.1', port: 0 });
@@ -147,6 +157,11 @@ try {
   assertIncludes(previewCanvasJs, 'Solved geometry preview', 'preview_canvas.js');
 
   await smokeBootstrapSolveDemo();
+  await smokeBootstrapSolveDemo({
+    search: '?mode=solve-demo&demo=conflictingLine',
+    expectedDemo: 'conflictingLine',
+    expectedStatus: 'blocked',
+  });
 
   console.log(`solve-demo smoke PASS: ${indexUrl}`);
 } finally {
