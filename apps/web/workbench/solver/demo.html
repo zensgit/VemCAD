@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VemCAD Solve Workbench</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f5f7fb;
+        color: #1d2433;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      #app {
+        min-height: 100vh;
+      }
+
+      .vemcad-solve-demo {
+        width: min(1120px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 28px 0;
+      }
+
+      .vemcad-solve-demo__header h1 {
+        margin: 0 0 18px;
+        font-size: 28px;
+        font-weight: 720;
+        letter-spacing: 0;
+      }
+
+      .vemcad-solve-demo__nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      .vemcad-solve-demo__tab,
+      .vemcad-solve-panel button {
+        border: 1px solid #c9d3e5;
+        background: #ffffff;
+        color: #1f2937;
+        min-height: 38px;
+        border-radius: 6px;
+        padding: 8px 12px;
+        cursor: pointer;
+      }
+
+      .vemcad-solve-demo__tab[data-active="true"],
+      .vemcad-solve-panel button {
+        background: #114d7a;
+        border-color: #114d7a;
+        color: #ffffff;
+      }
+
+      .vemcad-solve-panel button:disabled {
+        cursor: progress;
+        opacity: 0.65;
+      }
+
+      .vemcad-solve-demo__content {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(240px, 320px);
+        gap: 16px;
+        align-items: start;
+      }
+
+      .vemcad-solve-demo__panel,
+      .vemcad-solve-demo__meta {
+        background: #ffffff;
+        border: 1px solid #d8e0ee;
+        border-radius: 8px;
+        padding: 18px;
+        box-shadow: 0 8px 22px rgb(15 23 42 / 0.06);
+      }
+
+      .vemcad-solve-panel h2,
+      .vemcad-solve-demo__meta h2 {
+        margin: 0 0 12px;
+        font-size: 18px;
+        letter-spacing: 0;
+      }
+
+      .vemcad-solve-panel h3 {
+        margin: 18px 0 8px;
+        font-size: 15px;
+        letter-spacing: 0;
+      }
+
+      .vemcad-solve-panel__status {
+        display: inline-flex;
+        min-height: 30px;
+        align-items: center;
+        border-radius: 6px;
+        padding: 4px 10px;
+        margin: 0 0 10px;
+        background: #eef6ed;
+        color: #255a2e;
+        font-weight: 650;
+      }
+
+      .vemcad-solve-panel__status[data-status="blocked"],
+      .vemcad-solve-panel__status[data-status="failed"] {
+        background: #fff3df;
+        color: #8a4b00;
+      }
+
+      .vemcad-solve-panel__status[data-status="solving"] {
+        background: #eaf1ff;
+        color: #1f4f91;
+      }
+
+      .vemcad-solve-panel__details,
+      .vemcad-solve-panel__preview,
+      .vemcad-solve-demo__summary {
+        margin: 0 0 12px;
+        color: #3d485c;
+        line-height: 1.45;
+      }
+
+      .vemcad-solve-panel__diagnostics {
+        margin: 0;
+        padding-left: 20px;
+        color: #354258;
+        line-height: 1.5;
+      }
+
+      @media (max-width: 760px) {
+        .vemcad-solve-demo {
+          width: min(100vw - 20px, 1120px);
+          padding: 18px 0;
+        }
+
+        .vemcad-solve-demo__content {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import { installVemcadAppBridge } from "../../app.js";
+      import { mountSolveWorkbenchDemo } from "./demo_page.js";
+
+      const appBridge = installVemcadAppBridge();
+      await mountSolveWorkbenchDemo({
+        root: document.getElementById("app"),
+        appBridge,
+      });
+    </script>
+  </body>
+</html>

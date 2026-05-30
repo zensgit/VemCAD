@@ -12,6 +12,8 @@
   - 缩放工具使用的兼容 payload helper。迁移期继续保留，直到工具侧完成切换。
 - `bootstrapCadWorkspace({ params })`
   - workbench 启动入口。返回的 `{ destroy, state, commands, importPayload }` 视为稳定对外接口。
+- `mountSolveWorkbenchDemo({ root, appBridge })`
+  - 产品层 solve workbench demo 入口。用于本地 smoke / demo，不替代正式 workbench bootstrap。
 - `window.__vemcadApp.switchToEditor(documentJson)`
   - preview -> editor 的稳定桥接路径。preview/runtime 和 workbench/bootstrap 可以重组，但全局 handoff 入口不能回退。
 - `window.__vemcadApp.mountSolvePanel(root, { project, controller })`

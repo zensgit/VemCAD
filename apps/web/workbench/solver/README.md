@@ -11,6 +11,8 @@
   passthrough），用于 demo / smoke / fixture。
 - `demo_fetch.js`：纯前端 demo fetch，按 `demo_projects.js` 的 project id 返回固定
   `/solve` 信封，便于在没有真实 solve 服务时演示 panel 状态流。
+- `demo_page.js` / `demo.html`：可打开的产品层 solve workbench demo，串起 app bridge、
+  panel、demo fixtures 和 demo fetch。
 
 ## 适合放在这里的内容
 
