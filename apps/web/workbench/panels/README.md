@@ -2,6 +2,11 @@
 
 这个目录承接 editor panel 和 panel orchestration 相关模块。
 
+当前产品层入口：
+
+- `solve_panel.js`：把 solver controller state 映射到最小 DOM panel。它只消费
+  `workbench/solver` 的稳定状态，不重新定义 solve contract，也不直接调用 solver。
+
 ## 适合放在这里的内容
 
 - property panel、solver action panel、状态栏等 UI 协作者
