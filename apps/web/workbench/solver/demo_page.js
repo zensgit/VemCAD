@@ -40,7 +40,10 @@ function ensureSolveDemoStyles(document) {
     .vemcad-solve-panel__status[data-status="blocked"],.vemcad-solve-panel__status[data-status="failed"]{background:#fff3df;color:#8a4b00}
     .vemcad-solve-panel__status[data-status="solving"]{background:#eaf1ff;color:#1f4f91}
     .vemcad-solve-panel__details,.vemcad-solve-panel__preview,.vemcad-solve-demo__summary{margin:0 0 12px;color:#3d485c;line-height:1.45}
-    .vemcad-solve-demo__share{display:block;margin:0 0 12px;color:#114d7a;line-height:1.35;overflow-wrap:anywhere}
+    .vemcad-solve-demo__share{display:block;margin:0 0 8px;color:#114d7a;line-height:1.35;overflow-wrap:anywhere}
+    .vemcad-solve-demo__copy{min-height:34px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
+    .vemcad-solve-demo__copy:disabled{cursor:progress;opacity:.65}
+    .vemcad-solve-demo__copy-status{min-height:22px;margin:0 0 12px;color:#5b6679;line-height:1.45}
     .vemcad-solve-demo__solve-summary{margin:0 0 6px;color:#3d485c;line-height:1.45}
     .vemcad-solve-demo__diagnostic-count{margin:0 0 12px;color:#5b6679;line-height:1.45}
     .vemcad-solve-demo__visual{min-height:180px;border:1px solid #e1e7f2;border-radius:6px;background:#f8fafc;overflow:hidden}
@@ -113,6 +116,33 @@ function demoUrlFor(root, key) {
   }
 }
 
+async function defaultCopyText(text, root) {
+  const doc = root.ownerDocument;
+  const clipboard = root.ownerDocument?.defaultView?.navigator?.clipboard ?? globalThis.navigator?.clipboard;
+  if (clipboard && typeof clipboard.writeText === 'function') {
+    try {
+      await clipboard.writeText(text);
+      return;
+    } catch {
+      // Fall through to the textarea path for browsers that expose the API
+      // but deny it in local or embedded contexts.
+    }
+  }
+  if (doc?.body && typeof doc.createElement === 'function' && typeof doc.execCommand === 'function') {
+    const textarea = doc.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    doc.body.appendChild(textarea);
+    textarea.select();
+    const copied = doc.execCommand('copy');
+    doc.body.removeChild(textarea);
+    if (copied) return;
+  }
+  throw new Error('clipboard is unavailable');
+}
+
 function resolveInitialDemo(initialDemo, demos) {
   if (initialDemo && Object.prototype.hasOwnProperty.call(demos, initialDemo)) {
     return initialDemo;
@@ -143,6 +173,7 @@ export async function mountSolveWorkbenchDemo({
   initialDemo = DEFAULT_DEMO_ID,
   demos = SOLVE_WORKBENCH_DEMOS,
   fetchImpl = createSolveDemoFetch(),
+  copyText = defaultCopyText,
 } = {}) {
   if (!root || typeof root.appendChild !== 'function') {
     throw new TypeError('root element is required');
@@ -177,6 +208,16 @@ export async function mountSolveWorkbenchDemo({
   const shareLink = append(meta, 'a', { className: 'vemcad-solve-demo__share' });
   shareLink.target = '_blank';
   shareLink.rel = 'noreferrer';
+  const copyButton = append(meta, 'button', {
+    type: 'button',
+    text: 'Copy link',
+    className: 'vemcad-solve-demo__copy',
+  });
+  const copyStatus = append(meta, 'p', {
+    className: 'vemcad-solve-demo__copy-status',
+    text: 'Ready to copy link.',
+  });
+  copyStatus.setAttribute?.('aria-live', 'polite');
   append(meta, 'h2', { text: 'Solve summary' });
   const solveSummary = append(meta, 'p', { className: 'vemcad-solve-demo__solve-summary' });
   const diagnosticsSummary = append(meta, 'p', { className: 'vemcad-solve-demo__diagnostic-count' });
@@ -187,6 +228,7 @@ export async function mountSolveWorkbenchDemo({
   let panelHandle = null;
   let controller = null;
   let previewUnsubscribe = null;
+  let currentShareUrl = '';
 
   async function select(key) {
     if (!demos[key]) {
@@ -199,9 +241,11 @@ export async function mountSolveWorkbenchDemo({
     const project = demos[key];
     projectSummary.textContent = summarizeProject(project);
     const demoUrl = demoUrlFor(root, key);
+    currentShareUrl = demoUrl;
     shareLink.href = demoUrl;
     shareLink.setAttribute?.('href', demoUrl);
     shareLink.textContent = demoUrl;
+    copyStatus.textContent = 'Ready to copy link.';
     controller = createSolveWorkbenchController({ fetchImpl });
     previewUnsubscribe = controller.subscribe((state) => {
       renderCadgfPreviewCanvas({ root: previewRoot, cadgfDocument: state.previewDocument });
@@ -219,6 +263,18 @@ export async function mountSolveWorkbenchDemo({
       });
     });
   }
+
+  copyButton.addEventListener('click', async () => {
+    copyButton.disabled = true;
+    try {
+      await copyText(currentShareUrl, root);
+      copyStatus.textContent = 'Link copied.';
+    } catch {
+      copyStatus.textContent = 'Copy unavailable.';
+    } finally {
+      copyButton.disabled = false;
+    }
+  });
 
   await select(resolveInitialDemo(initialDemo, demos));
   if (autoSolve) {
