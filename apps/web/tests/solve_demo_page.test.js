@@ -141,6 +141,7 @@ test('mountSolveWorkbenchDemo mounts selectable demos and solves without a live 
   );
   assert.equal(findByClass(root, 'vemcad-solve-demo__solve-summary').textContent, 'No solve has run yet.');
   assert.equal(findByClass(root, 'vemcad-solve-demo__diagnostic-count').textContent, 'diagnostics=0');
+  assert.equal(findByClass(root, 'vemcad-solve-demo__solve-evidence').textContent, 'No solve result yet.');
   assert.equal(findByClass(root, 'vemcad-solve-demo__export-status').textContent, 'Ready to export project.');
   assert.equal(findByClass(root, 'vemcad-solve-demo__import-status').textContent, 'Ready to import project.');
   assert.equal(findByClass(root, 'vemcad-solve-demo__solve-export').disabled, true);
@@ -164,6 +165,8 @@ test('mountSolveWorkbenchDemo mounts selectable demos and solves without a live 
   assert.equal(findByTag(root, 'svg').getAttribute('aria-label'), 'Solved geometry preview');
   assert.match(findByClass(root, 'vemcad-solve-demo__solve-summary').textContent, /state=underconstrained/);
   assert.equal(findByClass(root, 'vemcad-solve-demo__diagnostic-count').textContent, 'diagnostics=1');
+  assert.match(findByClass(root, 'vemcad-solve-demo__solve-evidence').textContent, /ok=true\nhttp=200\nstatus=solved/);
+  assert.match(findByClass(root, 'vemcad-solve-demo__solve-evidence').textContent, /state=underconstrained/);
 
   await demo.select('conflictingLine');
   await demo.solve();
@@ -179,6 +182,8 @@ test('mountSolveWorkbenchDemo mounts selectable demos and solves without a live 
     'http://127.0.0.1/apps/web/index.html?mode=solve-demo&demo=conflictingLine',
   );
   assert.match(findByClass(root, 'vemcad-solve-demo__solve-summary').textContent, /state=overconstrained/);
+  assert.match(findByClass(root, 'vemcad-solve-demo__solve-evidence').textContent, /ok=false\nhttp=422\nstatus=blocked\nerror=SOLVE_UNSATISFIED/);
+  assert.match(findByClass(root, 'vemcad-solve-demo__solve-evidence').textContent, /state=overconstrained\ndof=0\nconflicts=1/);
   assert.match(findByClass(root, 'vemcad-preview-canvas__empty').textContent, /No solved geometry/);
 });
 

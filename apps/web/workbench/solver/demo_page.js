@@ -50,7 +50,8 @@ function ensureSolveDemoStyles(document) {
     .vemcad-solve-demo__copy:disabled{cursor:progress;opacity:.65}
     .vemcad-solve-demo__copy-status{min-height:22px;margin:0 0 12px;color:#5b6679;line-height:1.45}
     .vemcad-solve-demo__solve-summary{margin:0 0 6px;color:#3d485c;line-height:1.45}
-    .vemcad-solve-demo__diagnostic-count{margin:0 0 12px;color:#5b6679;line-height:1.45}
+    .vemcad-solve-demo__diagnostic-count{margin:0 0 10px;color:#5b6679;line-height:1.45}
+    .vemcad-solve-demo__solve-evidence{min-height:38px;margin:0 0 12px;padding:8px;border:1px solid #e1e7f2;border-radius:6px;background:#f8fafc;color:#334155;font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;white-space:pre-wrap;overflow-wrap:anywhere}
     .vemcad-solve-demo__visual{min-height:180px;border:1px solid #e1e7f2;border-radius:6px;background:#f8fafc;overflow:hidden}
     .vemcad-preview-canvas{display:block;width:100%;height:180px}
     .vemcad-preview-canvas__line{stroke:#114d7a;stroke-width:.22;stroke-linecap:round;vector-effect:non-scaling-stroke}
@@ -104,6 +105,24 @@ function summarizeSolveState(state) {
 function diagnosticCountText(state) {
   const count = Array.isArray(state?.diagnostics) ? state.diagnostics.length : 0;
   return `diagnostics=${count}`;
+}
+
+function solveEvidenceText(envelope, summary) {
+  if (!envelope || !summary) return 'No solve result yet.';
+  const lines = [
+    `ok=${envelope.ok === true ? 'true' : 'false'}`,
+    Number.isFinite(summary.httpStatus) ? `http=${summary.httpStatus}` : null,
+    summary.status ? `status=${summary.status}` : null,
+    summary.errorCode ? `error=${summary.errorCode}` : null,
+    summary.structuralState ? `state=${summary.structuralState}` : null,
+    Number.isFinite(summary.dofEstimate) ? `dof=${summary.dofEstimate}` : null,
+    Number.isFinite(summary.conflictGroupCount) ? `conflicts=${summary.conflictGroupCount}` : null,
+    Number.isFinite(summary.redundantConstraintEstimate) ? `redundant=${summary.redundantConstraintEstimate}` : null,
+    Number.isFinite(summary.iterations) ? `iters=${summary.iterations}` : null,
+    Number.isFinite(summary.finalError) ? `err=${summary.finalError}` : null,
+    Number.isFinite(summary.diagnosticCount) ? `diagnostics=${summary.diagnosticCount}` : null,
+  ].filter(Boolean);
+  return lines.join('\n') || 'Solve result has no summary.';
 }
 
 function demoUrlFor(root, key) {
@@ -347,6 +366,10 @@ export async function mountSolveWorkbenchDemo({
   append(meta, 'h2', { text: 'Solve summary' });
   const solveSummary = append(meta, 'p', { className: 'vemcad-solve-demo__solve-summary' });
   const diagnosticsSummary = append(meta, 'p', { className: 'vemcad-solve-demo__diagnostic-count' });
+  const solveEvidence = append(meta, 'pre', {
+    className: 'vemcad-solve-demo__solve-evidence',
+    text: 'No solve result yet.',
+  });
   const solveExportButton = append(meta, 'button', {
     type: 'button',
     text: 'Export Solve Result JSON',
@@ -433,6 +456,7 @@ export async function mountSolveWorkbenchDemo({
     importStatus.textContent = 'Ready to import project.';
     solveExportButton.disabled = true;
     solveExportStatus.textContent = 'Run solve to export result.';
+    solveEvidence.textContent = 'No solve result yet.';
     previewExportButton.disabled = true;
     previewExportStatus.textContent = 'Run solve to export CADGF preview.';
     updateShare(key);
@@ -443,6 +467,7 @@ export async function mountSolveWorkbenchDemo({
       renderCadgfPreviewCanvas({ root: previewRoot, cadgfDocument: state.previewDocument });
       solveSummary.textContent = summarizeSolveState(state);
       diagnosticsSummary.textContent = diagnosticCountText(state);
+      solveEvidence.textContent = solveEvidenceText(currentSolveEnvelope, state.summary);
       solveExportButton.disabled = !currentSolveEnvelope;
       solveExportStatus.textContent = currentSolveEnvelope
         ? 'Ready to export solve result.'
