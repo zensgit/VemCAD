@@ -358,6 +358,24 @@ test('import project button reports failure for an invalid project', async () =>
   assert.match(findByClass(root, 'vemcad-solve-demo__summary').textContent, /id=demo-solvable-line/);
 });
 
+test('import success is not relabeled as import failure when auto-solve fails', async () => {
+  const document = makeDocument();
+  const root = makeElement('div', document);
+
+  const demo = await mountSolveWorkbenchDemo({
+    root,
+    autoSolve: true,
+    importProjectJson: async () => importedLineProject(),
+  });
+
+  await findByClass(root, 'vemcad-solve-demo__import').click();
+
+  assert.equal(demo.selectedKey, 'importedProject');
+  assert.equal(findByClass(root, 'vemcad-solve-demo__import-status').textContent, 'Project JSON imported.');
+  assert.equal(demo.getPanelState().status, 'failed');
+  assert.match(findByClass(root, 'vemcad-solve-demo__summary').textContent, /id=imported-line/);
+});
+
 test('mountSolveWorkbenchDemo can select and auto-run a requested initial demo', async () => {
   const document = makeDocument();
   const root = makeElement('div', document);
