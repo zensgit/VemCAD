@@ -4,6 +4,7 @@ export const WORKBENCH_STABLE_EXPORTS = Object.freeze([
   'computeScalePayload(center, referencePoint, targetPoint)',
   'bootstrapCadWorkspace({ params })',
   'createSolveWorkbenchController({ endpoint, fetchImpl })',
+  'createSolveWorkbenchPanel({ root, project, controller })',
 ]);
 
 export const WORKBENCH_GLOBAL_CONTRACTS = Object.freeze([
@@ -25,3 +26,4 @@ export {
   summarizeSolveEnvelope,
 } from '../solver/solve_workbench.js';
 export { SOLVE_WORKBENCH_DEMOS } from '../solver/demo_projects.js';
+export { createSolveWorkbenchPanel } from '../panels/solve_panel.js';
