@@ -2,6 +2,14 @@
 
 这个目录承接 editor solver bridge、solver state 和诊断协作者。
 
+当前产品层入口：
+
+- `solve_workbench.js`：调用产品 `/solve` 服务、归一化 solve summary、从
+  `evaluatedView` 派生 CADGF preview document，并提供可绑定 UI 的 controller
+  `{ getState, subscribe, solve }`。
+- `demo_projects.js`：三个固定 VEMCAD-PROJECT 样本（可解、冲突、unsupported
+  passthrough），用于 demo / smoke / fixture。
+
 ## 适合放在这里的内容
 
 - solver bridge 和 action 状态机

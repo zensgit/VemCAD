@@ -22,6 +22,8 @@
 - `preview/runtime/preview_bootstrap.js`
 - `preview/runtime/editor_handoff.js`
 - `preview/runtime/contracts/index.js`
+- `workbench/solver/solve_workbench.js`
+- `workbench/solver/demo_projects.js`
 
 已有可复用的拆分前置模块包括：
 
@@ -57,5 +59,6 @@
 - 新增产品级命令逻辑，不再默认直接追加到 `command_registry.js`。
 - 新增 UI wiring / panel orchestration，不再默认直接追加到 `workspace.js`。
 - 新增 preview 与 desktop bridge 规则，不再默认直接追加到 `preview_app.js`。
+- 新增 solver 诊断 / solve action state，不再默认直接追加到 `workspace.js`。
 - 迁移期优先经由 `apps/web/*` facade 暴露稳定入口，再逐步替换 legacy 依赖。
 - 迁移期优先保持旧入口兼容，等模块边界稳定后再做物理挪动到 `apps/web/*`。
