@@ -158,6 +158,36 @@ test('mountSolveWorkbenchDemo can auto-run the default solve', async () => {
   assert.equal(findByTag(root, 'svg').getAttribute('aria-label'), 'Solved geometry preview');
 });
 
+test('mountSolveWorkbenchDemo can select and auto-run a requested initial demo', async () => {
+  const document = makeDocument();
+  const root = makeElement('div', document);
+
+  const demo = await mountSolveWorkbenchDemo({
+    root,
+    autoSolve: true,
+    initialDemo: 'conflictingLine',
+  });
+
+  assert.equal(demo.selectedKey, 'conflictingLine');
+  assert.equal(demo.getPanelState().status, 'blocked');
+  assert.equal(demo.getPanelState().previewDocument, null);
+  assert.equal(demo.buttons.conflictingLine.disabled, true);
+  assert.match(findByClass(root, 'vemcad-preview-canvas__empty').textContent, /No solved geometry/);
+});
+
+test('mountSolveWorkbenchDemo falls back to the default demo for an unknown initial demo', async () => {
+  const document = makeDocument();
+  const root = makeElement('div', document);
+
+  const demo = await mountSolveWorkbenchDemo({
+    root,
+    initialDemo: 'unknown-demo',
+  });
+
+  assert.equal(demo.selectedKey, 'solvableLine');
+  assert.match(findByClass(root, 'vemcad-solve-demo__summary').textContent, /id=demo-solvable-line/);
+});
+
 test('demo buttons switch the mounted project', async () => {
   const document = makeDocument();
   const root = makeElement('div', document);

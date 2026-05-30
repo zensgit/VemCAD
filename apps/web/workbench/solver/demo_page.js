@@ -6,6 +6,7 @@ import { createSolveWorkbenchController } from './solve_workbench.js';
 
 const STYLE_ID = 'vemcad-solve-demo-styles';
 const DEMO_ORDER = ['solvableLine', 'conflictingLine', 'passthroughUnsupported'];
+const DEFAULT_DEMO_ID = DEMO_ORDER[0];
 
 const DEMO_LABELS = Object.freeze({
   solvableLine: 'Solvable',
@@ -78,6 +79,13 @@ function summarizeProject(project) {
   ].join(' | ');
 }
 
+function resolveInitialDemo(initialDemo, demos) {
+  if (initialDemo && Object.prototype.hasOwnProperty.call(demos, initialDemo)) {
+    return initialDemo;
+  }
+  return DEFAULT_DEMO_ID;
+}
+
 async function mountPanel({ appBridge, panelRoot, project, controller }) {
   if (appBridge && typeof appBridge.mountSolvePanel === 'function') {
     return appBridge.mountSolvePanel(panelRoot, {
@@ -98,6 +106,7 @@ export async function mountSolveWorkbenchDemo({
   root,
   appBridge = null,
   autoSolve = false,
+  initialDemo = DEFAULT_DEMO_ID,
   demos = SOLVE_WORKBENCH_DEMOS,
   fetchImpl = createSolveDemoFetch(),
 } = {}) {
@@ -164,7 +173,7 @@ export async function mountSolveWorkbenchDemo({
     });
   }
 
-  await select(DEMO_ORDER[0]);
+  await select(resolveInitialDemo(initialDemo, demos));
   if (autoSolve) {
     await panelHandle.solve();
   }

@@ -318,7 +318,7 @@ test('bootstrapVemcadWebApp schedules product offline cache after editor bootstr
 });
 
 test('bootstrapVemcadWebApp mounts solve demo mode without starting preview or workspace', async () => {
-  const { elements } = installDomStubs({ search: '?mode=solve-demo' });
+  const { elements } = installDomStubs({ search: '?mode=solve-demo&demo=conflictingLine' });
   const moduleUrl = pathToFileURL(path.join(repoRoot, 'apps/web/app.js')).href;
   const appModule = await import(`${moduleUrl}?solve-demo-mode`);
 
@@ -327,7 +327,7 @@ test('bootstrapVemcadWebApp mounts solve demo mode without starting preview or w
   let mounted = null;
 
   const result = await appModule.bootstrapVemcadWebApp({
-    params: new URLSearchParams('mode=solve-demo'),
+    params: new URLSearchParams('mode=solve-demo&demo=conflictingLine'),
     previewBootstrap: async () => {
       throw new Error('preview should not start in solve-demo mode');
     },
@@ -350,6 +350,7 @@ test('bootstrapVemcadWebApp mounts solve demo mode without starting preview or w
   assert.deepEqual(result.demo, { kind: 'solve-demo-handle' });
   assert.equal(mounted.root.id, 'cad-editor-root');
   assert.equal(mounted.autoSolve, true);
+  assert.equal(mounted.initialDemo, 'conflictingLine');
   assert.equal(typeof mounted.appBridge.mountSolvePanel, 'function');
   assert.equal(elements.get('preview-root').classList.contains('is-hidden'), true);
   assert.equal(elements.get('cad-editor-root').classList.contains('is-hidden'), false);
