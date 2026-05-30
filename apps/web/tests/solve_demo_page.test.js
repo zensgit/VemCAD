@@ -56,6 +56,11 @@ function makeElement(tag, ownerDocument) {
 
 function makeDocument() {
   const document = {
+    defaultView: {
+      location: {
+        href: 'http://127.0.0.1/apps/web/index.html?mode=solve-demo',
+      },
+    },
     createElement(tag) {
       return makeElement(tag, document);
     },
@@ -108,17 +113,30 @@ test('mountSolveWorkbenchDemo mounts selectable demos and solves without a live 
   assert.equal(demo.buttons.solvableLine.disabled, true);
   assert.equal(demo.buttons.conflictingLine.disabled, false);
   assert.match(findByClass(root, 'vemcad-solve-demo__summary').textContent, /id=demo-solvable-line/);
+  assert.equal(
+    findByClass(root, 'vemcad-solve-demo__share').getAttribute('href'),
+    'http://127.0.0.1/apps/web/index.html?mode=solve-demo&demo=solvableLine',
+  );
+  assert.equal(findByClass(root, 'vemcad-solve-demo__solve-summary').textContent, 'No solve has run yet.');
+  assert.equal(findByClass(root, 'vemcad-solve-demo__diagnostic-count').textContent, 'diagnostics=0');
 
   await demo.solve();
   assert.equal(demo.getPanelState().status, 'solved');
   assert.equal(demo.getPanelState().previewDocument.document_id, 'demo-solvable-line');
   assert.equal(findByTag(root, 'svg').getAttribute('aria-label'), 'Solved geometry preview');
+  assert.match(findByClass(root, 'vemcad-solve-demo__solve-summary').textContent, /state=underconstrained/);
+  assert.equal(findByClass(root, 'vemcad-solve-demo__diagnostic-count').textContent, 'diagnostics=1');
 
   await demo.select('conflictingLine');
   await demo.solve();
   assert.equal(demo.selectedKey, 'conflictingLine');
   assert.equal(demo.getPanelState().status, 'blocked');
   assert.equal(demo.getPanelState().previewDocument, null);
+  assert.equal(
+    findByClass(root, 'vemcad-solve-demo__share').getAttribute('href'),
+    'http://127.0.0.1/apps/web/index.html?mode=solve-demo&demo=conflictingLine',
+  );
+  assert.match(findByClass(root, 'vemcad-solve-demo__solve-summary').textContent, /state=overconstrained/);
   assert.match(findByClass(root, 'vemcad-preview-canvas__empty').textContent, /No solved geometry/);
 });
 

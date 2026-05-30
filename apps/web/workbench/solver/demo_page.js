@@ -40,6 +40,9 @@ function ensureSolveDemoStyles(document) {
     .vemcad-solve-panel__status[data-status="blocked"],.vemcad-solve-panel__status[data-status="failed"]{background:#fff3df;color:#8a4b00}
     .vemcad-solve-panel__status[data-status="solving"]{background:#eaf1ff;color:#1f4f91}
     .vemcad-solve-panel__details,.vemcad-solve-panel__preview,.vemcad-solve-demo__summary{margin:0 0 12px;color:#3d485c;line-height:1.45}
+    .vemcad-solve-demo__share{display:block;margin:0 0 12px;color:#114d7a;line-height:1.35;overflow-wrap:anywhere}
+    .vemcad-solve-demo__solve-summary{margin:0 0 6px;color:#3d485c;line-height:1.45}
+    .vemcad-solve-demo__diagnostic-count{margin:0 0 12px;color:#5b6679;line-height:1.45}
     .vemcad-solve-demo__visual{min-height:180px;border:1px solid #e1e7f2;border-radius:6px;background:#f8fafc;overflow:hidden}
     .vemcad-preview-canvas{display:block;width:100%;height:180px}
     .vemcad-preview-canvas__line{stroke:#114d7a;stroke-width:.22;stroke-linecap:round;vector-effect:non-scaling-stroke}
@@ -77,6 +80,37 @@ function summarizeProject(project) {
     `entities=${project.entities.length}`,
     `constraints=${project.constraints.length}`,
   ].join(' | ');
+}
+
+function summarizeSolveState(state) {
+  if (!state?.summary) return 'No solve has run yet.';
+  const parts = [];
+  if (state.summary.structuralState) parts.push(`state=${state.summary.structuralState}`);
+  if (state.summary.dofEstimate !== null) parts.push(`dof=${state.summary.dofEstimate}`);
+  if (state.summary.conflictGroupCount !== null) parts.push(`conflicts=${state.summary.conflictGroupCount}`);
+  if (state.summary.iterations !== null) parts.push(`iters=${state.summary.iterations}`);
+  if (state.summary.finalError !== null) parts.push(`err=${state.summary.finalError}`);
+  return parts.length ? parts.join(' | ') : `status=${state.status}`;
+}
+
+function diagnosticCountText(state) {
+  const count = Array.isArray(state?.diagnostics) ? state.diagnostics.length : 0;
+  return `diagnostics=${count}`;
+}
+
+function demoUrlFor(root, key) {
+  const href = root.ownerDocument?.defaultView?.location?.href
+    ?? globalThis.window?.location?.href
+    ?? '';
+  if (!href) return `?mode=solve-demo&demo=${encodeURIComponent(key)}`;
+  try {
+    const url = new URL(href);
+    url.searchParams.set('mode', 'solve-demo');
+    url.searchParams.set('demo', key);
+    return url.href;
+  } catch {
+    return `?mode=solve-demo&demo=${encodeURIComponent(key)}`;
+  }
 }
 
 function resolveInitialDemo(initialDemo, demos) {
@@ -139,6 +173,13 @@ export async function mountSolveWorkbenchDemo({
   const meta = append(content, 'aside', { className: 'vemcad-solve-demo__meta' });
   append(meta, 'h2', { text: 'Project' });
   const projectSummary = append(meta, 'p', { className: 'vemcad-solve-demo__summary' });
+  append(meta, 'h2', { text: 'Share' });
+  const shareLink = append(meta, 'a', { className: 'vemcad-solve-demo__share' });
+  shareLink.target = '_blank';
+  shareLink.rel = 'noreferrer';
+  append(meta, 'h2', { text: 'Solve summary' });
+  const solveSummary = append(meta, 'p', { className: 'vemcad-solve-demo__solve-summary' });
+  const diagnosticsSummary = append(meta, 'p', { className: 'vemcad-solve-demo__diagnostic-count' });
   append(meta, 'h2', { text: 'Preview' });
   const previewRoot = append(meta, 'div', { className: 'vemcad-solve-demo__visual' });
 
@@ -157,9 +198,15 @@ export async function mountSolveWorkbenchDemo({
     setActiveButton(buttons, key);
     const project = demos[key];
     projectSummary.textContent = summarizeProject(project);
+    const demoUrl = demoUrlFor(root, key);
+    shareLink.href = demoUrl;
+    shareLink.setAttribute?.('href', demoUrl);
+    shareLink.textContent = demoUrl;
     controller = createSolveWorkbenchController({ fetchImpl });
     previewUnsubscribe = controller.subscribe((state) => {
       renderCadgfPreviewCanvas({ root: previewRoot, cadgfDocument: state.previewDocument });
+      solveSummary.textContent = summarizeSolveState(state);
+      diagnosticsSummary.textContent = diagnosticCountText(state);
     });
     panelHandle = await mountPanel({ appBridge, panelRoot, project, controller });
     return panelHandle;
