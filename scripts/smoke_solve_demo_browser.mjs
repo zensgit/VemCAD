@@ -16,6 +16,7 @@ const CASES = [
     summary: /state=underconstrained/,
     diagnostics: /^diagnostics=1$/,
     preview: 'svg',
+    evidence: /ok=true\nhttp=200\nstatus=solved\nstate=underconstrained/,
     solveExportStatus: 'Ready to export solve result.',
     previewExportStatus: 'Ready to export CADGF preview.',
   },
@@ -26,6 +27,7 @@ const CASES = [
     summary: /state=overconstrained/,
     diagnostics: /^diagnostics=1$/,
     preview: 'empty',
+    evidence: /ok=false\nhttp=422\nstatus=blocked\nerror=SOLVE_UNSATISFIED\nstate=overconstrained\ndof=0\nconflicts=1/,
     solveExportStatus: 'Ready to export solve result.',
     previewExportStatus: 'No CADGF preview to export.',
     downloadSolveResult: true,
@@ -37,6 +39,7 @@ const CASES = [
     summary: /iters=0/,
     diagnostics: /^diagnostics=2$/,
     preview: 'empty',
+    evidence: /ok=true\nhttp=200\nstatus=solved\nstate=underconstrained/,
     solveExportStatus: 'Ready to export solve result.',
     previewExportStatus: 'Ready to export CADGF preview.',
   },
@@ -122,6 +125,7 @@ async function verifyCase({ page, base, screenshotDir, spec }) {
   await assertMatches(page, '.vemcad-solve-panel__details', spec.detail, `${spec.id} details`);
   await assertMatches(page, '.vemcad-solve-demo__solve-summary', spec.summary, `${spec.id} meta summary`);
   await assertMatches(page, '.vemcad-solve-demo__diagnostic-count', spec.diagnostics, `${spec.id} diagnostic count`);
+  await assertMatches(page, '.vemcad-solve-demo__solve-evidence', spec.evidence, `${spec.id} solve evidence`);
   await assertMatches(page, '.vemcad-solve-demo__share', new RegExp(`demo=${spec.id}`), `${spec.id} share link`);
   await assertText(page, '.vemcad-solve-demo__export', 'Export Project JSON', `${spec.id} export button`);
   await assertText(page, '.vemcad-solve-demo__export-status', 'Ready to export project.', `${spec.id} export status`);
@@ -176,6 +180,7 @@ async function verifyImportProject({ page, base, screenshotDir }) {
   await assertText(page, '.vemcad-solve-demo__share', 'Imported project is local. Export JSON to share.', 'imported share text');
   await assertText(page, '.vemcad-solve-demo__copy-status', 'No share link for imported project.', 'imported copy status');
   await assertText(page, '.vemcad-solve-panel__status', 'Solved', 'imported solve status');
+  await assertMatches(page, '.vemcad-solve-demo__solve-evidence', /ok=true\nhttp=200\nstatus=solved/, 'imported solve evidence');
   await assertText(page, '.vemcad-solve-demo__solve-export-status', 'Ready to export solve result.', 'imported solve export status');
   await assertText(page, '.vemcad-solve-demo__preview-export-status', 'Ready to export CADGF preview.', 'imported preview export status');
   await assertPreview(page, 'svg', 'imported project preview');
