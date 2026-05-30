@@ -75,3 +75,6 @@
   `http://127.0.0.1:4173/apps/web/index.html?mode=solve-demo`。
 - `npm run smoke:solve-demo`：启动临时静态 server 并验证 solve demo 入口所需 HTML/JS
   都能通过 HTTP 取到。
+- `npm run smoke:solve-demo:browser`：用真实浏览器打开 solve demo 三个深链接
+  （`solvableLine` / `conflictingLine` / `passthroughUnsupported`），断言状态、预览 DOM 和
+  layout。该脚本需要本机可用的 Playwright；仓库不把它放进默认 CI 门禁。
