@@ -9,6 +9,7 @@ export const WORKBENCH_STABLE_EXPORTS = Object.freeze([
 
 export const WORKBENCH_GLOBAL_CONTRACTS = Object.freeze([
   'window.__vemcadApp.switchToEditor(documentJson)',
+  'window.__vemcadApp.mountSolvePanel(root, { project, controller })',
   'window.__cadDebug',
 ]);
 

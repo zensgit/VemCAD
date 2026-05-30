@@ -62,4 +62,5 @@
 - 新增 preview 与 desktop bridge 规则，不再默认直接追加到 `preview_app.js`。
 - 新增 solver 诊断 / solve action state，不再默认直接追加到 `workspace.js`。
 - 迁移期优先经由 `apps/web/*` facade 暴露稳定入口，再逐步替换 legacy 依赖。
+- solve panel 通过 `window.__vemcadApp.mountSolvePanel(root, { project, controller })` 挂载，legacy/submodule 侧不需要直接 import 产品层内部文件。
 - 迁移期优先保持旧入口兼容，等模块边界稳定后再做物理挪动到 `apps/web/*`。
