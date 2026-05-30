@@ -54,6 +54,10 @@ async function loadWorkbenchBootstrapModule() {
   return import('./workbench/bootstrap/workspace_bootstrap.js');
 }
 
+async function loadSolvePanelModule() {
+  return import('./workbench/panels/solve_panel.js');
+}
+
 export async function ensureWorkspaceBootstrapped({
   params = null,
   loadModule = loadWorkbenchBootstrapModule,
@@ -76,7 +80,10 @@ export async function ensureWorkspaceBootstrapped({
   return workspaceBootstrapPromise;
 }
 
-export function installVemcadAppBridge({ params = null } = {}) {
+export function installVemcadAppBridge({
+  params = null,
+  loadSolvePanelModule: loadSolvePanel = loadSolvePanelModule,
+} = {}) {
   const resolvedParams = resolveSearchParams(params);
   const bridge = {
     async switchToEditor(documentJson, { fitView = true } = {}) {
@@ -86,6 +93,10 @@ export function installVemcadAppBridge({ params = null } = {}) {
         workspace.importPayload(documentJson, { fitView });
       }
       return workspace;
+    },
+    async mountSolvePanel(root, options = {}) {
+      const panel = await loadSolvePanel();
+      return panel.createSolveWorkbenchPanel({ root, ...options });
     },
   };
 

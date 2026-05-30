@@ -14,6 +14,8 @@
   - workbench 启动入口。返回的 `{ destroy, state, commands, importPayload }` 视为稳定对外接口。
 - `window.__vemcadApp.switchToEditor(documentJson)`
   - preview -> editor 的稳定桥接路径。preview/runtime 和 workbench/bootstrap 可以重组，但全局 handoff 入口不能回退。
+- `window.__vemcadApp.mountSolvePanel(root, { project, controller })`
+  - 产品层 solver panel 的稳定挂载入口。它动态加载 `workbench/panels/solve_panel.js`，只消费 solver controller contract，不直接重写 `/solve` 契约。
 - `window.__cadDebug`
   - `?debug=1` 下暴露的 debug / smoke contract。它不是普通产品 API，但拆分时不能回退核心调试能力。
 

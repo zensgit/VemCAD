@@ -207,6 +207,40 @@ test('installVemcadAppBridge imports payload into bootstrapped workspace', async
   cleanupDomStubs();
 });
 
+test('installVemcadAppBridge exposes a lazy solve panel mount hook', async () => {
+  installDomStubs({ search: '?mode=editor' });
+  const moduleUrl = pathToFileURL(path.join(repoRoot, 'apps/web/app.js')).href;
+  const appModule = await import(`${moduleUrl}?solve-panel-bridge`);
+
+  let loadCount = 0;
+  let mounted = null;
+  const root = { appendChild() {} };
+  const project = { project: { id: 'p1' } };
+  const controller = { getState() { return { status: 'idle' }; } };
+
+  const bridge = appModule.installVemcadAppBridge({
+    params: new URLSearchParams('mode=editor'),
+    loadSolvePanelModule: async () => {
+      loadCount += 1;
+      return {
+        createSolveWorkbenchPanel(args) {
+          mounted = args;
+          return { kind: 'panel-handle', args };
+        },
+      };
+    },
+  });
+
+  const result = await bridge.mountSolvePanel(root, { project, controller, labels: { title: 'Solve' } });
+
+  assert.equal(typeof globalThis.window.__vemcadApp.mountSolvePanel, 'function');
+  assert.equal(loadCount, 1);
+  assert.equal(result.kind, 'panel-handle');
+  assert.deepEqual(mounted, { root, project, controller, labels: { title: 'Solve' } });
+
+  cleanupDomStubs();
+});
+
 test('bootstrapVemcadWebApp schedules product offline cache after preview bootstrap', async () => {
   installDomStubs({ search: '' });
   const moduleUrl = pathToFileURL(path.join(repoRoot, 'apps/web/app.js')).href;
