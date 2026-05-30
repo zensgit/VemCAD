@@ -39,7 +39,7 @@ function makeElement(tag, ownerDocument) {
       listeners.set(type, handler);
     },
     click() {
-      listeners.get('click')?.({ type: 'click', target: el });
+      return listeners.get('click')?.({ type: 'click', target: el });
     },
     setAttribute(name, value) {
       attrs.set(name, String(value));
@@ -174,6 +174,46 @@ test('mountSolveWorkbenchDemo can auto-run the default solve', async () => {
   assert.equal(demo.getPanelState().status, 'solved');
   assert.equal(demo.getPanelState().previewDocument.document_id, 'demo-solvable-line');
   assert.equal(findByTag(root, 'svg').getAttribute('aria-label'), 'Solved geometry preview');
+});
+
+test('copy link button uses the current demo URL and reports status', async () => {
+  const document = makeDocument();
+  const root = makeElement('div', document);
+  const copied = [];
+
+  const demo = await mountSolveWorkbenchDemo({
+    root,
+    copyText: async (text) => {
+      copied.push(text);
+    },
+  });
+  const copyButton = findByClass(root, 'vemcad-solve-demo__copy');
+  const copyStatus = findByClass(root, 'vemcad-solve-demo__copy-status');
+
+  await copyButton.click();
+  assert.deepEqual(copied, ['http://127.0.0.1/apps/web/index.html?mode=solve-demo&demo=solvableLine']);
+  assert.equal(copyStatus.textContent, 'Link copied.');
+
+  await demo.select('conflictingLine');
+  assert.equal(copyStatus.textContent, 'Ready to copy link.');
+  await copyButton.click();
+  assert.equal(copied.at(-1), 'http://127.0.0.1/apps/web/index.html?mode=solve-demo&demo=conflictingLine');
+  assert.equal(copyStatus.textContent, 'Link copied.');
+});
+
+test('copy link button reports unavailable when clipboard write fails', async () => {
+  const document = makeDocument();
+  const root = makeElement('div', document);
+
+  await mountSolveWorkbenchDemo({
+    root,
+    copyText: async () => {
+      throw new Error('clipboard denied');
+    },
+  });
+
+  await findByClass(root, 'vemcad-solve-demo__copy').click();
+  assert.equal(findByClass(root, 'vemcad-solve-demo__copy-status').textContent, 'Copy unavailable.');
 });
 
 test('mountSolveWorkbenchDemo can select and auto-run a requested initial demo', async () => {
