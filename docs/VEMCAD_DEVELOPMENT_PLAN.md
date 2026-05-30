@@ -7,6 +7,57 @@
 > (2) 一次对抗评审判定本方案 **sound-with-fixable-gaps**（架构扎实，缺口在交付管线+排序）；其中排序建议
 > （如 P4 先于 P2、推迟 fillet/chamfer）为**建议、待 owner 拍板**，下方 P0–P5 优先级尚未更改。
 
+## 执行收口状态（2026-05-30）— 已完成 / 暂不做 / 触发条件
+
+> 本节是顶层 roadmap 的当前状态快照；细节见各 development/verification/scoping 文档与
+> [`VEMCAD_PLAN_PROGRESS_STATUS_20260528.md`](./VEMCAD_PLAN_PROGRESS_STATUS_20260528.md)（living register）。
+> 下方 P0–P5 原文为参考路线，以本节为最新执行事实。
+
+**当前钉点**：VemCAD `main` 子模块指针 = CADGameFusion `711c005`（含 web_viewer golden +
+glob 门禁 + 路由 `/manifest`）；`services/router` launcher 已在 main。
+
+### ✅ 已完成（在 main、CI 验证）
+
+- **P0 冻结边界** / **P1 Project Runtime + v1 求解器**（PR #2–#6，该线已 milestone 收口）。
+- **规划文档 + 已验证 web WIP 落盘**（#11/#12）——此前是 untracked，现已版本控制。
+- **产品 CI 可见性**：root `package.json` + `product_tests`（`core` 无 PAT/无子模块 + `web-integration`）（#13）。
+- **方案体检（sound-with-fixable-gaps）+ 治理修订**：A→C 子模块成本、需求驱动重排（建议）、
+  "VERIFICATION = 门禁非 run-log" 定义、§7 风险登记。
+- **上帝文件 golden 网 + 门禁**：command_registry / workspace / preview 三批 characterization golden，
+  且 CADGameFusion 4 个 runner 改 glob → 门禁全部 714 个 web_viewer 测试（CADGameFusion #378–#381 →
+  VemCAD 指针 bump #14/#15/#18）。**这是 P2 拆分的前置安全网。**
+- **P4 参考 router 契约零缺口**：`GET /manifest/{task_id}`（CADGameFusion #382 → bump #18）。
+- **P4 phase 1 薄 router launcher**：`services/router/{launcher,main}.mjs` + 纯 node lifecycle 测试（进 core）
+  + review-found orphan bug 修复（#19）。
+- **决策文档**：P4 产品化 scoping（#17）、Electron-dedup scoping + 决策（#20）。
+
+### ⏸️ 暂不做（明确 park，按 owner 决定）
+
+- **P2 上帝文件物理拆分**（12.8k 行）——有网了，但**需求驱动触发**，不投机式全量拆；fillet/chamfer 等推迟。
+- **P3 desktop shell 收敛**（壳在子模块，A→C）。
+- **P4 云/多用户**（共享 DB / 真认证 / OAuth / 水平扩展）——部署目标 **= 桌面/本地单用户（frozen 2026-05-30）**。
+- **P4 router 重写**（python→node）。
+- **Electron 复用 launcher 去重**——直接 import 是层次反向；挂到 Phase 3（见 dedup 决策文档）。
+- **P5 Qt 角色**（仅文档层，inspector/validator 定位不追加产品 UI）。
+- **D1b**（CADGF-PROJ schema arity 2→4 / 一等 coincident）——需重开已收口的 solver 线。
+- **OCCT / 3D**——被产品目标 gate（frozen 默认：2D 保真 + Web/云护城河；可逆）。
+
+### 🔔 触发条件（满足才动）
+
+| 项 | 触发 |
+|---|---|
+| P2 拆某域 | 某真实功能需要拆该域（如 solver 诊断 UI）；有 golden 网保护后按域最小切 |
+| P4 转云 | 部署目标决策改变（出现云/多用户/协作的真实客户需求） |
+| P3 / Electron dedup | desktop shell 收敛立项，或"重复真的造成一次漂移 bug" |
+| D1b | 出现真实机械草图需求（radius/diameter/tangent/coincident） |
+| OCCT | 产品明确要正面追 FreeCAD-height 3D（拿到 timeboxed POC 数据点后立项） |
+| Electron cleanup escalation | 可选防御性小修，随时可做、非必需（真 router 默认 SIGTERM 大概率即终止） |
+
+### 纪律（贯穿，不变）
+
+从最新 `origin/main` 切独立 worktree；子模块改动走 A→C（CADGameFusion PR + gitlink-only 指针 bump +
+`merge-base --is-ancestor` 护栏 + editor-light）；测试随代码、绿了再合；交付声明分级诚实（已合入 vs 仅验证文档 vs untested-by-construction）。
+
 ## 文档目的
 
 在 `docs/VEMCAD_MODULE_DESIGN.md` 的总体判断基础上，把建议收敛成可以逐步执行的开发路线，避免架构结论停留在原则层。
