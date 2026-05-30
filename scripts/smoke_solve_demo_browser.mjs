@@ -16,6 +16,7 @@ const CASES = [
     summary: /state=underconstrained/,
     diagnostics: /^diagnostics=1$/,
     preview: 'svg',
+    previewExportStatus: 'Ready to export CADGF preview.',
   },
   {
     id: 'conflictingLine',
@@ -24,6 +25,7 @@ const CASES = [
     summary: /state=overconstrained/,
     diagnostics: /^diagnostics=1$/,
     preview: 'empty',
+    previewExportStatus: 'No CADGF preview to export.',
   },
   {
     id: 'passthroughUnsupported',
@@ -32,6 +34,7 @@ const CASES = [
     summary: /iters=0/,
     diagnostics: /^diagnostics=2$/,
     preview: 'empty',
+    previewExportStatus: 'Ready to export CADGF preview.',
   },
 ];
 
@@ -120,6 +123,8 @@ async function verifyCase({ page, base, screenshotDir, spec }) {
   await assertText(page, '.vemcad-solve-demo__export-status', 'Ready to export project.', `${spec.id} export status`);
   await assertText(page, '.vemcad-solve-demo__import', 'Import Project JSON', `${spec.id} import button`);
   await assertText(page, '.vemcad-solve-demo__import-status', 'Ready to import project.', `${spec.id} import status`);
+  await assertText(page, '.vemcad-solve-demo__preview-export', 'Export CADGF Preview JSON', `${spec.id} preview export button`);
+  await assertText(page, '.vemcad-solve-demo__preview-export-status', spec.previewExportStatus, `${spec.id} preview export status`);
   await assertText(page, '.vemcad-solve-demo__copy', 'Copy link', `${spec.id} copy button`);
   await assertText(page, '.vemcad-solve-demo__copy-status', 'Ready to copy link.', `${spec.id} copy status`);
   await assertPreview(page, spec.preview, spec.id);
@@ -150,6 +155,7 @@ async function verifyImportProject({ page, base, screenshotDir }) {
   await assertText(page, '.vemcad-solve-demo__share', 'Imported project is local. Export JSON to share.', 'imported share text');
   await assertText(page, '.vemcad-solve-demo__copy-status', 'No share link for imported project.', 'imported copy status');
   await assertText(page, '.vemcad-solve-panel__status', 'Solved', 'imported solve status');
+  await assertText(page, '.vemcad-solve-demo__preview-export-status', 'Ready to export CADGF preview.', 'imported preview export status');
   await assertPreview(page, 'svg', 'imported project preview');
 
   try {
