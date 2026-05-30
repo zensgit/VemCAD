@@ -5,6 +5,8 @@
   "type": "module",
   "description": "VemCAD product-layer runtime, web workbench, and services (consumes CADGameFusion as deps/cadgamefusion).",
   "scripts": {
+    "dev:web": "node scripts/serve_product_web.mjs",
+    "smoke:solve-demo": "node scripts/smoke_solve_demo.mjs",
     "test": "node --test apps/runtime/tests/*.test.js services/solve/tests/*.test.js services/router/tests/*.test.js",
     "test:web": "node --test apps/web/tests/*.test.js",
     "test:all": "npm test && npm run test:web"

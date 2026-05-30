@@ -68,3 +68,10 @@
 - solve panel 通过 `window.__vemcadApp.mountSolvePanel(root, { project, controller })` 挂载，legacy/submodule 侧不需要直接 import 产品层内部文件。
 - `?mode=solve-demo` 会走产品层 demo bootstrap，挂载可交互的 solve workbench demo。
 - 迁移期优先保持旧入口兼容，等模块边界稳定后再做物理挪动到 `apps/web/*`。
+
+## 本地运行
+
+- `npm run dev:web`：启动产品层静态 dev server，默认打开目标为
+  `http://127.0.0.1:4173/apps/web/index.html?mode=solve-demo`。
+- `npm run smoke:solve-demo`：启动临时静态 server 并验证 solve demo 入口所需 HTML/JS
+  都能通过 HTTP 取到。
