@@ -9,6 +9,8 @@
   `{ getState, subscribe, solve }`。
 - `demo_projects.js`：三个固定 VEMCAD-PROJECT 样本（可解、冲突、unsupported
   passthrough），用于 demo / smoke / fixture。
+- `demo_fetch.js`：纯前端 demo fetch，按 `demo_projects.js` 的 project id 返回固定
+  `/solve` 信封，便于在没有真实 solve 服务时演示 panel 状态流。
 
 ## 适合放在这里的内容
 

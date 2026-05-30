@@ -24,6 +24,7 @@
 - `preview/runtime/contracts/index.js`
 - `workbench/solver/solve_workbench.js`
 - `workbench/solver/demo_projects.js`
+- `workbench/solver/demo_fetch.js`
 - `workbench/panels/solve_panel.js`
 
 已有可复用的拆分前置模块包括：

@@ -26,5 +26,6 @@ export {
   solveRuntimeProject,
   summarizeSolveEnvelope,
 } from '../solver/solve_workbench.js';
+export { createSolveDemoFetch } from '../solver/demo_fetch.js';
 export { SOLVE_WORKBENCH_DEMOS } from '../solver/demo_projects.js';
 export { createSolveWorkbenchPanel } from '../panels/solve_panel.js';

@@ -6,6 +6,7 @@ import {
   solveRuntimeProject,
   summarizeSolveEnvelope,
 } from '../workbench/solver/solve_workbench.js';
+import { createSolveDemoFetch } from '../workbench/solver/demo_fetch.js';
 import { SOLVE_WORKBENCH_DEMOS } from '../workbench/solver/demo_projects.js';
 
 function jsonResponse(status, body) {
@@ -148,4 +149,47 @@ test('demo fixtures cover solved, conflict, and unsupported-passthrough workbenc
   assert.equal(SOLVE_WORKBENCH_DEMOS.solvableLine.constraints.some((c) => c.type === 'distance'), true);
   assert.equal(SOLVE_WORKBENCH_DEMOS.conflictingLine.constraints.some((c) => c.type === 'vertical'), true);
   assert.deepEqual(SOLVE_WORKBENCH_DEMOS.passthroughUnsupported.entities.map((e) => e.kind).sort(), ['polyline', 'text']);
+});
+
+test('createSolveDemoFetch drives the controller to a solved preview without a live /solve service', async () => {
+  const controller = createSolveWorkbenchController({
+    fetchImpl: createSolveDemoFetch(),
+  });
+
+  const state = await controller.solve(SOLVE_WORKBENCH_DEMOS.solvableLine);
+
+  assert.equal(state.status, 'solved');
+  assert.equal(state.summary.httpStatus, 200);
+  assert.equal(state.summary.iterations, 4);
+  assert.equal(state.previewDocument.document_id, 'demo-solvable-line');
+  const line = state.envelope.value.evaluatedView.entities.find((entity) => entity.id === 'L1');
+  assert.deepEqual(line.line, [[0, 3], [10, 3]]);
+});
+
+test('createSolveDemoFetch exposes the blocked conflict path as a user-fixable solve result', async () => {
+  const controller = createSolveWorkbenchController({
+    fetchImpl: createSolveDemoFetch(),
+  });
+
+  const state = await controller.solve(SOLVE_WORKBENCH_DEMOS.conflictingLine);
+
+  assert.equal(state.status, 'blocked');
+  assert.equal(state.summary.httpStatus, 422);
+  assert.equal(state.summary.conflictGroupCount, 1);
+  assert.equal(state.previewDocument, null);
+  assert.equal(state.envelope.error_code, 'SOLVE_UNSATISFIED');
+});
+
+test('createSolveDemoFetch fails unknown projects explicitly', async () => {
+  const result = await solveRuntimeProject({
+    ...SOLVE_WORKBENCH_DEMOS.solvableLine,
+    project: { ...SOLVE_WORKBENCH_DEMOS.solvableLine.project, id: 'unknown-demo' },
+  }, {
+    fetchImpl: createSolveDemoFetch(),
+  });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.httpStatus, 400);
+  assert.equal(result.error_code, 'SOLVE_DEMO_PROJECT_NOT_FOUND');
+  assert.equal(result.summary.status, 'failed');
 });
