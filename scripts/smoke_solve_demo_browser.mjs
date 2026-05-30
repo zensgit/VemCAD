@@ -10,18 +10,24 @@ const CASES = [
     id: 'solvableLine',
     status: 'Solved',
     detail: /state=underconstrained/,
+    summary: /state=underconstrained/,
+    diagnostics: /^diagnostics=1$/,
     preview: 'svg',
   },
   {
     id: 'conflictingLine',
     status: 'Blocked',
     detail: /state=overconstrained/,
+    summary: /state=overconstrained/,
+    diagnostics: /^diagnostics=1$/,
     preview: 'empty',
   },
   {
     id: 'passthroughUnsupported',
     status: 'Solved',
     detail: /iters=0/,
+    summary: /iters=0/,
+    diagnostics: /^diagnostics=2$/,
     preview: 'empty',
   },
 ];
@@ -104,6 +110,9 @@ async function verifyCase({ page, base, screenshotDir, spec }) {
   await assertText(page, '.vemcad-solve-demo__tab[data-active="true"]', labelFor(spec.id), `${spec.id} active tab`);
   await assertText(page, '.vemcad-solve-panel__status', spec.status, `${spec.id} status`);
   await assertMatches(page, '.vemcad-solve-panel__details', spec.detail, `${spec.id} details`);
+  await assertMatches(page, '.vemcad-solve-demo__solve-summary', spec.summary, `${spec.id} meta summary`);
+  await assertMatches(page, '.vemcad-solve-demo__diagnostic-count', spec.diagnostics, `${spec.id} diagnostic count`);
+  await assertMatches(page, '.vemcad-solve-demo__share', new RegExp(`demo=${spec.id}`), `${spec.id} share link`);
   await assertPreview(page, spec.preview, spec.id);
   await assertVisibleBox(page, '.vemcad-solve-demo__content', `${spec.id} content`);
   if (spec.preview === 'svg') {
