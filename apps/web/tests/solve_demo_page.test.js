@@ -143,10 +143,20 @@ test('mountSolveWorkbenchDemo mounts selectable demos and solves without a live 
   assert.equal(findByClass(root, 'vemcad-solve-demo__diagnostic-count').textContent, 'diagnostics=0');
   assert.equal(findByClass(root, 'vemcad-solve-demo__export-status').textContent, 'Ready to export project.');
   assert.equal(findByClass(root, 'vemcad-solve-demo__import-status').textContent, 'Ready to import project.');
+  assert.equal(findByClass(root, 'vemcad-solve-demo__preview-export').disabled, true);
+  assert.equal(
+    findByClass(root, 'vemcad-solve-demo__preview-export-status').textContent,
+    'Run solve to export CADGF preview.',
+  );
 
   await demo.solve();
   assert.equal(demo.getPanelState().status, 'solved');
   assert.equal(demo.getPanelState().previewDocument.document_id, 'demo-solvable-line');
+  assert.equal(findByClass(root, 'vemcad-solve-demo__preview-export').disabled, false);
+  assert.equal(
+    findByClass(root, 'vemcad-solve-demo__preview-export-status').textContent,
+    'Ready to export CADGF preview.',
+  );
   assert.equal(findByTag(root, 'svg').getAttribute('aria-label'), 'Solved geometry preview');
   assert.match(findByClass(root, 'vemcad-solve-demo__solve-summary').textContent, /state=underconstrained/);
   assert.equal(findByClass(root, 'vemcad-solve-demo__diagnostic-count').textContent, 'diagnostics=1');
@@ -156,6 +166,8 @@ test('mountSolveWorkbenchDemo mounts selectable demos and solves without a live 
   assert.equal(demo.selectedKey, 'conflictingLine');
   assert.equal(demo.getPanelState().status, 'blocked');
   assert.equal(demo.getPanelState().previewDocument, null);
+  assert.equal(findByClass(root, 'vemcad-solve-demo__preview-export').disabled, true);
+  assert.equal(findByClass(root, 'vemcad-solve-demo__preview-export-status').textContent, 'No CADGF preview to export.');
   assert.equal(
     findByClass(root, 'vemcad-solve-demo__share').getAttribute('href'),
     'http://127.0.0.1/apps/web/index.html?mode=solve-demo&demo=conflictingLine',
@@ -293,6 +305,56 @@ test('export project button reports unavailable when export fails', async () => 
 
   await findByClass(root, 'vemcad-solve-demo__export').click();
   assert.equal(findByClass(root, 'vemcad-solve-demo__export-status').textContent, 'Export unavailable.');
+});
+
+test('export preview button exports the solved CADGF preview document', async () => {
+  const document = makeDocument();
+  const root = makeElement('div', document);
+  const exported = [];
+
+  const demo = await mountSolveWorkbenchDemo({
+    root,
+    exportPreviewJson: async (previewDocument, key) => {
+      exported.push({
+        key,
+        documentId: previewDocument.document_id,
+        schemaVersion: previewDocument.schema_version,
+        entities: previewDocument.entities.length,
+      });
+    },
+  });
+  const previewExportButton = findByClass(root, 'vemcad-solve-demo__preview-export');
+  const previewExportStatus = findByClass(root, 'vemcad-solve-demo__preview-export-status');
+
+  previewExportButton.click();
+  assert.equal(previewExportStatus.textContent, 'No CADGF preview to export.');
+
+  await demo.solve();
+  await previewExportButton.click();
+
+  assert.deepEqual(exported, [{
+    key: 'solvableLine',
+    documentId: 'demo-solvable-line',
+    schemaVersion: 1,
+    entities: 1,
+  }]);
+  assert.equal(previewExportStatus.textContent, 'CADGF preview JSON exported.');
+});
+
+test('export preview button reports unavailable when preview export fails', async () => {
+  const document = makeDocument();
+  const root = makeElement('div', document);
+
+  const demo = await mountSolveWorkbenchDemo({
+    root,
+    exportPreviewJson: async () => {
+      throw new Error('download denied');
+    },
+  });
+
+  await demo.solve();
+  await findByClass(root, 'vemcad-solve-demo__preview-export').click();
+  assert.equal(findByClass(root, 'vemcad-solve-demo__preview-export-status').textContent, 'Preview export unavailable.');
 });
 
 test('import project button selects an imported VEMCAD-PROJECT and keeps it local-only', async () => {

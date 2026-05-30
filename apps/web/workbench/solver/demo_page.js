@@ -42,9 +42,9 @@ function ensureSolveDemoStyles(document) {
     .vemcad-solve-panel__status[data-status="blocked"],.vemcad-solve-panel__status[data-status="failed"]{background:#fff3df;color:#8a4b00}
     .vemcad-solve-panel__status[data-status="solving"]{background:#eaf1ff;color:#1f4f91}
     .vemcad-solve-panel__details,.vemcad-solve-panel__preview,.vemcad-solve-demo__summary{margin:0 0 12px;color:#3d485c;line-height:1.45}
-    .vemcad-solve-demo__export,.vemcad-solve-demo__import{min-height:34px;margin:0 0 6px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
-    .vemcad-solve-demo__export:disabled,.vemcad-solve-demo__import:disabled{cursor:progress;opacity:.65}
-    .vemcad-solve-demo__export-status,.vemcad-solve-demo__import-status{min-height:22px;margin:0 0 12px;color:#5b6679;line-height:1.45}
+    .vemcad-solve-demo__export,.vemcad-solve-demo__import,.vemcad-solve-demo__preview-export{min-height:34px;margin:0 0 6px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
+    .vemcad-solve-demo__export:disabled,.vemcad-solve-demo__import:disabled,.vemcad-solve-demo__preview-export:disabled{cursor:progress;opacity:.65}
+    .vemcad-solve-demo__export-status,.vemcad-solve-demo__import-status,.vemcad-solve-demo__preview-export-status{min-height:22px;margin:0 0 12px;color:#5b6679;line-height:1.45}
     .vemcad-solve-demo__share{display:block;margin:0 0 8px;color:#114d7a;line-height:1.35;overflow-wrap:anywhere}
     .vemcad-solve-demo__copy{min-height:34px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
     .vemcad-solve-demo__copy:disabled{cursor:progress;opacity:.65}
@@ -154,19 +154,25 @@ function filenameForProject(project, key) {
   return `${safe}.vemcad-project.json`;
 }
 
-async function defaultExportProjectJson(project, key, root) {
+function filenameForPreviewDocument(document, key) {
+  const raw = document?.document_id || key || 'vemcad-preview';
+  const safe = String(raw).replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'vemcad-preview';
+  return `${safe}.cadgf-document.json`;
+}
+
+async function downloadJson(value, filename, root) {
   const doc = root.ownerDocument;
   const win = doc?.defaultView ?? globalThis.window;
   if (!doc?.body || typeof doc.createElement !== 'function' || !win?.Blob || !win?.URL?.createObjectURL) {
     throw new Error('download is unavailable');
   }
-  const blob = new win.Blob([`${JSON.stringify(project, null, 2)}\n`], {
+  const blob = new win.Blob([`${JSON.stringify(value, null, 2)}\n`], {
     type: 'application/json',
   });
   const url = win.URL.createObjectURL(blob);
   const link = doc.createElement('a');
   link.href = url;
-  link.download = filenameForProject(project, key);
+  link.download = filename;
   link.rel = 'noreferrer';
   doc.body.appendChild(link);
   try {
@@ -175,6 +181,14 @@ async function defaultExportProjectJson(project, key, root) {
     doc.body.removeChild(link);
     win.setTimeout?.(() => win.URL.revokeObjectURL(url), 0);
   }
+}
+
+async function defaultExportProjectJson(project, key, root) {
+  await downloadJson(project, filenameForProject(project, key), root);
+}
+
+async function defaultExportPreviewJson(previewDocument, key, root) {
+  await downloadJson(previewDocument, filenameForPreviewDocument(previewDocument, key), root);
 }
 
 async function defaultImportProjectJson(root) {
@@ -253,6 +267,7 @@ export async function mountSolveWorkbenchDemo({
   fetchImpl = createSolveDemoFetch(),
   copyText = defaultCopyText,
   exportProjectJson = defaultExportProjectJson,
+  exportPreviewJson = defaultExportPreviewJson,
   importProjectJson = defaultImportProjectJson,
 } = {}) {
   if (!root || typeof root.appendChild !== 'function') {
@@ -322,6 +337,16 @@ export async function mountSolveWorkbenchDemo({
   const solveSummary = append(meta, 'p', { className: 'vemcad-solve-demo__solve-summary' });
   const diagnosticsSummary = append(meta, 'p', { className: 'vemcad-solve-demo__diagnostic-count' });
   append(meta, 'h2', { text: 'Preview' });
+  const previewExportButton = append(meta, 'button', {
+    type: 'button',
+    text: 'Export CADGF Preview JSON',
+    className: 'vemcad-solve-demo__preview-export',
+  });
+  const previewExportStatus = append(meta, 'p', {
+    className: 'vemcad-solve-demo__preview-export-status',
+    text: 'Run solve to export CADGF preview.',
+  });
+  previewExportStatus.setAttribute?.('aria-live', 'polite');
   const previewRoot = append(meta, 'div', { className: 'vemcad-solve-demo__visual' });
 
   let selectedKey = null;
@@ -330,6 +355,7 @@ export async function mountSolveWorkbenchDemo({
   let previewUnsubscribe = null;
   let currentShareUrl = '';
   let currentProject = null;
+  let currentPreviewDocument = null;
   const projectsByKey = { ...demos };
 
   function ensureImportedButton() {
@@ -378,15 +404,25 @@ export async function mountSolveWorkbenchDemo({
     setActiveButton(buttons, key);
     const project = projectsByKey[key];
     currentProject = project;
+    currentPreviewDocument = null;
     projectSummary.textContent = summarizeProject(project);
     exportStatus.textContent = 'Ready to export project.';
     importStatus.textContent = 'Ready to import project.';
+    previewExportButton.disabled = true;
+    previewExportStatus.textContent = 'Run solve to export CADGF preview.';
     updateShare(key);
     controller = createSolveWorkbenchController({ fetchImpl });
     previewUnsubscribe = controller.subscribe((state) => {
+      currentPreviewDocument = state.previewDocument ?? null;
       renderCadgfPreviewCanvas({ root: previewRoot, cadgfDocument: state.previewDocument });
       solveSummary.textContent = summarizeSolveState(state);
       diagnosticsSummary.textContent = diagnosticCountText(state);
+      previewExportButton.disabled = !currentPreviewDocument;
+      previewExportStatus.textContent = currentPreviewDocument
+        ? 'Ready to export CADGF preview.'
+        : state.status === 'idle'
+          ? 'Run solve to export CADGF preview.'
+          : 'No CADGF preview to export.';
     });
     panelHandle = await mountPanel({ appBridge, panelRoot, project, controller });
     return panelHandle;
@@ -452,6 +488,22 @@ export async function mountSolveWorkbenchDemo({
       importStatus.textContent = 'Import failed.';
     } finally {
       importButton.disabled = false;
+    }
+  });
+
+  previewExportButton.addEventListener('click', async () => {
+    if (!currentPreviewDocument) {
+      previewExportStatus.textContent = 'No CADGF preview to export.';
+      return;
+    }
+    previewExportButton.disabled = true;
+    try {
+      await exportPreviewJson(currentPreviewDocument, selectedKey, root);
+      previewExportStatus.textContent = 'CADGF preview JSON exported.';
+    } catch {
+      previewExportStatus.textContent = 'Preview export unavailable.';
+    } finally {
+      previewExportButton.disabled = false;
     }
   });
 
