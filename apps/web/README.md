@@ -26,6 +26,7 @@
 - `workbench/solver/demo_projects.js`
 - `workbench/solver/demo_fetch.js`
 - `workbench/solver/demo_page.js`
+- `workbench/solver/preview_canvas.js`
 - `workbench/panels/solve_panel.js`
 
 已有可复用的拆分前置模块包括：

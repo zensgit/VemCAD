@@ -13,6 +13,7 @@
   `/solve` 信封，便于在没有真实 solve 服务时演示 panel 状态流。
 - `demo_page.js` / `demo.html`：可打开的产品层 solve workbench demo，串起 app bridge、
   panel、demo fixtures 和 demo fetch。
+- `preview_canvas.js`：把 solved 后的 CADGF preview document 绘成轻量 SVG 预览。
 
 ## 适合放在这里的内容
 
