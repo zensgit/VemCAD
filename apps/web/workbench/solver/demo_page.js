@@ -1,6 +1,7 @@
 import { createSolveWorkbenchPanel } from '../panels/solve_panel.js';
 import { createSolveDemoFetch } from './demo_fetch.js';
 import { SOLVE_WORKBENCH_DEMOS } from './demo_projects.js';
+import { renderCadgfPreviewCanvas } from './preview_canvas.js';
 import { createSolveWorkbenchController } from './solve_workbench.js';
 
 const DEMO_ORDER = ['solvableLine', 'conflictingLine', 'passthroughUnsupported'];
@@ -92,21 +93,28 @@ export async function mountSolveWorkbenchDemo({
   const meta = append(content, 'aside', { className: 'vemcad-solve-demo__meta' });
   append(meta, 'h2', { text: 'Project' });
   const projectSummary = append(meta, 'p', { className: 'vemcad-solve-demo__summary' });
+  append(meta, 'h2', { text: 'Preview' });
+  const previewRoot = append(meta, 'div', { className: 'vemcad-solve-demo__visual' });
 
   let selectedKey = null;
   let panelHandle = null;
   let controller = null;
+  let previewUnsubscribe = null;
 
   async function select(key) {
     if (!demos[key]) {
       throw new Error(`unknown solve demo: ${key}`);
     }
     panelHandle?.destroy?.();
+    previewUnsubscribe?.();
     selectedKey = key;
     setActiveButton(buttons, key);
     const project = demos[key];
     projectSummary.textContent = summarizeProject(project);
     controller = createSolveWorkbenchController({ fetchImpl });
+    previewUnsubscribe = controller.subscribe((state) => {
+      renderCadgfPreviewCanvas({ root: previewRoot, cadgfDocument: state.previewDocument });
+    });
     panelHandle = await mountPanel({ appBridge, panelRoot, project, controller });
     return panelHandle;
   }
@@ -138,6 +146,7 @@ export async function mountSolveWorkbenchDemo({
     },
     destroy() {
       panelHandle?.destroy?.();
+      previewUnsubscribe?.();
     },
   };
 }

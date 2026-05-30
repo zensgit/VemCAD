@@ -59,6 +59,9 @@ function makeDocument() {
     createElement(tag) {
       return makeElement(tag, document);
     },
+    createElementNS(_ns, tag) {
+      return makeElement(tag, document);
+    },
   };
   return document;
 }
@@ -109,12 +112,14 @@ test('mountSolveWorkbenchDemo mounts selectable demos and solves without a live 
   await demo.solve();
   assert.equal(demo.getPanelState().status, 'solved');
   assert.equal(demo.getPanelState().previewDocument.document_id, 'demo-solvable-line');
+  assert.equal(findByTag(root, 'svg').getAttribute('aria-label'), 'Solved geometry preview');
 
   await demo.select('conflictingLine');
   await demo.solve();
   assert.equal(demo.selectedKey, 'conflictingLine');
   assert.equal(demo.getPanelState().status, 'blocked');
   assert.equal(demo.getPanelState().previewDocument, null);
+  assert.match(findByClass(root, 'vemcad-preview-canvas__empty').textContent, /No solved geometry/);
 });
 
 test('mountSolveWorkbenchDemo uses the supplied app bridge to mount the panel', async () => {
