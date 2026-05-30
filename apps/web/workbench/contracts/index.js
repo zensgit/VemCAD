@@ -5,6 +5,7 @@ export const WORKBENCH_STABLE_EXPORTS = Object.freeze([
   'bootstrapCadWorkspace({ params })',
   'createSolveWorkbenchController({ endpoint, fetchImpl })',
   'createSolveWorkbenchPanel({ root, project, controller })',
+  'mountSolveWorkbenchDemo({ root, appBridge })',
 ]);
 
 export const WORKBENCH_GLOBAL_CONTRACTS = Object.freeze([
@@ -28,4 +29,5 @@ export {
 } from '../solver/solve_workbench.js';
 export { createSolveDemoFetch } from '../solver/demo_fetch.js';
 export { SOLVE_WORKBENCH_DEMOS } from '../solver/demo_projects.js';
+export { mountSolveWorkbenchDemo } from '../solver/demo_page.js';
 export { createSolveWorkbenchPanel } from '../panels/solve_panel.js';
