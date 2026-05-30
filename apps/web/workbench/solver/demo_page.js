@@ -40,6 +40,9 @@ function ensureSolveDemoStyles(document) {
     .vemcad-solve-panel__status[data-status="blocked"],.vemcad-solve-panel__status[data-status="failed"]{background:#fff3df;color:#8a4b00}
     .vemcad-solve-panel__status[data-status="solving"]{background:#eaf1ff;color:#1f4f91}
     .vemcad-solve-panel__details,.vemcad-solve-panel__preview,.vemcad-solve-demo__summary{margin:0 0 12px;color:#3d485c;line-height:1.45}
+    .vemcad-solve-demo__export{min-height:34px;margin:0 0 6px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
+    .vemcad-solve-demo__export:disabled{cursor:progress;opacity:.65}
+    .vemcad-solve-demo__export-status{min-height:22px;margin:0 0 12px;color:#5b6679;line-height:1.45}
     .vemcad-solve-demo__share{display:block;margin:0 0 8px;color:#114d7a;line-height:1.35;overflow-wrap:anywhere}
     .vemcad-solve-demo__copy{min-height:34px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
     .vemcad-solve-demo__copy:disabled{cursor:progress;opacity:.65}
@@ -143,6 +146,35 @@ async function defaultCopyText(text, root) {
   throw new Error('clipboard is unavailable');
 }
 
+function filenameForProject(project, key) {
+  const raw = project?.project?.id || key || 'vemcad-project';
+  const safe = String(raw).replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'vemcad-project';
+  return `${safe}.vemcad-project.json`;
+}
+
+async function defaultExportProjectJson(project, key, root) {
+  const doc = root.ownerDocument;
+  const win = doc?.defaultView ?? globalThis.window;
+  if (!doc?.body || typeof doc.createElement !== 'function' || !win?.Blob || !win?.URL?.createObjectURL) {
+    throw new Error('download is unavailable');
+  }
+  const blob = new win.Blob([`${JSON.stringify(project, null, 2)}\n`], {
+    type: 'application/json',
+  });
+  const url = win.URL.createObjectURL(blob);
+  const link = doc.createElement('a');
+  link.href = url;
+  link.download = filenameForProject(project, key);
+  link.rel = 'noreferrer';
+  doc.body.appendChild(link);
+  try {
+    link.click();
+  } finally {
+    doc.body.removeChild(link);
+    win.setTimeout?.(() => win.URL.revokeObjectURL(url), 0);
+  }
+}
+
 function resolveInitialDemo(initialDemo, demos) {
   if (initialDemo && Object.prototype.hasOwnProperty.call(demos, initialDemo)) {
     return initialDemo;
@@ -174,6 +206,7 @@ export async function mountSolveWorkbenchDemo({
   demos = SOLVE_WORKBENCH_DEMOS,
   fetchImpl = createSolveDemoFetch(),
   copyText = defaultCopyText,
+  exportProjectJson = defaultExportProjectJson,
 } = {}) {
   if (!root || typeof root.appendChild !== 'function') {
     throw new TypeError('root element is required');
@@ -204,6 +237,16 @@ export async function mountSolveWorkbenchDemo({
   const meta = append(content, 'aside', { className: 'vemcad-solve-demo__meta' });
   append(meta, 'h2', { text: 'Project' });
   const projectSummary = append(meta, 'p', { className: 'vemcad-solve-demo__summary' });
+  const exportButton = append(meta, 'button', {
+    type: 'button',
+    text: 'Export Project JSON',
+    className: 'vemcad-solve-demo__export',
+  });
+  const exportStatus = append(meta, 'p', {
+    className: 'vemcad-solve-demo__export-status',
+    text: 'Ready to export project.',
+  });
+  exportStatus.setAttribute?.('aria-live', 'polite');
   append(meta, 'h2', { text: 'Share' });
   const shareLink = append(meta, 'a', { className: 'vemcad-solve-demo__share' });
   shareLink.target = '_blank';
@@ -229,6 +272,7 @@ export async function mountSolveWorkbenchDemo({
   let controller = null;
   let previewUnsubscribe = null;
   let currentShareUrl = '';
+  let currentProject = null;
 
   async function select(key) {
     if (!demos[key]) {
@@ -239,7 +283,9 @@ export async function mountSolveWorkbenchDemo({
     selectedKey = key;
     setActiveButton(buttons, key);
     const project = demos[key];
+    currentProject = project;
     projectSummary.textContent = summarizeProject(project);
+    exportStatus.textContent = 'Ready to export project.';
     const demoUrl = demoUrlFor(root, key);
     currentShareUrl = demoUrl;
     shareLink.href = demoUrl;
@@ -273,6 +319,18 @@ export async function mountSolveWorkbenchDemo({
       copyStatus.textContent = 'Copy unavailable.';
     } finally {
       copyButton.disabled = false;
+    }
+  });
+
+  exportButton.addEventListener('click', async () => {
+    exportButton.disabled = true;
+    try {
+      await exportProjectJson(currentProject, selectedKey, root);
+      exportStatus.textContent = 'Project JSON exported.';
+    } catch {
+      exportStatus.textContent = 'Export unavailable.';
+    } finally {
+      exportButton.disabled = false;
     }
   });
 

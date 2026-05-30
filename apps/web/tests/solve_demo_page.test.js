@@ -119,6 +119,7 @@ test('mountSolveWorkbenchDemo mounts selectable demos and solves without a live 
   );
   assert.equal(findByClass(root, 'vemcad-solve-demo__solve-summary').textContent, 'No solve has run yet.');
   assert.equal(findByClass(root, 'vemcad-solve-demo__diagnostic-count').textContent, 'diagnostics=0');
+  assert.equal(findByClass(root, 'vemcad-solve-demo__export-status').textContent, 'Ready to export project.');
 
   await demo.solve();
   assert.equal(demo.getPanelState().status, 'solved');
@@ -214,6 +215,61 @@ test('copy link button reports unavailable when clipboard write fails', async ()
 
   await findByClass(root, 'vemcad-solve-demo__copy').click();
   assert.equal(findByClass(root, 'vemcad-solve-demo__copy-status').textContent, 'Copy unavailable.');
+});
+
+test('export project button exports the current demo project and reports status', async () => {
+  const document = makeDocument();
+  const root = makeElement('div', document);
+  const exported = [];
+
+  const demo = await mountSolveWorkbenchDemo({
+    root,
+    exportProjectJson: async (project, key) => {
+      exported.push({
+        key,
+        id: project.project.id,
+        format: project.header.format,
+        constraints: project.constraints.length,
+      });
+    },
+  });
+  const exportButton = findByClass(root, 'vemcad-solve-demo__export');
+  const exportStatus = findByClass(root, 'vemcad-solve-demo__export-status');
+
+  await exportButton.click();
+  assert.deepEqual(exported[0], {
+    key: 'solvableLine',
+    id: 'demo-solvable-line',
+    format: 'VEMCAD-PROJECT',
+    constraints: 2,
+  });
+  assert.equal(exportStatus.textContent, 'Project JSON exported.');
+
+  await demo.select('conflictingLine');
+  assert.equal(exportStatus.textContent, 'Ready to export project.');
+  await exportButton.click();
+  assert.deepEqual(exported.at(-1), {
+    key: 'conflictingLine',
+    id: 'demo-conflicting-line',
+    format: 'VEMCAD-PROJECT',
+    constraints: 3,
+  });
+  assert.equal(exportStatus.textContent, 'Project JSON exported.');
+});
+
+test('export project button reports unavailable when export fails', async () => {
+  const document = makeDocument();
+  const root = makeElement('div', document);
+
+  await mountSolveWorkbenchDemo({
+    root,
+    exportProjectJson: async () => {
+      throw new Error('download denied');
+    },
+  });
+
+  await findByClass(root, 'vemcad-solve-demo__export').click();
+  assert.equal(findByClass(root, 'vemcad-solve-demo__export-status').textContent, 'Export unavailable.');
 });
 
 test('mountSolveWorkbenchDemo can select and auto-run a requested initial demo', async () => {

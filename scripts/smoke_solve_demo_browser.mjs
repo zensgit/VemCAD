@@ -113,6 +113,8 @@ async function verifyCase({ page, base, screenshotDir, spec }) {
   await assertMatches(page, '.vemcad-solve-demo__solve-summary', spec.summary, `${spec.id} meta summary`);
   await assertMatches(page, '.vemcad-solve-demo__diagnostic-count', spec.diagnostics, `${spec.id} diagnostic count`);
   await assertMatches(page, '.vemcad-solve-demo__share', new RegExp(`demo=${spec.id}`), `${spec.id} share link`);
+  await assertText(page, '.vemcad-solve-demo__export', 'Export Project JSON', `${spec.id} export button`);
+  await assertText(page, '.vemcad-solve-demo__export-status', 'Ready to export project.', `${spec.id} export status`);
   await assertText(page, '.vemcad-solve-demo__copy', 'Copy link', `${spec.id} copy button`);
   await assertText(page, '.vemcad-solve-demo__copy-status', 'Ready to copy link.', `${spec.id} copy status`);
   await assertPreview(page, spec.preview, spec.id);
