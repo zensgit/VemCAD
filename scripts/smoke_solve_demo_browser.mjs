@@ -1,7 +1,10 @@
 #!/usr/bin/env node
+import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { startStaticServer } from './serve_product_web.mjs';
+import { SOLVE_WORKBENCH_DEMOS } from '../apps/web/workbench/solver/demo_projects.js';
 
 const require = createRequire(import.meta.url);
 
@@ -127,6 +130,35 @@ async function verifyCase({ page, base, screenshotDir, spec }) {
   return maybeScreenshot(page, screenshotDir, spec.id);
 }
 
+async function verifyImportProject({ page, base, screenshotDir }) {
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'vemcad-solve-demo-import-'));
+  const projectPath = path.join(tmpDir, 'solvable-line.vemcad-project.json');
+  await fs.writeFile(projectPath, `${JSON.stringify(SOLVE_WORKBENCH_DEMOS.solvableLine, null, 2)}\n`, 'utf8');
+
+  const url = `${base}/apps/web/index.html?mode=solve-demo&demo=conflictingLine`;
+  await page.goto(url, { waitUntil: 'networkidle' });
+  await page.waitForSelector('.vemcad-solve-demo__import');
+  const chooserPromise = page.waitForEvent('filechooser', { timeout: 5000 });
+  await page.locator('.vemcad-solve-demo__import').click();
+  const chooser = await chooserPromise;
+  await chooser.setFiles(projectPath);
+
+  await page.waitForSelector('.vemcad-solve-demo__tab[data-demo-id="importedProject"][data-active="true"]');
+  await assertText(page, '.vemcad-solve-demo__tab[data-active="true"]', 'Imported', 'imported active tab');
+  await assertText(page, '.vemcad-solve-demo__import-status', 'Project JSON imported.', 'import status after file picker');
+  await assertMatches(page, '.vemcad-solve-demo__summary', /id=demo-solvable-line/, 'imported project summary');
+  await assertText(page, '.vemcad-solve-demo__share', 'Imported project is local. Export JSON to share.', 'imported share text');
+  await assertText(page, '.vemcad-solve-demo__copy-status', 'No share link for imported project.', 'imported copy status');
+  await assertText(page, '.vemcad-solve-panel__status', 'Solved', 'imported solve status');
+  await assertPreview(page, 'svg', 'imported project preview');
+
+  try {
+    return await maybeScreenshot(page, screenshotDir, 'importedProject');
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true });
+  }
+}
+
 function labelFor(id) {
   if (id === 'solvableLine') return 'Solvable';
   if (id === 'conflictingLine') return 'Conflict';
@@ -153,6 +185,8 @@ try {
     const screenshot = await verifyCase({ page, base, screenshotDir, spec });
     if (screenshot) screenshots.push(screenshot);
   }
+  const importScreenshot = await verifyImportProject({ page, base, screenshotDir });
+  if (importScreenshot) screenshots.push(importScreenshot);
 
   console.log('solve-demo browser smoke PASS');
   if (screenshots.length) {

@@ -440,7 +440,14 @@ export async function mountSolveWorkbenchDemo({
       ensureImportedButton();
       await select(IMPORTED_DEMO_ID);
       importStatus.textContent = 'Project JSON imported.';
-      if (autoSolve) await panelHandle.solve();
+      if (autoSolve) {
+        try {
+          await panelHandle.solve();
+        } catch {
+          // Import has already succeeded. The panel owns solve failure state,
+          // so do not re-label a valid file import as an import failure.
+        }
+      }
     } catch {
       importStatus.textContent = 'Import failed.';
     } finally {
