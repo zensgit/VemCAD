@@ -97,6 +97,7 @@ async function mountPanel({ appBridge, panelRoot, project, controller }) {
 export async function mountSolveWorkbenchDemo({
   root,
   appBridge = null,
+  autoSolve = false,
   demos = SOLVE_WORKBENCH_DEMOS,
   fetchImpl = createSolveDemoFetch(),
 } = {}) {
@@ -164,6 +165,9 @@ export async function mountSolveWorkbenchDemo({
   }
 
   await select(DEMO_ORDER[0]);
+  if (autoSolve) {
+    await panelHandle.solve();
+  }
 
   return {
     root,

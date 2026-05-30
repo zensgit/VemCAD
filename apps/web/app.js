@@ -147,7 +147,7 @@ export async function bootstrapVemcadWebApp({
     setEditorMode();
     const demoRoot = resolveSolveDemoRoot();
     const demoModule = await loadSolveDemo();
-    const demo = await demoModule.mountSolveWorkbenchDemo({ root: demoRoot, appBridge: bridge });
+    const demo = await demoModule.mountSolveWorkbenchDemo({ root: demoRoot, appBridge: bridge, autoSolve: true });
     triggerProductOfflineCaching(scheduleOfflineCaching, { mode: 'solve-demo' });
     return { mode: 'solve-demo', bridge, demo };
   }
