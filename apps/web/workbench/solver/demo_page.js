@@ -42,9 +42,9 @@ function ensureSolveDemoStyles(document) {
     .vemcad-solve-panel__status[data-status="blocked"],.vemcad-solve-panel__status[data-status="failed"]{background:#fff3df;color:#8a4b00}
     .vemcad-solve-panel__status[data-status="solving"]{background:#eaf1ff;color:#1f4f91}
     .vemcad-solve-panel__details,.vemcad-solve-panel__preview,.vemcad-solve-demo__summary{margin:0 0 12px;color:#3d485c;line-height:1.45}
-    .vemcad-solve-demo__export,.vemcad-solve-demo__import,.vemcad-solve-demo__solve-export,.vemcad-solve-demo__preview-export{min-height:34px;margin:0 0 6px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
-    .vemcad-solve-demo__export:disabled,.vemcad-solve-demo__import:disabled,.vemcad-solve-demo__solve-export:disabled,.vemcad-solve-demo__preview-export:disabled{cursor:progress;opacity:.65}
-    .vemcad-solve-demo__export-status,.vemcad-solve-demo__import-status,.vemcad-solve-demo__solve-export-status,.vemcad-solve-demo__preview-export-status{min-height:22px;margin:0 0 12px;color:#5b6679;line-height:1.45}
+    .vemcad-solve-demo__export,.vemcad-solve-demo__import,.vemcad-solve-demo__solve-copy,.vemcad-solve-demo__solve-export,.vemcad-solve-demo__preview-export{min-height:34px;margin:0 0 6px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
+    .vemcad-solve-demo__export:disabled,.vemcad-solve-demo__import:disabled,.vemcad-solve-demo__solve-copy:disabled,.vemcad-solve-demo__solve-export:disabled,.vemcad-solve-demo__preview-export:disabled{cursor:progress;opacity:.65}
+    .vemcad-solve-demo__export-status,.vemcad-solve-demo__import-status,.vemcad-solve-demo__solve-copy-status,.vemcad-solve-demo__solve-export-status,.vemcad-solve-demo__preview-export-status{min-height:22px;margin:0 0 12px;color:#5b6679;line-height:1.45}
     .vemcad-solve-demo__share{display:block;margin:0 0 8px;color:#114d7a;line-height:1.35;overflow-wrap:anywhere}
     .vemcad-solve-demo__copy{min-height:34px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
     .vemcad-solve-demo__copy:disabled{cursor:progress;opacity:.65}
@@ -370,6 +370,16 @@ export async function mountSolveWorkbenchDemo({
     className: 'vemcad-solve-demo__solve-evidence',
     text: 'No solve result yet.',
   });
+  const solveCopyButton = append(meta, 'button', {
+    type: 'button',
+    text: 'Copy Solve Evidence',
+    className: 'vemcad-solve-demo__solve-copy',
+  });
+  const solveCopyStatus = append(meta, 'p', {
+    className: 'vemcad-solve-demo__solve-copy-status',
+    text: 'Run solve to copy evidence.',
+  });
+  solveCopyStatus.setAttribute?.('aria-live', 'polite');
   const solveExportButton = append(meta, 'button', {
     type: 'button',
     text: 'Export Solve Result JSON',
@@ -400,6 +410,7 @@ export async function mountSolveWorkbenchDemo({
   let currentShareUrl = '';
   let currentProject = null;
   let currentSolveEnvelope = null;
+  let currentSolveEvidenceText = '';
   let currentPreviewDocument = null;
   const projectsByKey = { ...demos };
 
@@ -450,10 +461,13 @@ export async function mountSolveWorkbenchDemo({
     const project = projectsByKey[key];
     currentProject = project;
     currentSolveEnvelope = null;
+    currentSolveEvidenceText = '';
     currentPreviewDocument = null;
     projectSummary.textContent = summarizeProject(project);
     exportStatus.textContent = 'Ready to export project.';
     importStatus.textContent = 'Ready to import project.';
+    solveCopyButton.disabled = true;
+    solveCopyStatus.textContent = 'Run solve to copy evidence.';
     solveExportButton.disabled = true;
     solveExportStatus.textContent = 'Run solve to export result.';
     solveEvidence.textContent = 'No solve result yet.';
@@ -467,7 +481,15 @@ export async function mountSolveWorkbenchDemo({
       renderCadgfPreviewCanvas({ root: previewRoot, cadgfDocument: state.previewDocument });
       solveSummary.textContent = summarizeSolveState(state);
       diagnosticsSummary.textContent = diagnosticCountText(state);
-      solveEvidence.textContent = solveEvidenceText(currentSolveEnvelope, state.summary);
+      const evidenceText = solveEvidenceText(currentSolveEnvelope, state.summary);
+      currentSolveEvidenceText = currentSolveEnvelope ? evidenceText : '';
+      solveEvidence.textContent = evidenceText;
+      solveCopyButton.disabled = !currentSolveEvidenceText;
+      solveCopyStatus.textContent = currentSolveEvidenceText
+        ? 'Ready to copy solve evidence.'
+        : state.status === 'solving'
+          ? 'Solving before evidence copy.'
+          : 'Run solve to copy evidence.';
       solveExportButton.disabled = !currentSolveEnvelope;
       solveExportStatus.textContent = currentSolveEnvelope
         ? 'Ready to export solve result.'
@@ -545,6 +567,22 @@ export async function mountSolveWorkbenchDemo({
       importStatus.textContent = 'Import failed.';
     } finally {
       importButton.disabled = false;
+    }
+  });
+
+  solveCopyButton.addEventListener('click', async () => {
+    if (!currentSolveEvidenceText) {
+      solveCopyStatus.textContent = 'No solve evidence to copy.';
+      return;
+    }
+    solveCopyButton.disabled = true;
+    try {
+      await copyText(currentSolveEvidenceText, root);
+      solveCopyStatus.textContent = 'Solve evidence copied.';
+    } catch {
+      solveCopyStatus.textContent = 'Copy evidence unavailable.';
+    } finally {
+      solveCopyButton.disabled = false;
     }
   });
 
