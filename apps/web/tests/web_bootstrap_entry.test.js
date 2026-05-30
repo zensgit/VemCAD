@@ -349,6 +349,7 @@ test('bootstrapVemcadWebApp mounts solve demo mode without starting preview or w
   assert.equal(result.mode, 'solve-demo');
   assert.deepEqual(result.demo, { kind: 'solve-demo-handle' });
   assert.equal(mounted.root.id, 'cad-editor-root');
+  assert.equal(mounted.autoSolve, true);
   assert.equal(typeof mounted.appBridge.mountSolvePanel, 'function');
   assert.equal(elements.get('preview-root').classList.contains('is-hidden'), true);
   assert.equal(elements.get('cad-editor-root').classList.contains('is-hidden'), false);

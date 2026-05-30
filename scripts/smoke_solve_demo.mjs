@@ -15,6 +15,117 @@ async function fetchText(url) {
   return response.text();
 }
 
+function makeElement(tag, ownerDocument, id = '') {
+  const children = [];
+  const listeners = new Map();
+  const attrs = new Map();
+  const classes = new Set();
+  const el = {
+    id,
+    tagName: tag.toUpperCase(),
+    ownerDocument,
+    children,
+    firstChild: null,
+    parentNode: null,
+    className: '',
+    textContent: '',
+    type: '',
+    disabled: false,
+    dataset: {},
+    classList: {
+      add(name) { classes.add(name); },
+      remove(name) { classes.delete(name); },
+      toggle(name, force) {
+        if (force === undefined) {
+          if (classes.has(name)) classes.delete(name);
+          else classes.add(name);
+          return classes.has(name);
+        }
+        if (force) classes.add(name);
+        else classes.delete(name);
+        return !!force;
+      },
+      contains(name) { return classes.has(name); },
+    },
+    appendChild(child) {
+      child.parentNode = el;
+      children.push(child);
+      el.firstChild = children[0] ?? null;
+      return child;
+    },
+    removeChild(child) {
+      const index = children.indexOf(child);
+      if (index >= 0) children.splice(index, 1);
+      el.firstChild = children[0] ?? null;
+      child.parentNode = null;
+      return child;
+    },
+    addEventListener(type, handler) {
+      listeners.set(type, handler);
+    },
+    setAttribute(name, value) {
+      attrs.set(name, String(value));
+    },
+    removeAttribute(name) {
+      attrs.delete(name);
+    },
+    getAttribute(name) {
+      return attrs.get(name) ?? null;
+    },
+  };
+  return el;
+}
+
+function installSmokeDom(search) {
+  const elements = new Map();
+  const document = {
+    head: null,
+    body: null,
+    createElement(tag) {
+      return makeElement(tag, document);
+    },
+    createElementNS(_ns, tag) {
+      return makeElement(tag, document);
+    },
+    getElementById(id) {
+      if (!elements.has(id)) {
+        elements.set(id, makeElement('div', document, id));
+      }
+      return elements.get(id);
+    },
+    querySelector() {
+      return null;
+    },
+  };
+  document.head = makeElement('head', document, 'head');
+  document.body = makeElement('body', document, 'body');
+  globalThis.document = document;
+  globalThis.window = { location: { search } };
+  return { document, elements };
+}
+
+async function smokeBootstrapSolveDemo() {
+  installSmokeDom('?mode=solve-demo');
+  const app = await import(`../apps/web/app.js?smoke=${Date.now()}`);
+  app.resetVemcadWebAppBootstrapState();
+  const result = await app.bootstrapVemcadWebApp({
+    params: new URLSearchParams('mode=solve-demo'),
+    previewBootstrap: async () => {
+      throw new Error('preview must not start in solve-demo smoke');
+    },
+    scheduleOfflineCaching: () => ({ ok: true }),
+  });
+  if (result.mode !== 'solve-demo') {
+    throw new Error(`expected solve-demo mode, got ${result.mode}`);
+  }
+  if (result.demo.getPanelState()?.status !== 'solved') {
+    throw new Error(`expected auto-solved demo state, got ${result.demo.getPanelState()?.status}`);
+  }
+  app.resetVemcadWebAppBootstrapState();
+  delete globalThis.document;
+  delete globalThis.window;
+}
+
 const started = await startStaticServer({ host: '127.0.0.1', port: 0 });
 
 try {
@@ -34,6 +145,8 @@ try {
 
   const previewCanvasJs = await fetchText(`${base}/apps/web/workbench/solver/preview_canvas.js`);
   assertIncludes(previewCanvasJs, 'Solved geometry preview', 'preview_canvas.js');
+
+  await smokeBootstrapSolveDemo();
 
   console.log(`solve-demo smoke PASS: ${indexUrl}`);
 } finally {

@@ -146,6 +146,18 @@ test('mountSolveWorkbenchDemo uses the supplied app bridge to mount the panel', 
   assert.equal(calls[0].options.labels.title, 'Solvable line');
 });
 
+test('mountSolveWorkbenchDemo can auto-run the default solve', async () => {
+  const document = makeDocument();
+  const root = makeElement('div', document);
+
+  const demo = await mountSolveWorkbenchDemo({ root, autoSolve: true });
+
+  assert.equal(demo.selectedKey, 'solvableLine');
+  assert.equal(demo.getPanelState().status, 'solved');
+  assert.equal(demo.getPanelState().previewDocument.document_id, 'demo-solvable-line');
+  assert.equal(findByTag(root, 'svg').getAttribute('aria-label'), 'Solved geometry preview');
+});
+
 test('demo buttons switch the mounted project', async () => {
   const document = makeDocument();
   const root = makeElement('div', document);
