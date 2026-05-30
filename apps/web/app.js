@@ -2,6 +2,7 @@ import { bootstrapLegacyPreviewRuntime } from './preview/runtime/preview_bootstr
 import { scheduleProductOfflineCaching } from './offline/product_offline_cache.js';
 
 const EDITOR_MODES = new Set(['editor', 'cad', 'draft']);
+const SOLVE_DEMO_MODES = new Set(['solve-demo', 'solver-demo']);
 
 function resolveSearchParams(params = null) {
   if (params instanceof URLSearchParams) {
@@ -56,6 +57,19 @@ async function loadWorkbenchBootstrapModule() {
 
 async function loadSolvePanelModule() {
   return import('./workbench/panels/solve_panel.js');
+}
+
+async function loadSolveDemoModule() {
+  return import('./workbench/solver/demo_page.js');
+}
+
+function resolveSolveDemoRoot() {
+  const doc = globalThis.document;
+  if (!doc) return null;
+  return doc.getElementById('cad-editor-root')
+    || doc.getElementById('app')
+    || doc.body
+    || null;
 }
 
 export async function ensureWorkspaceBootstrapped({
@@ -123,10 +137,20 @@ export async function bootstrapVemcadWebApp({
   previewBootstrap = bootstrapLegacyPreviewRuntime,
   scheduleOfflineCaching = scheduleProductOfflineCaching,
   ensureWorkspaceBootstrappedImpl = ensureWorkspaceBootstrapped,
+  loadSolveDemoModule: loadSolveDemo = loadSolveDemoModule,
 } = {}) {
   const resolvedParams = resolveSearchParams(params);
   const mode = (resolvedParams.get('mode') || '').trim().toLowerCase();
   const bridge = installVemcadAppBridge({ params: resolvedParams });
+
+  if (SOLVE_DEMO_MODES.has(mode)) {
+    setEditorMode();
+    const demoRoot = resolveSolveDemoRoot();
+    const demoModule = await loadSolveDemo();
+    const demo = await demoModule.mountSolveWorkbenchDemo({ root: demoRoot, appBridge: bridge });
+    triggerProductOfflineCaching(scheduleOfflineCaching, { mode: 'solve-demo' });
+    return { mode: 'solve-demo', bridge, demo };
+  }
 
   if (EDITOR_MODES.has(mode)) {
     setEditorMode();
