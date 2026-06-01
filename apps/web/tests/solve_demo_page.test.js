@@ -143,6 +143,8 @@ test('mountSolveWorkbenchDemo mounts selectable demos and solves without a live 
   assert.equal(findByClass(root, 'vemcad-solve-demo__diagnostic-count').textContent, 'diagnostics=0');
   assert.equal(findByClass(root, 'vemcad-solve-demo__solve-evidence').textContent, 'No solve result yet.');
   assert.equal(findByClass(root, 'vemcad-solve-demo__export-status').textContent, 'Ready to export project.');
+  assert.equal(findByClass(root, 'vemcad-solve-demo__project-copy').disabled, false);
+  assert.equal(findByClass(root, 'vemcad-solve-demo__project-copy-status').textContent, 'Ready to copy project.');
   assert.equal(findByClass(root, 'vemcad-solve-demo__import-status').textContent, 'Ready to import project.');
   assert.equal(findByClass(root, 'vemcad-solve-demo__solve-copy').disabled, true);
   assert.equal(findByClass(root, 'vemcad-solve-demo__solve-copy-status').textContent, 'Run solve to copy evidence.');
@@ -181,6 +183,8 @@ test('mountSolveWorkbenchDemo mounts selectable demos and solves without a live 
   assert.equal(findByClass(root, 'vemcad-solve-demo__solve-export-status').textContent, 'Ready to export solve result.');
   assert.equal(findByClass(root, 'vemcad-solve-demo__preview-export').disabled, true);
   assert.equal(findByClass(root, 'vemcad-solve-demo__preview-export-status').textContent, 'No CADGF preview to export.');
+  assert.equal(findByClass(root, 'vemcad-solve-demo__project-copy').disabled, false);
+  assert.equal(findByClass(root, 'vemcad-solve-demo__project-copy-status').textContent, 'Ready to copy project.');
   assert.equal(
     findByClass(root, 'vemcad-solve-demo__share').getAttribute('href'),
     'http://127.0.0.1/apps/web/index.html?mode=solve-demo&demo=conflictingLine',
@@ -267,6 +271,47 @@ test('copy link button reports unavailable when clipboard write fails', async ()
 
   await findByClass(root, 'vemcad-solve-demo__copy').click();
   assert.equal(findByClass(root, 'vemcad-solve-demo__copy-status').textContent, 'Copy unavailable.');
+});
+
+test('copy project button copies the current VEMCAD-PROJECT json', async () => {
+  const document = makeDocument();
+  const root = makeElement('div', document);
+  const copied = [];
+
+  const demo = await mountSolveWorkbenchDemo({
+    root,
+    copyText: async (text) => {
+      copied.push(JSON.parse(text));
+    },
+  });
+  const projectCopyButton = findByClass(root, 'vemcad-solve-demo__project-copy');
+  const projectCopyStatus = findByClass(root, 'vemcad-solve-demo__project-copy-status');
+
+  await projectCopyButton.click();
+  assert.equal(copied[0].project.id, 'demo-solvable-line');
+  assert.equal(copied[0].header.format, 'VEMCAD-PROJECT');
+  assert.equal(projectCopyStatus.textContent, 'Project JSON copied.');
+
+  await demo.select('conflictingLine');
+  await projectCopyButton.click();
+  assert.equal(copied.at(-1).project.id, 'demo-conflicting-line');
+  assert.equal(copied.at(-1).constraints.length, 3);
+  assert.equal(projectCopyStatus.textContent, 'Project JSON copied.');
+});
+
+test('copy project button reports unavailable when clipboard write fails', async () => {
+  const document = makeDocument();
+  const root = makeElement('div', document);
+
+  await mountSolveWorkbenchDemo({
+    root,
+    copyText: async () => {
+      throw new Error('clipboard denied');
+    },
+  });
+
+  await findByClass(root, 'vemcad-solve-demo__project-copy').click();
+  assert.equal(findByClass(root, 'vemcad-solve-demo__project-copy-status').textContent, 'Copy project unavailable.');
 });
 
 test('copy solve evidence button copies solved and blocked evidence text', async () => {

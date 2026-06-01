@@ -42,9 +42,9 @@ function ensureSolveDemoStyles(document) {
     .vemcad-solve-panel__status[data-status="blocked"],.vemcad-solve-panel__status[data-status="failed"]{background:#fff3df;color:#8a4b00}
     .vemcad-solve-panel__status[data-status="solving"]{background:#eaf1ff;color:#1f4f91}
     .vemcad-solve-panel__details,.vemcad-solve-panel__preview,.vemcad-solve-demo__summary{margin:0 0 12px;color:#3d485c;line-height:1.45}
-    .vemcad-solve-demo__export,.vemcad-solve-demo__import,.vemcad-solve-demo__solve-copy,.vemcad-solve-demo__solve-export,.vemcad-solve-demo__preview-export{min-height:34px;margin:0 0 6px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
-    .vemcad-solve-demo__export:disabled,.vemcad-solve-demo__import:disabled,.vemcad-solve-demo__solve-copy:disabled,.vemcad-solve-demo__solve-export:disabled,.vemcad-solve-demo__preview-export:disabled{cursor:progress;opacity:.65}
-    .vemcad-solve-demo__export-status,.vemcad-solve-demo__import-status,.vemcad-solve-demo__solve-copy-status,.vemcad-solve-demo__solve-export-status,.vemcad-solve-demo__preview-export-status{min-height:22px;margin:0 0 12px;color:#5b6679;line-height:1.45}
+    .vemcad-solve-demo__export,.vemcad-solve-demo__project-copy,.vemcad-solve-demo__import,.vemcad-solve-demo__solve-copy,.vemcad-solve-demo__solve-export,.vemcad-solve-demo__preview-export{min-height:34px;margin:0 0 6px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
+    .vemcad-solve-demo__export:disabled,.vemcad-solve-demo__project-copy:disabled,.vemcad-solve-demo__import:disabled,.vemcad-solve-demo__solve-copy:disabled,.vemcad-solve-demo__solve-export:disabled,.vemcad-solve-demo__preview-export:disabled{cursor:progress;opacity:.65}
+    .vemcad-solve-demo__export-status,.vemcad-solve-demo__project-copy-status,.vemcad-solve-demo__import-status,.vemcad-solve-demo__solve-copy-status,.vemcad-solve-demo__solve-export-status,.vemcad-solve-demo__preview-export-status{min-height:22px;margin:0 0 12px;color:#5b6679;line-height:1.45}
     .vemcad-solve-demo__share{display:block;margin:0 0 8px;color:#114d7a;line-height:1.35;overflow-wrap:anywhere}
     .vemcad-solve-demo__copy{min-height:34px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
     .vemcad-solve-demo__copy:disabled{cursor:progress;opacity:.65}
@@ -171,6 +171,10 @@ function filenameForProject(project, key) {
   const raw = project?.project?.id || key || 'vemcad-project';
   const safe = String(raw).replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'vemcad-project';
   return `${safe}.vemcad-project.json`;
+}
+
+function projectJsonText(project) {
+  return `${JSON.stringify(project, null, 2)}\n`;
 }
 
 function filenameForPreviewDocument(document, key) {
@@ -339,6 +343,16 @@ export async function mountSolveWorkbenchDemo({
     text: 'Ready to export project.',
   });
   exportStatus.setAttribute?.('aria-live', 'polite');
+  const projectCopyButton = append(meta, 'button', {
+    type: 'button',
+    text: 'Copy Project JSON',
+    className: 'vemcad-solve-demo__project-copy',
+  });
+  const projectCopyStatus = append(meta, 'p', {
+    className: 'vemcad-solve-demo__project-copy-status',
+    text: 'Ready to copy project.',
+  });
+  projectCopyStatus.setAttribute?.('aria-live', 'polite');
   const importButton = append(meta, 'button', {
     type: 'button',
     text: 'Import Project JSON',
@@ -465,6 +479,8 @@ export async function mountSolveWorkbenchDemo({
     currentPreviewDocument = null;
     projectSummary.textContent = summarizeProject(project);
     exportStatus.textContent = 'Ready to export project.';
+    projectCopyButton.disabled = false;
+    projectCopyStatus.textContent = 'Ready to copy project.';
     importStatus.textContent = 'Ready to import project.';
     solveCopyButton.disabled = true;
     solveCopyStatus.textContent = 'Run solve to copy evidence.';
@@ -540,6 +556,22 @@ export async function mountSolveWorkbenchDemo({
       exportStatus.textContent = 'Export unavailable.';
     } finally {
       exportButton.disabled = false;
+    }
+  });
+
+  projectCopyButton.addEventListener('click', async () => {
+    if (!currentProject) {
+      projectCopyStatus.textContent = 'No project to copy.';
+      return;
+    }
+    projectCopyButton.disabled = true;
+    try {
+      await copyText(projectJsonText(currentProject), root);
+      projectCopyStatus.textContent = 'Project JSON copied.';
+    } catch {
+      projectCopyStatus.textContent = 'Copy project unavailable.';
+    } finally {
+      projectCopyButton.disabled = false;
     }
   });
 

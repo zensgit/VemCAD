@@ -153,6 +153,7 @@ try {
   assertIncludes(demoPageJs, 'VemCAD Solve Workbench', 'demo_page.js');
   assertIncludes(demoPageJs, 'renderCadgfPreviewCanvas', 'demo_page.js');
   assertIncludes(demoPageJs, 'Import Project JSON', 'demo_page.js');
+  assertIncludes(demoPageJs, 'Copy Project JSON', 'demo_page.js');
   assertIncludes(demoPageJs, 'Copy Solve Evidence', 'demo_page.js');
   assertIncludes(demoPageJs, 'Export Solve Result JSON', 'demo_page.js');
   assertIncludes(demoPageJs, 'No solve result yet.', 'demo_page.js');

@@ -134,6 +134,8 @@ async function verifyCase({ page, base, screenshotDir, spec }) {
   await assertMatches(page, '.vemcad-solve-demo__share', new RegExp(`demo=${spec.id}`), `${spec.id} share link`);
   await assertText(page, '.vemcad-solve-demo__export', 'Export Project JSON', `${spec.id} export button`);
   await assertText(page, '.vemcad-solve-demo__export-status', 'Ready to export project.', `${spec.id} export status`);
+  await assertText(page, '.vemcad-solve-demo__project-copy', 'Copy Project JSON', `${spec.id} project copy button`);
+  await assertText(page, '.vemcad-solve-demo__project-copy-status', 'Ready to copy project.', `${spec.id} project copy status`);
   await assertText(page, '.vemcad-solve-demo__import', 'Import Project JSON', `${spec.id} import button`);
   await assertText(page, '.vemcad-solve-demo__import-status', 'Ready to import project.', `${spec.id} import status`);
   await assertText(page, '.vemcad-solve-demo__solve-export', 'Export Solve Result JSON', `${spec.id} solve export button`);
@@ -182,6 +184,7 @@ async function verifyImportProject({ page, base, screenshotDir }) {
   await assertText(page, '.vemcad-solve-demo__tab[data-active="true"]', 'Imported', 'imported active tab');
   await assertText(page, '.vemcad-solve-demo__import-status', 'Project JSON imported.', 'import status after file picker');
   await assertMatches(page, '.vemcad-solve-demo__summary', /id=demo-solvable-line/, 'imported project summary');
+  await assertText(page, '.vemcad-solve-demo__project-copy-status', 'Ready to copy project.', 'imported project copy status');
   await assertText(page, '.vemcad-solve-demo__share', 'Imported project is local. Export JSON to share.', 'imported share text');
   await assertText(page, '.vemcad-solve-demo__copy-status', 'No share link for imported project.', 'imported copy status');
   await assertText(page, '.vemcad-solve-panel__status', 'Solved', 'imported solve status');
