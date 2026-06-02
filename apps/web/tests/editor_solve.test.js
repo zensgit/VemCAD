@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { mountEditorSolvePanel, EDITOR_SOLVE_EXPORT_FAILED } from '../workbench/solver/editor_solve.js';
+import { mountEditorSolvePanel, translateEvaluatedViewToUpdates, EDITOR_SOLVE_EXPORT_FAILED } from '../workbench/solver/editor_solve.js';
 import { bootstrapVemcadWebApp, resetVemcadWebAppBootstrapState } from '../app.js';
 
 // Pure, dependency-injected tests — no editor, no runtime bridge, no solver, no submodule.
@@ -14,7 +14,18 @@ function recorder(returnValue) {
   return fn;
 }
 
-// --- editor_solve module: read-only compose (export -> panel) ----------------
+// A controller stub that supports subscribe (records the listener, fires once with idle
+// state like the real one) + a manual emit, so we can drive solve-result states.
+function fakeSolveController() {
+  let listener = null;
+  return {
+    solve() {},
+    subscribe(l) { listener = l; l({ status: 'idle', envelope: null }); return () => { listener = null; }; },
+    emit(state) { if (listener) listener(state); },
+  };
+}
+
+// --- editor_solve module: compose (export -> panel) + auto-apply writeback ----
 
 test('mountEditorSolvePanel: exportable document -> mounts panel with the project + wired controller', () => {
   const project = { header: { format: 'VEMCAD-PROJECT' }, entities: [], constraints: [] };
@@ -85,6 +96,100 @@ test('mountEditorSolvePanel: ok-but-empty export value -> EDITOR_SOLVE_EXPORT_FA
 test('mountEditorSolvePanel: missing root or collaborators throws', () => {
   assert.throws(() => mountEditorSolvePanel({ exportProject() {}, createPanel() {}, createController() {} }), TypeError);
   assert.throws(() => mountEditorSolvePanel({ root: fakeRoot() }), TypeError);
+});
+
+// --- translateEvaluatedViewToUpdates: solved view -> editor geometry patches --
+// These lock the EXACT editor field names per kind; a wrong key would make updateEntity
+// merge a junk field that normalize drops -> geometry silently does not move.
+
+test('translateEvaluatedViewToUpdates: maps each handled kind to its editor field names', () => {
+  const evaluatedView = {
+    entities: [
+      { id: 1, kind: 'line', line: [[1, 2], [9, 8]] },
+      { id: 2, kind: 'circle', circle: { c: [3, 4], r: 5 } },
+      { id: 3, kind: 'arc', arc: { c: [5, 6] } },
+      { id: 4, kind: 'point', point: [7, 8] }, // editor has no point type -> not written back
+    ],
+  };
+  assert.deepEqual(translateEvaluatedViewToUpdates(evaluatedView), [
+    { id: 1, patch: { start: { x: 1, y: 2 }, end: { x: 9, y: 8 } } },
+    { id: 2, patch: { center: { x: 3, y: 4 } } },
+    { id: 3, patch: { center: { x: 5, y: 6 } } },
+  ]);
+});
+
+test('translateEvaluatedViewToUpdates: skips no-id, unknown kind, malformed coords, and non-views', () => {
+  const evaluatedView = {
+    entities: [
+      { kind: 'line', line: [[0, 0], [1, 1]] },               // no id
+      { id: 'x', kind: 'circle', circle: { c: [0, 0] } },     // non-finite id
+      { id: 5, kind: 'spline', points: [[0, 0]] },            // unknown kind
+      { id: 6, kind: 'line', line: [[0, 0]] },                // malformed (one endpoint)
+      { id: 7, kind: 'circle', circle: { c: [Number.NaN, 0] } }, // malformed coord
+      { id: 8, kind: 'line', line: [[2, 3], [4, 5]] },        // valid -> kept
+    ],
+  };
+  assert.deepEqual(translateEvaluatedViewToUpdates(evaluatedView), [
+    { id: 8, patch: { start: { x: 2, y: 3 }, end: { x: 4, y: 5 } } },
+  ]);
+  assert.deepEqual(translateEvaluatedViewToUpdates(null), []);
+  assert.deepEqual(translateEvaluatedViewToUpdates({}), []);
+});
+
+// --- auto-apply: a successful solve writes solved geometry back via applyUpdates ---
+
+function mountWithController(controller, applyUpdates) {
+  const project = { header: { format: 'VEMCAD-PROJECT' }, entities: [], constraints: [] };
+  return mountEditorSolvePanel({
+    root: fakeRoot(),
+    documentState: { listEntities() { return []; }, listLayers() { return []; } },
+    exportProject: () => ({ ok: true, value: project }),
+    createPanel: () => ({ destroy() {} }),
+    createController: () => controller,
+    applyUpdates,
+  });
+}
+
+test('mountEditorSolvePanel: a successful solve auto-applies the translated updates once', () => {
+  const controller = fakeSolveController();
+  const applyUpdates = recorder();
+  const result = mountWithController(controller, applyUpdates);
+  assert.equal(result.ok, true);
+
+  // idle subscribe fire (no envelope) -> nothing applied yet
+  assert.equal(applyUpdates.calls.length, 0);
+
+  const evaluatedView = { entities: [{ id: 1, kind: 'line', line: [[1, 2], [9, 8]] }] };
+  controller.emit({ status: 'satisfied', envelope: { ok: true, value: { evaluatedView } } });
+
+  assert.equal(applyUpdates.calls.length, 1);
+  assert.deepEqual(applyUpdates.calls[0][0], {
+    updates: [{ id: 1, patch: { start: { x: 1, y: 2 }, end: { x: 9, y: 8 } } }],
+  });
+
+  // a notify replay of the SAME view must not re-apply (object-identity guard)
+  controller.emit({ status: 'satisfied', envelope: { ok: true, value: { evaluatedView } } });
+  assert.equal(applyUpdates.calls.length, 1);
+});
+
+test('mountEditorSolvePanel: does NOT apply on a failed solve or an empty solved view', () => {
+  const controller = fakeSolveController();
+  const applyUpdates = recorder();
+  mountWithController(controller, applyUpdates);
+
+  controller.emit({ status: 'error', envelope: { ok: false, value: null } });
+  controller.emit({ status: 'solving', envelope: null });
+  controller.emit({ status: 'satisfied', envelope: { ok: true, value: { evaluatedView: { entities: [] } } } });
+
+  assert.equal(applyUpdates.calls.length, 0);
+});
+
+test('mountEditorSolvePanel: read-only when applyUpdates is not injected (no throw on solve)', () => {
+  const controller = fakeSolveController();
+  const result = mountWithController(controller, undefined);
+  assert.equal(result.ok, true);
+  const evaluatedView = { entities: [{ id: 1, kind: 'line', line: [[1, 2], [9, 8]] }] };
+  assert.doesNotThrow(() => controller.emit({ status: 'satisfied', envelope: { ok: true, value: { evaluatedView } } }));
 });
 
 // --- app.js wiring: editor mode invokes the (injectable) editor-solve mounter -
