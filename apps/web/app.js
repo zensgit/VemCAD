@@ -161,8 +161,10 @@ async function mountEditorSolveRegion({ workspace, params = null } = {}) {
     // so placement is correct by construction. (editorRoot existence already gated editor mode.)
     const entry = entryMod.buildSolveEntry({ document: doc, host: doc.body || editorRoot });
     if (!entry) return null;
-    const mounted = editorSolveMod.mountEditorSolvePanel({
-      root: entry.regionRoot,
+
+    // Panel collaborators are stable across re-mounts (workspace is fixed); only the document
+    // snapshot changes (e.g. after an import).
+    const panelDeps = {
       documentState,
       exportProject: bridgeMod.exportRuntimeProjectFromDocumentState,
       createPanel: panelMod.createSolveWorkbenchPanel,
@@ -171,7 +173,6 @@ async function mountEditorSolveRegion({ workspace, params = null } = {}) {
       // Guarded: no commandBus -> editor_solve degrades to read-only (solve + display only).
       applyUpdates: ({ updates }) => workspace?.commandBus?.execute('entity.applyGeometry', { updates }),
       // Highlight conflicting entities (over-constrained solve) by selecting them in the editor.
-      // Guarded: no selection -> no-op.
       highlightEntities: (ids) => workspace?.selection?.setSelection?.(ids, ids?.[0] ?? null),
       // Clear a conflict highlight on a later conflict-free solve, but ONLY if the selection is
       // still the ids we set (the user did not change it since) -> never wipes a user selection.
@@ -180,34 +181,63 @@ async function mountEditorSolveRegion({ workspace, params = null } = {}) {
         if (!selection || typeof selection.setSelection !== 'function') return;
         if (editorSolveMod.shouldClearHighlight(selection.entityIds, ids)) selection.setSelection([], null);
       },
-    });
+    };
+
+    // current = { mounted, exportsRow, unsubExports }. A successful import re-mounts (refresh) so
+    // the panel + exports snapshot the freshly-imported document; teardown disposes EVERY old
+    // handle (the exports subscription, the row DOM, and editor_solve's own subscription/panel)
+    // so a re-mount never leaves a stale subscriber updating a detached row.
+    let current = null;
+    const teardownCurrent = () => {
+      if (!current) return;
+      try { current.unsubExports?.(); } catch { /* ignore */ }
+      current.exportsRow?.destroy?.();
+      current.mounted?.destroy?.();
+      current = null;
+    };
+    const mountInner = () => {
+      const mounted = editorSolveMod.mountEditorSolvePanel({ root: entry.regionRoot, ...panelDeps });
+      if (mounted?.ok !== true) return { mounted, ok: false };
+      let exportsRow = null;
+      let unsubExports = null;
+      try {
+        exportsRow = exportsMod.mountEditorSolveExports({
+          root: entry.card,
+          document: doc,
+          getProject: () => mounted.project,
+          getSolveState: () => mounted.controller?.getState?.() ?? {},
+          getShareUrl: () => doc.defaultView?.location?.href ?? globalThis.location?.href ?? null,
+          // Load a project (or repro bundle) into the editor document. Returns the bridge's
+          // {ok,...}; the row only re-mounts on ok === true.
+          loadProject: (project) => bridgeMod.importRuntimeProjectToDocumentState(documentState, project),
+          onImported: () => refresh(),
+        });
+        const unsub = mounted.controller?.subscribe?.(() => exportsRow?.update?.());
+        unsubExports = typeof unsub === 'function' ? unsub : null;
+      } catch {
+        exportsRow = null;
+        unsubExports = null;
+      }
+      return { mounted, exportsRow, unsubExports, ok: true };
+    };
+    const refresh = () => { teardownCurrent(); current = mountInner(); };
+
+    current = mountInner();
     // If the document could not be exported to a solvable project, don't leave a launcher that
     // opens an empty card — tear the entry back down and surface the same failure result.
-    if (mounted?.ok !== true) {
+    if (!current.ok) {
       entry.dock?.remove?.();
-      return mounted;
-    }
-    // Export row in the card (below the panel): Project JSON / Repro Bundle / CADGF Preview for
-    // the current project, via the shared export path. Guarded so an export-row failure never
-    // breaks the solve panel; subscribe so repro/preview enable as soon as a solve runs.
-    let exportsRow = null;
-    try {
-      exportsRow = exportsMod.mountEditorSolveExports({
-        root: entry.card,
-        document: doc,
-        getProject: () => mounted.project,
-        getSolveState: () => mounted.controller?.getState?.() ?? {},
-        getShareUrl: () => doc.defaultView?.location?.href ?? globalThis.location?.href ?? null,
-      });
-      mounted.controller?.subscribe?.(() => exportsRow?.update?.());
-    } catch {
-      exportsRow = null;
+      return current.mounted;
     }
     return {
-      ...mounted,
+      get ok() { return current?.mounted?.ok ?? false; },
+      get project() { return current?.mounted?.project; },
+      get controller() { return current?.mounted?.controller; },
+      get panel() { return current?.mounted?.panel; },
+      get exports() { return current?.exportsRow; },
       entry,
-      exports: exportsRow,
-      destroy() { exportsRow?.destroy?.(); mounted.destroy?.(); entry.dock?.remove?.(); },
+      refresh,
+      destroy() { teardownCurrent(); entry.dock?.remove?.(); },
     };
   } catch {
     return null;

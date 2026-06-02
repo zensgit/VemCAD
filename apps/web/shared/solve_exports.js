@@ -63,3 +63,12 @@ export function filenameForSolveResult(envelope, project, key) {
   const raw = project?.project?.id || envelope?.value?.evaluatedView?.project?.id || key;
   return `${safeFilenameStem(raw, 'vemcad-solve-result')}.solve-result.json`;
 }
+
+// Pull the importable project out of parsed JSON: either a Solve Repro Bundle (unwrap `.project`)
+// or a raw project. So re-importing a bundle exported by reproBundleJsonText() Just Works.
+// Returns the project object, or null when the JSON is neither (caller reports a clear error).
+export function extractImportedProject(parsed) {
+  if (!parsed || typeof parsed !== 'object') return null;
+  const candidate = parsed.schema === SOLVE_REPRO_SCHEMA ? parsed.project : parsed;
+  return candidate && typeof candidate === 'object' ? candidate : null;
+}

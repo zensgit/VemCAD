@@ -16,8 +16,9 @@ import {
   solveEvidenceText,
   filenameForProject,
   filenameForPreviewDocument,
+  extractImportedProject,
 } from '../../shared/solve_exports.js';
-import { copyText as defaultCopyText, downloadJson as defaultDownloadJson } from '../../shared/solve_export_io.js';
+import { copyText as defaultCopyText, downloadJson as defaultDownloadJson, readJsonFile as defaultReadJsonFile } from '../../shared/solve_export_io.js';
 
 function appendEl(parent, tag, { className, text, type } = {}) {
   const el = parent.ownerDocument.createElement(tag);
@@ -36,6 +37,9 @@ export function mountEditorSolveExports({
   getShareUrl,
   copyText = defaultCopyText,
   downloadJson = defaultDownloadJson,
+  readJsonFile = defaultReadJsonFile,
+  loadProject,
+  onImported,
   labels = {},
 } = {}) {
   if (!root || typeof root.appendChild !== 'function' || !root.ownerDocument) {
@@ -46,14 +50,45 @@ export function mountEditorSolveExports({
   const stateOf = () => getSolveState?.() ?? {};
 
   const container = appendEl(root, 'section', { className: 'vemcad-solve-exports' });
-  appendEl(container, 'h3', { text: labels.title ?? 'Export' });
+  appendEl(container, 'h3', { text: labels.title ?? 'Import / Export' });
 
+  const importButton = appendEl(container, 'button', { type: 'button', text: 'Import Project JSON', className: 'vemcad-solve-exports__import' });
   const projectButton = appendEl(container, 'button', { type: 'button', text: 'Export Project JSON', className: 'vemcad-solve-exports__project' });
   const reproButton = appendEl(container, 'button', { type: 'button', text: 'Copy Repro Bundle', className: 'vemcad-solve-exports__repro' });
   const previewButton = appendEl(container, 'button', { type: 'button', text: 'Export CADGF Preview', className: 'vemcad-solve-exports__preview' });
   const status = appendEl(container, 'p', { className: 'vemcad-solve-exports__status', text: '' });
   status.setAttribute?.('aria-live', 'polite');
   const setStatus = (text) => { status.textContent = text; };
+
+  // Import Project JSON (or a Repro Bundle — unwrapped). SAFETY: only a SUCCESSFUL load triggers
+  // onImported (the re-mount). A bad file / wrong shape / failed load / user-cancel leaves the
+  // current document + panel intact and just reports an error — a bad file must never cost the
+  // user their working session. onImported replaces this row, so nothing touches it afterward.
+  importButton.addEventListener('click', async () => {
+    if (typeof loadProject !== 'function') { setStatus('Import is unavailable.'); return; }
+    setStatus('Importing…');
+    let parsed;
+    try {
+      parsed = await readJsonFile({ document });
+    } catch (err) {
+      setStatus(err?.message === 'project import canceled' ? 'Import canceled.' : 'Could not read the file.');
+      return;
+    }
+    const project = extractImportedProject(parsed);
+    if (!project) { setStatus('Not a VemCAD project or repro bundle.'); return; }
+    let result;
+    try {
+      result = await loadProject(project);
+    } catch (err) {
+      setStatus(`Import failed: ${err?.message ?? String(err)}`);
+      return;
+    }
+    if (!result || result.ok !== true) {
+      setStatus(result?.error ? `Import failed: ${result.error}` : 'Import failed.');
+      return;
+    }
+    onImported?.();
+  });
 
   // Project JSON — always available; exports the project the panel solves.
   projectButton.addEventListener('click', async () => {
@@ -100,6 +135,7 @@ export function mountEditorSolveExports({
 
   return {
     root: container,
+    importButton,
     projectButton,
     reproButton,
     previewButton,
