@@ -102,3 +102,17 @@ test('GET /health -> 200 {ok:true}; wrong method -> 405; unknown path -> 404', (
   assert.equal((await fetch(`${base}/solve`, { method: 'GET' })).status, 405);
   assert.equal((await fetch(`${base}/nope`)).status, 404);
 }));
+
+test('POST /solve-cadgf routes to the CADGF-PROJ cli and maps exit/status like /solve', () => withServer({ cadgfCliPath: FAKE }, async (base) => {
+  // solved -> 200, envelope (with vars) passed through verbatim
+  const solved = { ok: true, value: { vars: { 'e1_start.y': 2.5, 'e1_end.y': 2.5 }, solve: { ok: true } } };
+  const ok = await fetch(`${base}/solve-cadgf`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ exit: 0, stdout: solved }) });
+  assert.equal(ok.status, 200);
+  assert.deepEqual(await ok.json(), solved);
+  // unsatisfiable -> 422 (same mapping as /solve)
+  const blocked = await fetch(`${base}/solve-cadgf`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ exit: 1, stdout: { ok: false, error_code: 'SOLVE_UNSATISFIED', error: 'conflict' } }) });
+  assert.equal(blocked.status, 422);
+  // GET /solve-cadgf -> 405
+  const get = await fetch(`${base}/solve-cadgf`, { method: 'GET' });
+  assert.equal(get.status, 405);
+}));

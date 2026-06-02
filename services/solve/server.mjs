@@ -30,6 +30,8 @@ import { fileURLToPath } from 'node:url';
 // Default solve unit, resolved relative to this file (not cwd) so the service runs
 // from anywhere. Overridable for tests / alternate layouts via options or env.
 const DEFAULT_CLI = fileURLToPath(new URL('../../apps/runtime/tools/solve_cli.mjs', import.meta.url));
+// CADGF-PROJ-direct solve unit (the editor's native "Solve" path — no semantic adapter).
+const DEFAULT_CADGF_CLI = fileURLToPath(new URL('../../apps/runtime/tools/solve_cadgf_cli.mjs', import.meta.url));
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -77,8 +79,34 @@ function sendJson(res, status, obj) {
 
 export function createSolveServer(options = {}) {
   const cliPath = options.cliPath || process.env.VEMCAD_SOLVE_CLI || DEFAULT_CLI;
+  const cadgfCliPath = options.cadgfCliPath || process.env.VEMCAD_SOLVE_CADGF_CLI || DEFAULT_CADGF_CLI;
   const command = options.command || process.env.VEMCAD_SOLVE_NODE || process.execPath;
   const env = options.env || process.env;
+
+  // Shared pipe: shell the given solve CLI with the request body, map its exit code + JSON
+  // envelope onto HTTP. Used by both /solve (semantic VEMCAD-PROJECT) and /solve-cadgf
+  // (CADGF-PROJ-direct) — they differ ONLY in which CLI runs; the contract is identical.
+  async function solveAndRespond(req, res, solveCliPath) {
+    if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error_code: 'METHOD_NOT_ALLOWED' });
+    const body = await readBody(req);
+    const r = await runCli(command, solveCliPath, body, env);
+    if (r.spawnError) {
+      return sendJson(res, 500, { ok: false, error_code: 'ROUTER_SPAWN_FAILED', error: String(r.spawnError?.message ?? r.spawnError), diagnostics: [] });
+    }
+    let envelope;
+    try {
+      envelope = JSON.parse(r.stdout);
+    } catch {
+      return sendJson(res, 500, { ok: false, error_code: 'ROUTER_BAD_CLI_OUTPUT', error: 'solve CLI did not emit JSON', stderr: (r.stderr || '').slice(0, 500), diagnostics: [] });
+    }
+    // Self-consistency guard: the CLI contract is "exit 0 iff ok". If the exit code and
+    // envelope.ok disagree (CLI/host drift), treat the contradiction as a server-side anomaly
+    // rather than returning a 200+{ok:false}. Original envelope kept for debugging.
+    if ((r.code === 0) !== (envelope?.ok === true)) {
+      return sendJson(res, 500, { ok: false, error_code: 'ROUTER_BAD_CLI_OUTPUT', error: `solve CLI exit code ${r.code} disagrees with envelope.ok=${JSON.stringify(envelope?.ok)}`, envelope, diagnostics: [] });
+    }
+    return sendJson(res, statusForResult(r.code, envelope), envelope);
+  }
 
   return http.createServer(async (req, res) => {
     try {
@@ -89,29 +117,10 @@ export function createSolveServer(options = {}) {
         return sendJson(res, 200, { ok: true });
       }
 
-      if (path === '/solve') {
-        if (req.method !== 'POST') return sendJson(res, 405, { ok: false, error_code: 'METHOD_NOT_ALLOWED' });
-        const body = await readBody(req);
-        const r = await runCli(command, cliPath, body, env);
-        if (r.spawnError) {
-          return sendJson(res, 500, { ok: false, error_code: 'ROUTER_SPAWN_FAILED', error: String(r.spawnError?.message ?? r.spawnError), diagnostics: [] });
-        }
-        let envelope;
-        try {
-          envelope = JSON.parse(r.stdout);
-        } catch {
-          return sendJson(res, 500, { ok: false, error_code: 'ROUTER_BAD_CLI_OUTPUT', error: 'solve CLI did not emit JSON', stderr: (r.stderr || '').slice(0, 500), diagnostics: [] });
-        }
-        // Self-consistency guard: solve_cli's contract is "exit 0 iff ok". If the
-        // exit code and envelope.ok disagree (CLI/host drift), don't return a
-        // 200+{ok:false} (or a failure status + ok:true) — treat the contradiction
-        // as a server-side anomaly, like non-JSON output. Original envelope kept for
-        // debugging.
-        if ((r.code === 0) !== (envelope?.ok === true)) {
-          return sendJson(res, 500, { ok: false, error_code: 'ROUTER_BAD_CLI_OUTPUT', error: `solve CLI exit code ${r.code} disagrees with envelope.ok=${JSON.stringify(envelope?.ok)}`, envelope, diagnostics: [] });
-        }
-        return sendJson(res, statusForResult(r.code, envelope), envelope);
-      }
+      // POST /solve        body = VEMCAD-PROJECT (semantic) -> solve_cli
+      if (path === '/solve') return await solveAndRespond(req, res, cliPath);
+      // POST /solve-cadgf   body = CADGF-PROJ (editor native) -> solve_cadgf_cli
+      if (path === '/solve-cadgf') return await solveAndRespond(req, res, cadgfCliPath);
 
       return sendJson(res, 404, { ok: false, error_code: 'NOT_FOUND' });
     } catch (err) {
