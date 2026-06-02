@@ -145,12 +145,13 @@ async function mountEditorSolveRegion({ workspace, params = null } = {}) {
     if (!doc || !documentState) return null;
     const editorRoot = doc.getElementById('cad-editor-root');
     if (!editorRoot) return null;
-    const [bridgeMod, panelMod, controllerMod, editorSolveMod, entryMod] = await Promise.all([
+    const [bridgeMod, panelMod, controllerMod, editorSolveMod, entryMod, exportsMod] = await Promise.all([
       import('./shared/runtime_bridge.js'),
       import('./workbench/panels/solve_panel.js'),
       import('./workbench/solver/solve_workbench.js'),
       import('./workbench/solver/editor_solve.js'),
       import('./workbench/solver/editor_solve_entry.js'),
+      import('./workbench/solver/editor_solve_exports.js'),
     ]);
     // Lightweight floating entry: a launcher that toggles a floating card holding the panel
     // (default closed). The verified panel mounts into the entry's region; not a layout dock.
@@ -186,10 +187,27 @@ async function mountEditorSolveRegion({ workspace, params = null } = {}) {
       entry.dock?.remove?.();
       return mounted;
     }
+    // Export row in the card (below the panel): Project JSON / Repro Bundle / CADGF Preview for
+    // the current project, via the shared export path. Guarded so an export-row failure never
+    // breaks the solve panel; subscribe so repro/preview enable as soon as a solve runs.
+    let exportsRow = null;
+    try {
+      exportsRow = exportsMod.mountEditorSolveExports({
+        root: entry.card,
+        document: doc,
+        getProject: () => mounted.project,
+        getSolveState: () => mounted.controller?.getState?.() ?? {},
+        getShareUrl: () => doc.defaultView?.location?.href ?? globalThis.location?.href ?? null,
+      });
+      mounted.controller?.subscribe?.(() => exportsRow?.update?.());
+    } catch {
+      exportsRow = null;
+    }
     return {
       ...mounted,
       entry,
-      destroy() { mounted.destroy?.(); entry.dock?.remove?.(); },
+      exports: exportsRow,
+      destroy() { exportsRow?.destroy?.(); mounted.destroy?.(); entry.dock?.remove?.(); },
     };
   } catch {
     return null;

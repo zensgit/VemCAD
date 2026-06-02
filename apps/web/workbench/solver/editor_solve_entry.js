@@ -28,6 +28,11 @@ export function ensureEditorSolveStyles(document) {
     .vemcad-solve-dock__close{border:0;background:transparent;font-size:20px;line-height:1;color:#5b6679;cursor:pointer;padding:2px 8px}
     .vemcad-solve-dock__close:hover{color:#1d2433}
     .vemcad-solve-region{padding:6px 14px 14px}
+    .vemcad-solve-exports{padding:0 14px 12px;border-top:1px solid #eef1f6;margin-top:2px}
+    .vemcad-solve-exports h3{margin:10px 0 8px;font-size:13px;font-weight:650;letter-spacing:0;color:#3d485c}
+    .vemcad-solve-exports button{display:block;width:100%;min-height:32px;margin:0 0 6px;border:1px solid #c9d3e5;border-radius:6px;background:#fff;color:#1f2937;padding:6px 10px;font:inherit;cursor:pointer}
+    .vemcad-solve-exports button:disabled{cursor:not-allowed;opacity:.55}
+    .vemcad-solve-exports__status{min-height:18px;margin:2px 0 0;color:#5b6679;font-size:12px;line-height:1.4}
   `;
   document.head.appendChild(style);
 }

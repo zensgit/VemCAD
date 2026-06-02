@@ -12,6 +12,7 @@ import {
   filenameForPreviewDocument,
   filenameForSolveResult,
 } from '../../shared/solve_exports.js';
+import { copyText as copyTextIo, downloadJson as downloadJsonIo } from '../../shared/solve_export_io.js';
 
 const STYLE_ID = 'vemcad-solve-demo-styles';
 const DEMO_ORDER = ['solvableLine', 'conflictingLine', 'passthroughUnsupported'];
@@ -130,54 +131,14 @@ function demoUrlFor(root, key) {
   }
 }
 
+// Delegate the demo's clipboard/download to the shared IO (one copy/download path for demo +
+// editor); the demo's collaborators stay injectable, so its tests are unaffected.
 async function defaultCopyText(text, root) {
-  const doc = root.ownerDocument;
-  const clipboard = root.ownerDocument?.defaultView?.navigator?.clipboard ?? globalThis.navigator?.clipboard;
-  if (clipboard && typeof clipboard.writeText === 'function') {
-    try {
-      await clipboard.writeText(text);
-      return;
-    } catch {
-      // Fall through to the textarea path for browsers that expose the API
-      // but deny it in local or embedded contexts.
-    }
-  }
-  if (doc?.body && typeof doc.createElement === 'function' && typeof doc.execCommand === 'function') {
-    const textarea = doc.createElement('textarea');
-    textarea.value = text;
-    textarea.setAttribute('readonly', '');
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    doc.body.appendChild(textarea);
-    textarea.select();
-    const copied = doc.execCommand('copy');
-    doc.body.removeChild(textarea);
-    if (copied) return;
-  }
-  throw new Error('clipboard is unavailable');
+  return copyTextIo({ document: root?.ownerDocument, text });
 }
 
 async function downloadJson(value, filename, root) {
-  const doc = root.ownerDocument;
-  const win = doc?.defaultView ?? globalThis.window;
-  if (!doc?.body || typeof doc.createElement !== 'function' || !win?.Blob || !win?.URL?.createObjectURL) {
-    throw new Error('download is unavailable');
-  }
-  const blob = new win.Blob([`${JSON.stringify(value, null, 2)}\n`], {
-    type: 'application/json',
-  });
-  const url = win.URL.createObjectURL(blob);
-  const link = doc.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.rel = 'noreferrer';
-  doc.body.appendChild(link);
-  try {
-    link.click();
-  } finally {
-    doc.body.removeChild(link);
-    win.setTimeout?.(() => win.URL.revokeObjectURL(url), 0);
-  }
+  return downloadJsonIo({ document: root?.ownerDocument, value, filename });
 }
 
 async function defaultExportProjectJson(project, key, root) {
