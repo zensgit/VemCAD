@@ -23,6 +23,15 @@ function solveOf(envelope) {
   return envelope?.value?.solve ?? envelope?.solve ?? null;
 }
 
+// The solver's own actionable hint for the primary conflict (the first enabled conflict-category
+// action panel). Shown verbatim in the panel so it tells the user what to DO next ("relax/remove a
+// conflicting constraint"), without the product promising any auto-fix. null when no conflict.
+function primaryConflictAdvice(analysis) {
+  const panels = Array.isArray(analysis?.action_panels) ? analysis.action_panels : [];
+  const panel = panels.find((p) => p?.category === 'conflict' && p?.enabled === true && typeof p?.hint === 'string' && p.hint.trim());
+  return panel ? panel.hint : null;
+}
+
 export function summarizeSolveEnvelope(envelope, { httpStatus = null } = {}) {
   const analysis = analysisOf(envelope);
   const solve = solveOf(envelope);
@@ -50,6 +59,8 @@ export function summarizeSolveEnvelope(envelope, { httpStatus = null } = {}) {
     // pointMap). Surfaced EXPLICITLY here so it survives into controller state for the editor to
     // highlight; summary is the controller's curated UI view of the envelope.
     conflictEntityIds: Array.isArray(analysis?.conflict_entity_ids) ? analysis.conflict_entity_ids : [],
+    // The solver's actionable hint for the primary conflict (shown in the panel). null when none.
+    conflictAdvice: primaryConflictAdvice(analysis),
   };
 }
 
