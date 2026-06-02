@@ -12,7 +12,7 @@ import {
   filenameForPreviewDocument,
   filenameForSolveResult,
 } from '../../shared/solve_exports.js';
-import { copyText as copyTextIo, downloadJson as downloadJsonIo } from '../../shared/solve_export_io.js';
+import { copyText as copyTextIo, downloadJson as downloadJsonIo, readJsonFile as readJsonFileIo } from '../../shared/solve_export_io.js';
 
 const STYLE_ID = 'vemcad-solve-demo-styles';
 const DEMO_ORDER = ['solvableLine', 'conflictingLine', 'passthroughUnsupported'];
@@ -153,48 +153,9 @@ async function defaultExportSolveResultJson(envelope, project, key, root) {
   await downloadJson(envelope, filenameForSolveResult(envelope, project, key), root);
 }
 
+// Delegate to the shared file picker (one IO path for demo + editor).
 async function defaultImportProjectJson(root) {
-  const doc = root.ownerDocument;
-  if (!doc?.body || typeof doc.createElement !== 'function') {
-    throw new Error('file picker is unavailable');
-  }
-  return new Promise((resolve, reject) => {
-    const input = doc.createElement('input');
-    input.type = 'file';
-    input.accept = '.json,application/json';
-    input.style.position = 'fixed';
-    input.style.opacity = '0';
-    input.style.pointerEvents = 'none';
-    let settled = false;
-
-    function cleanup() {
-      if (input.parentNode) input.parentNode.removeChild(input);
-    }
-
-    function finish(fn, value) {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      fn(value);
-    }
-
-    input.addEventListener('change', async () => {
-      try {
-        const file = input.files?.[0];
-        if (!file || typeof file.text !== 'function') {
-          throw new Error('no project file selected');
-        }
-        finish(resolve, JSON.parse(await file.text()));
-      } catch (err) {
-        finish(reject, err);
-      }
-    });
-    input.addEventListener?.('cancel', () => {
-      finish(reject, new Error('project import canceled'));
-    });
-    doc.body.appendChild(input);
-    input.click();
-  });
+  return readJsonFileIo({ document: root?.ownerDocument });
 }
 
 function resolveInitialDemo(initialDemo, demos) {

@@ -55,3 +55,37 @@ export async function downloadJson({ document, value, filename } = {}) {
     win.setTimeout?.(() => win.URL.revokeObjectURL(url), 0);
   }
 }
+
+// Open a file picker and resolve the parsed JSON of the chosen .json file. Rejects with
+// 'project import canceled' if the user cancels, or a parse/read error otherwise. The hidden
+// input is always cleaned up.
+export function readJsonFile({ document } = {}) {
+  const doc = document ?? globalThis.document;
+  if (!doc?.body || typeof doc.createElement !== 'function') {
+    return Promise.reject(new Error('file picker is unavailable'));
+  }
+  return new Promise((resolve, reject) => {
+    const input = doc.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.style.position = 'fixed';
+    input.style.opacity = '0';
+    input.style.pointerEvents = 'none';
+    let settled = false;
+    const cleanup = () => { if (input.parentNode) input.parentNode.removeChild(input); };
+    const finish = (fn, value) => { if (settled) return; settled = true; cleanup(); fn(value); };
+
+    input.addEventListener('change', async () => {
+      try {
+        const file = input.files?.[0];
+        if (!file || typeof file.text !== 'function') throw new Error('no project file selected');
+        finish(resolve, JSON.parse(await file.text()));
+      } catch (err) {
+        finish(reject, err);
+      }
+    });
+    input.addEventListener?.('cancel', () => finish(reject, new Error('project import canceled')));
+    doc.body.appendChild(input);
+    input.click();
+  });
+}

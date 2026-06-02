@@ -9,6 +9,7 @@ import {
   filenameForProject,
   filenameForPreviewDocument,
   filenameForSolveResult,
+  extractImportedProject,
 } from '../shared/solve_exports.js';
 
 test('solveEvidenceText: one fact per line; placeholder without inputs', () => {
@@ -60,4 +61,19 @@ test('filename builders: id-based, sanitized, with stable fallbacks', () => {
   assert.equal(filenameForSolveResult(null, { project: { id: 'P2' } }), 'P2.solve-result.json');
   assert.equal(filenameForSolveResult({ value: { evaluatedView: { project: { id: 'EV3' } } } }, null), 'EV3.solve-result.json');
   assert.equal(filenameForSolveResult(null, null, null), 'vemcad-solve-result.solve-result.json');
+});
+
+test('extractImportedProject: unwraps a repro bundle, passes a raw project, rejects non-objects', () => {
+  const project = { project: { id: 'p' }, entities: [] };
+  // raw project passes through
+  assert.equal(extractImportedProject(project), project);
+  // repro bundle -> its .project
+  const bundle = { schema: SOLVE_REPRO_SCHEMA, demo: 'editor', project };
+  assert.equal(extractImportedProject(bundle), project);
+  // a repro bundle missing its project -> null
+  assert.equal(extractImportedProject({ schema: SOLVE_REPRO_SCHEMA }), null);
+  // non-objects -> null
+  assert.equal(extractImportedProject(42), null);
+  assert.equal(extractImportedProject('x'), null);
+  assert.equal(extractImportedProject(null), null);
 });

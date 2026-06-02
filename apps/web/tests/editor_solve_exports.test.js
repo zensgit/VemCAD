@@ -41,7 +41,7 @@ const SOLVED = {
   previewDocument: { schema_version: 1, document_id: 'prev-7', entities: [] },
 };
 
-function mount({ project = PROJECT, state = {}, shareUrl = null, copyText, downloadJson } = {}) {
+function mount({ project = PROJECT, state = {}, shareUrl = null, copyText, downloadJson, readJsonFile, loadProject, onImported } = {}) {
   const document = makeDocument();
   const root = document.createElement('div');
   const handle = mountEditorSolveExports({
@@ -52,6 +52,9 @@ function mount({ project = PROJECT, state = {}, shareUrl = null, copyText, downl
     getShareUrl: () => shareUrl,
     copyText: copyText ?? recorder(),
     downloadJson: downloadJson ?? recorder(),
+    readJsonFile,
+    loadProject,
+    onImported,
   });
   return { document, root, handle };
 }
@@ -133,4 +136,99 @@ test('export actions surface an unavailable status when the IO throws', async ()
   handle.reproButton.click();
   await tick();
   assert.equal(handle.status.textContent, 'Copy repro bundle unavailable.');
+});
+
+// --- import: a SUCCESSFUL load re-mounts; any failure leaves the session intact ---
+
+const IMPORTABLE = { project: { id: 'imported-1' }, entities: [], constraints: [] };
+
+test('import: a valid project loads then triggers onImported (re-mount)', async () => {
+  const loadProject = recorder(() => ({ ok: true }));
+  const onImported = recorder();
+  const { handle } = mount({
+    readJsonFile: async () => IMPORTABLE,
+    loadProject,
+    onImported,
+  });
+  handle.importButton.click();
+  await tick();
+  assert.equal(loadProject.calls.length, 1);
+  assert.deepEqual(loadProject.calls[0][0], IMPORTABLE);
+  assert.equal(onImported.calls.length, 1, 'success re-mounts');
+});
+
+test('import: a repro bundle is unwrapped to its .project before loading', async () => {
+  const loadProject = recorder(() => ({ ok: true }));
+  const onImported = recorder();
+  const { handle } = mount({
+    readJsonFile: async () => ({ schema: 'vemcad-solve-demo-repro/v1', demo: 'editor', project: IMPORTABLE }),
+    loadProject,
+    onImported,
+  });
+  handle.importButton.click();
+  await tick();
+  assert.deepEqual(loadProject.calls[0][0], IMPORTABLE);
+  assert.equal(onImported.calls.length, 1);
+});
+
+test('import: a FAILED load does NOT re-mount and reports the error (session intact)', async () => {
+  const loadProject = recorder(() => ({ ok: false, error: 'BRIDGE_LOAD_FAILED' }));
+  const onImported = recorder();
+  const { handle } = mount({ readJsonFile: async () => IMPORTABLE, loadProject, onImported });
+  handle.importButton.click();
+  await tick();
+  assert.equal(loadProject.calls.length, 1);
+  assert.equal(onImported.calls.length, 0, 'a failed load must NOT re-mount');
+  assert.match(handle.status.textContent, /Import failed: BRIDGE_LOAD_FAILED/);
+});
+
+test('import: loadProject throwing is caught, no re-mount', async () => {
+  const onImported = recorder();
+  const { handle } = mount({ readJsonFile: async () => IMPORTABLE, loadProject: () => { throw new Error('boom'); }, onImported });
+  handle.importButton.click();
+  await tick();
+  assert.equal(onImported.calls.length, 0);
+  assert.match(handle.status.textContent, /Import failed: boom/);
+});
+
+test('import: non-project JSON is rejected before any load', async () => {
+  const loadProject = recorder(() => ({ ok: true }));
+  const onImported = recorder();
+  const { handle } = mount({ readJsonFile: async () => 42, loadProject, onImported });
+  handle.importButton.click();
+  await tick();
+  assert.equal(loadProject.calls.length, 0);
+  assert.equal(onImported.calls.length, 0);
+  assert.equal(handle.status.textContent, 'Not a VemCAD project or repro bundle.');
+});
+
+test('import: a cancelled picker leaves the session intact', async () => {
+  const loadProject = recorder(() => ({ ok: true }));
+  const onImported = recorder();
+  const { handle } = mount({
+    readJsonFile: async () => { throw new Error('project import canceled'); },
+    loadProject,
+    onImported,
+  });
+  handle.importButton.click();
+  await tick();
+  assert.equal(loadProject.calls.length, 0);
+  assert.equal(onImported.calls.length, 0);
+  assert.equal(handle.status.textContent, 'Import canceled.');
+});
+
+test('import: a read/parse error is reported as unreadable, no load', async () => {
+  const loadProject = recorder(() => ({ ok: true }));
+  const { handle } = mount({ readJsonFile: async () => { throw new Error('Unexpected token'); }, loadProject, onImported: recorder() });
+  handle.importButton.click();
+  await tick();
+  assert.equal(loadProject.calls.length, 0);
+  assert.equal(handle.status.textContent, 'Could not read the file.');
+});
+
+test('import: unavailable when loadProject is not injected', async () => {
+  const { handle } = mount({ readJsonFile: async () => IMPORTABLE });
+  handle.importButton.click();
+  await tick();
+  assert.equal(handle.status.textContent, 'Import is unavailable.');
 });
