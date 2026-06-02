@@ -164,6 +164,9 @@ async function mountEditorSolveRegion({ workspace, params = null } = {}) {
       exportProject: bridgeMod.exportRuntimeProjectFromDocumentState,
       createPanel: panelMod.createSolveWorkbenchPanel,
       createController: controllerMod.createSolveWorkbenchController,
+      // Auto-apply solved geometry back into the editor via the undoable command bus.
+      // Guarded: no commandBus -> editor_solve degrades to read-only (solve + display only).
+      applyUpdates: ({ updates }) => workspace?.commandBus?.execute('entity.applyGeometry', { updates }),
     });
   } catch {
     return null;
