@@ -17,10 +17,14 @@
 // so envelope.ok === false), the offending editor entities — resolved server-side from the
 // solver's conflicting variable keys via the adapter pointMap, surfaced as
 // `summary.conflictEntityIds` — are highlighted through the injected `highlightEntities`
-// (app.js routes it to the editor selection). Independent of the auto-apply success gate.
+// (app.js routes it to the editor selection). Independent of the auto-apply success gate. A
+// later conflict-FREE solve clears that highlight via `clearHighlight` so a fixed sketch does
+// not keep a stale conflict selection — but only OUR highlight: clearHighlight clears only when
+// the selection is still the ids we set (shouldClearHighlight), so a selection the user changed
+// in between is preserved.
 //
-// Degrades to READ-ONLY when `applyUpdates` / `highlightEntities` are not injected (solve +
-// display only, no mutation), so the module stays useful and testable without the editor.
+// Degrades to READ-ONLY when `applyUpdates` / `highlightEntities` / `clearHighlight` are not
+// injected (solve + display only, no mutation), so the module stays useful and testable bare.
 //
 // Pure composition: every collaborator (exportProject / createPanel / createController /
 // applyUpdates / highlightEntities) is injected, so this module has no submodule-coupled
@@ -63,9 +67,21 @@ export function translateEvaluatedViewToUpdates(evaluatedView) {
   return updates;
 }
 
+// True when the current editor selection is still EXACTLY the set of ids we last highlighted for
+// conflicts (order-independent) — i.e. the highlight is still "ours" and the user has not changed
+// the selection since. Used to clear ONLY a solver-produced conflict highlight, never a selection
+// the user has since made. Empty `highlightedIds` => nothing of ours to clear => false.
+export function shouldClearHighlight(currentIds, highlightedIds) {
+  const current = Array.isArray(currentIds) ? currentIds : [];
+  const highlighted = Array.isArray(highlightedIds) ? highlightedIds : [];
+  if (highlighted.length === 0 || current.length !== highlighted.length) return false;
+  const currentSet = new Set(current);
+  return highlighted.every((id) => currentSet.has(id));
+}
+
 // Mount the solve panel for the CURRENT editor document and auto-apply solved geometry.
 //   { root, documentState, exportProject, createPanel, createController,
-//     applyUpdates?, endpoint?, fetchImpl?, labels? }
+//     applyUpdates?, highlightEntities?, clearHighlight?, endpoint?, fetchImpl?, labels? }
 // Returns { ok:true, project, controller, panel, destroy } when the document exported to a
 // solvable project, or { ok:false, error_code, error, diagnostics, panel:null } when it could
 // not (no panel is mounted, nothing is mutated).
@@ -77,6 +93,7 @@ export function mountEditorSolvePanel({
   createController,
   applyUpdates,
   highlightEntities,
+  clearHighlight,
   endpoint,
   fetchImpl,
   labels = {},
@@ -117,10 +134,14 @@ export function mountEditorSolvePanel({
   //      via applyUpdates (read-only if not injected); guard on the evaluatedView object.
   //   2. Conflict highlight (ANY outcome): conflicts come back as a FAILED/unsatisfied solve
   //      (envelope.ok === false), so this must NOT reuse the auto-apply gate. Keyed off the
-  //      curated summary.conflictEntityIds (resolved server-side); highlights only when there are
-  //      conflicts (never clears the user's selection on a clean solve); guard on the summary.
+  //      curated summary.conflictEntityIds (resolved server-side); highlights when there are
+  //      conflicts, and CLEARS our highlight on a later conflict-free solve (a fixed sketch must
+  //      not keep a stale conflict selection) — but only OUR highlight: clearHighlight clears
+  //      only if the selection is still the ids we set (see app.js / shouldClearHighlight), so a
+  //      selection the user changed in between is preserved. Guard on the summary.
   let lastAppliedView = null;
   let lastHighlightSummary = null;
+  let lastHighlightedIds = [];
   let unsubscribe = () => {};
   if (typeof controller.subscribe === 'function') {
     unsubscribe = controller.subscribe((state) => {
@@ -137,8 +158,12 @@ export function mountEditorSolvePanel({
       if (summary && summary !== lastHighlightSummary) {
         lastHighlightSummary = summary;
         const conflictIds = Array.isArray(summary.conflictEntityIds) ? summary.conflictEntityIds : [];
-        if (conflictIds.length > 0 && typeof highlightEntities === 'function') {
-          highlightEntities(conflictIds);
+        if (conflictIds.length > 0) {
+          if (typeof highlightEntities === 'function') highlightEntities(conflictIds);
+          lastHighlightedIds = conflictIds;
+        } else if (lastHighlightedIds.length > 0) {
+          if (typeof clearHighlight === 'function') clearHighlight(lastHighlightedIds);
+          lastHighlightedIds = [];
         }
       }
     });
