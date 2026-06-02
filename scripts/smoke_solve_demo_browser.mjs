@@ -131,6 +131,8 @@ async function verifyCase({ page, base, screenshotDir, spec }) {
   await assertMatches(page, '.vemcad-solve-demo__solve-evidence', spec.evidence, `${spec.id} solve evidence`);
   await assertText(page, '.vemcad-solve-demo__solve-copy', 'Copy Solve Evidence', `${spec.id} solve evidence copy button`);
   await assertText(page, '.vemcad-solve-demo__solve-copy-status', spec.evidenceCopyStatus, `${spec.id} solve evidence copy status`);
+  await assertText(page, '.vemcad-solve-demo__repro-copy', 'Copy Repro Bundle', `${spec.id} repro bundle copy button`);
+  await assertText(page, '.vemcad-solve-demo__repro-copy-status', 'Ready to copy repro bundle.', `${spec.id} repro bundle copy status`);
   await assertMatches(page, '.vemcad-solve-demo__share', new RegExp(`demo=${spec.id}`), `${spec.id} share link`);
   await assertText(page, '.vemcad-solve-demo__export', 'Export Project JSON', `${spec.id} export button`);
   await assertText(page, '.vemcad-solve-demo__export-status', 'Ready to export project.', `${spec.id} export status`);
@@ -190,6 +192,7 @@ async function verifyImportProject({ page, base, screenshotDir }) {
   await assertText(page, '.vemcad-solve-panel__status', 'Solved', 'imported solve status');
   await assertMatches(page, '.vemcad-solve-demo__solve-evidence', /ok=true\nhttp=200\nstatus=solved/, 'imported solve evidence');
   await assertText(page, '.vemcad-solve-demo__solve-copy-status', 'Ready to copy solve evidence.', 'imported solve evidence copy status');
+  await assertText(page, '.vemcad-solve-demo__repro-copy-status', 'Ready to copy repro bundle.', 'imported repro bundle copy status');
   await assertText(page, '.vemcad-solve-demo__solve-export-status', 'Ready to export solve result.', 'imported solve export status');
   await assertText(page, '.vemcad-solve-demo__preview-export-status', 'Ready to export CADGF preview.', 'imported preview export status');
   await assertPreview(page, 'svg', 'imported project preview');
@@ -219,7 +222,7 @@ let browser = null;
 
 try {
   browser = await chromium.launch({ headless: true, channel });
-  const page = await browser.newPage({ viewport: { width: 1280, height: 820 } });
+  const page = await browser.newPage({ viewport: { width: 1280, height: 1700 } });
   const base = `http://${started.host}:${started.server.address().port}`;
   const screenshots = [];
 

@@ -148,6 +148,8 @@ test('mountSolveWorkbenchDemo mounts selectable demos and solves without a live 
   assert.equal(findByClass(root, 'vemcad-solve-demo__import-status').textContent, 'Ready to import project.');
   assert.equal(findByClass(root, 'vemcad-solve-demo__solve-copy').disabled, true);
   assert.equal(findByClass(root, 'vemcad-solve-demo__solve-copy-status').textContent, 'Run solve to copy evidence.');
+  assert.equal(findByClass(root, 'vemcad-solve-demo__repro-copy').disabled, true);
+  assert.equal(findByClass(root, 'vemcad-solve-demo__repro-copy-status').textContent, 'Run solve to copy repro bundle.');
   assert.equal(findByClass(root, 'vemcad-solve-demo__solve-export').disabled, true);
   assert.equal(findByClass(root, 'vemcad-solve-demo__solve-export-status').textContent, 'Run solve to export result.');
   assert.equal(findByClass(root, 'vemcad-solve-demo__preview-export').disabled, true);
@@ -173,6 +175,8 @@ test('mountSolveWorkbenchDemo mounts selectable demos and solves without a live 
   assert.match(findByClass(root, 'vemcad-solve-demo__solve-evidence').textContent, /state=underconstrained/);
   assert.equal(findByClass(root, 'vemcad-solve-demo__solve-copy').disabled, false);
   assert.equal(findByClass(root, 'vemcad-solve-demo__solve-copy-status').textContent, 'Ready to copy solve evidence.');
+  assert.equal(findByClass(root, 'vemcad-solve-demo__repro-copy').disabled, false);
+  assert.equal(findByClass(root, 'vemcad-solve-demo__repro-copy-status').textContent, 'Ready to copy repro bundle.');
 
   await demo.select('conflictingLine');
   await demo.solve();
@@ -194,6 +198,8 @@ test('mountSolveWorkbenchDemo mounts selectable demos and solves without a live 
   assert.match(findByClass(root, 'vemcad-solve-demo__solve-evidence').textContent, /state=overconstrained\ndof=0\nconflicts=1/);
   assert.equal(findByClass(root, 'vemcad-solve-demo__solve-copy').disabled, false);
   assert.equal(findByClass(root, 'vemcad-solve-demo__solve-copy-status').textContent, 'Ready to copy solve evidence.');
+  assert.equal(findByClass(root, 'vemcad-solve-demo__repro-copy').disabled, false);
+  assert.equal(findByClass(root, 'vemcad-solve-demo__repro-copy-status').textContent, 'Ready to copy repro bundle.');
   assert.match(findByClass(root, 'vemcad-preview-canvas__empty').textContent, /No solved geometry/);
 });
 
@@ -357,6 +363,62 @@ test('copy solve evidence button reports unavailable when clipboard write fails'
   await demo.solve();
   await findByClass(root, 'vemcad-solve-demo__solve-copy').click();
   assert.equal(findByClass(root, 'vemcad-solve-demo__solve-copy-status').textContent, 'Copy evidence unavailable.');
+});
+
+test('copy repro bundle button copies project input and solve output together', async () => {
+  const document = makeDocument();
+  const root = makeElement('div', document);
+  const copied = [];
+
+  const demo = await mountSolveWorkbenchDemo({
+    root,
+    copyText: async (text) => {
+      copied.push(JSON.parse(text));
+    },
+  });
+  const reproCopyButton = findByClass(root, 'vemcad-solve-demo__repro-copy');
+  const reproCopyStatus = findByClass(root, 'vemcad-solve-demo__repro-copy-status');
+
+  reproCopyButton.click();
+  assert.equal(reproCopyStatus.textContent, 'No repro bundle to copy.');
+
+  await demo.solve();
+  await reproCopyButton.click();
+
+  await demo.select('conflictingLine');
+  await demo.solve();
+  await reproCopyButton.click();
+
+  assert.equal(copied[0].schema, 'vemcad-solve-demo-repro/v1');
+  assert.equal(copied[0].demo, 'solvableLine');
+  assert.equal(copied[0].share_url, 'http://127.0.0.1/apps/web/index.html?mode=solve-demo&demo=solvableLine');
+  assert.equal(copied[0].project.project.id, 'demo-solvable-line');
+  assert.equal(copied[0].solve_result.ok, true);
+  assert.match(copied[0].solve_evidence, /ok=true\nhttp=200\nstatus=solved/);
+
+  assert.equal(copied[1].demo, 'conflictingLine');
+  assert.equal(copied[1].share_url, 'http://127.0.0.1/apps/web/index.html?mode=solve-demo&demo=conflictingLine');
+  assert.equal(copied[1].project.project.id, 'demo-conflicting-line');
+  assert.equal(copied[1].solve_result.ok, false);
+  assert.equal(copied[1].solve_result.error_code, 'SOLVE_UNSATISFIED');
+  assert.match(copied[1].solve_evidence, /state=overconstrained\ndof=0\nconflicts=1/);
+  assert.equal(reproCopyStatus.textContent, 'Repro bundle copied.');
+});
+
+test('copy repro bundle button reports unavailable when clipboard write fails', async () => {
+  const document = makeDocument();
+  const root = makeElement('div', document);
+
+  const demo = await mountSolveWorkbenchDemo({
+    root,
+    copyText: async () => {
+      throw new Error('clipboard denied');
+    },
+  });
+
+  await demo.solve();
+  await findByClass(root, 'vemcad-solve-demo__repro-copy').click();
+  assert.equal(findByClass(root, 'vemcad-solve-demo__repro-copy-status').textContent, 'Copy repro bundle unavailable.');
 });
 
 test('export project button exports the current demo project and reports status', async () => {
