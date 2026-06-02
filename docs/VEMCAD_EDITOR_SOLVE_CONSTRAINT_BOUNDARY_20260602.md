@@ -1,6 +1,6 @@
 # VemCAD Editor-Solve ↔ Native-Solver 边界 — 两套约束/求解系统
 
-- 状态：**边界 + 定位钉定（2026-06-02）**——避免团队反复期望「编辑器 Solve dock 解用户在编辑器里画/加的约束」
+- 状态：**A 已落地（2026-06-02）**——编辑器 dock 现在走原生求解器、能解用户在编辑器里画/加的约束（见下「状态更新」节）；根因分析保留作记录
 - 日期：2026-06-02
 - 地基：`origin/main` @ `5a61e81`（CADGameFusion 子模块 `aaecd0b`，dual-mode 入口已合并）
 - 相关：`docs/VEMCAD_SOLVER_DIAGNOSTIC_UI_BOUNDARY_20260602.md`（同类「钉边界」决策）；求解线 PR 串 #45–#55 + dual-mode #384/#56
@@ -9,6 +9,19 @@
 ## 目的
 
 求解 dock（产品求解线 #45–#55）现在已在 live 编辑器里**可达并能调用真实 /solve**（dual-mode 入口 #384/#56 之后）。但 e2e 验证发现：**编辑器里点 Solve 不会移动几何**，因为编辑器导出给 /solve 的工程**没有约束**。本文钉死根因、产品求解线的**定位**，以及统一两套系统的**待决选项**——这是产品决策，不是小修复。
+
+## 状态更新（2026-06-02 晚）：A 已落地，编辑器原生求解已生效 ✅
+
+> 下方「定位结论 / 待决选项」是写于决策**之前**的分析；保留作为根因记录。**实际决策与落地如下，以本节为准**：
+>
+> 业主拍板：**短期 A，长期保留 B，不做 C**。**A 已实现并浏览器端到端验证**：
+> - **PR #58**（能力）：`apps/runtime/tools/solve_cadgf_cli.mjs` + `services/solve` `POST /solve-cadgf`（直接解 CADGF-PROJ，跳过语义 adapter）+ `apps/web/workbench/solver/native_solve.js`（`parseSolvedVarsToUpdates` + `solveEditorNative`：`solver.export-project` → `/solve-cadgf` → 经 `entity.applyGeometry` 写回）。
+> - **PR #59**（接线）：编辑器 dock 的 Solve 改为**原生**（`editor_native_solve_panel.js`），替换在编辑器里空转的语义面板；保留 Import/Export I/O 行。顺手修了潜伏 bug——workspace 命令总线键是 **`workspace.commands`**（非 `workspace.commandBus`），此前 #47/#48 的语义写回/高亮在真实浏览器从未生效。
+> - **真实浏览器验证**（Playwright + 真实 /solve-cadgf）：画斜线 → 用编辑器自己的约束 UI 加 horizontal → 点 dock 原生 Solve → 'Solved'（dof=1）→ 线在编辑器文档里**被压平**（端点 y 0/5→2.5/2.5）。
+>
+> 所以：**「编辑器里点 Solve 不会移动几何」「编辑器 dock 不是用来解原生约束的」这两条已被 A 推翻**——编辑器 dock 现在走原生求解器路径，解的就是用户在编辑器里画/加的（VarRef）约束。
+>
+> **两套系统的根因依然成立**（语义 VEMCAD-PROJECT 与原生 VarRef 仍是不同表示层、各自的求解器）；A 让编辑器走它自己的原生路径，产品语义求解线继续服务**语义工程**（demo / 导入 / runtime / API）。**B**（坚持 VEMCAD-PROJECT 语义真相 + 给编辑器补语义约束创作）保留为长期，未启动。
 
 ## 根因：两套并行、互不连通的求解系统
 
