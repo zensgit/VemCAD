@@ -58,6 +58,31 @@ glob 门禁 + 路由 `/manifest`）；`services/router` launcher 已在 main。
 从最新 `origin/main` 切独立 worktree；子模块改动走 A→C（CADGameFusion PR + gitlink-only 指针 bump +
 `merge-base --is-ancestor` 护栏 + editor-light）；测试随代码、绿了再合；交付声明分级诚实（已合入 vs 仅验证文档 vs untested-by-construction）。
 
+## 剩余开发量估算（2026-06-01，粗粒度）
+
+> 基于对真实代码的体量勘测（LOC + 各线复杂度，工期含 A→C 开销）。数字用于"投多少"的判断，非承诺。
+> **5-30 rollup 之后**：一条**产品层 solve-workbench MVP**（PR #22–#42，~3.3k 行 `apps/web`，含真 `/solve`
+> 集成 + 测试）已落 main——它是当前**唯一在飞行中**的线；其余仍 parked。
+
+**真正"接下去"的开发量 = 把 solve-workbench 收尾接进真编辑器，约 2–3 周**（多产品仓、中风险、0–2 个 A→C）：
+solve 按钮接 live editor + 几何 writeback 契约 / 面板进 panels registry + 命令注册 / 冲突·冗余 action flow /
+画布预览 overlay + undo/redo + solver binary 硬化（8–12 PR）。无需新决策即可继续。
+
+**Parked（决策驱动，按"若触发"估，当前都不做）：**
+
+| 工作线 | 新代码 LOC | PR | A→C | 风险 | 工期 |
+|---|---|---|---|---|---|
+| P2 上帝文件拆分（12.8k 行；fillet/chamfer 2.1k = 40%） | ~1.5–2k glue | 15–20 | 6–8 | 高 | 8–11 周 |
+| P3 desktop 收敛 + Electron dedup | 200–400 | 2–4 | 0–1 | 高 | dedup 几天–2 周 / 全收敛 1–4 周 |
+| P4 cloud 产品化（DB/认证/扩展） | 3000–4500 | 3–5 | 2–3 | 中 | 2–3 周（gated：部署=桌面 frozen） |
+| P4 router 重写 python→node | 2500–3500 | 2–3 | 0 | 中 | 2–3 周 |
+| P5 Qt 角色（仅文档） | 50–150 | 1 | 0 | 低 | 几天 |
+| D1b 一等 coincident + radius/tangent 为变量 | 800–1200 | 2–3 | 1 | 中 | 1–2 周 |
+| OCCT / 3D POC（greenfield：sketch→extrude→boolean→STEP） | 2500–4000 | 3–4 | 2–3 | 高 | 月级 / 产品目标 gate |
+
+**量级直觉**：收尾 active 线 ≈ 2–3 周；任选一个大 parked 项（P2 / cloud / OCCT）≈ 数周到数月。不会同时做。
+P2（8–11 周、6–8 A→C、高风险）与 OCCT（月级）是真正的大头；P5 基本零工作量。
+
 ## 文档目的
 
 在 `docs/VEMCAD_MODULE_DESIGN.md` 的总体判断基础上，把建议收敛成可以逐步执行的开发路线，避免架构结论停留在原则层。
