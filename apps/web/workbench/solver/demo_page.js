@@ -4,6 +4,14 @@ import { createSolveDemoFetch } from './demo_fetch.js';
 import { SOLVE_WORKBENCH_DEMOS } from './demo_projects.js';
 import { renderCadgfPreviewCanvas } from './preview_canvas.js';
 import { createSolveWorkbenchController } from './solve_workbench.js';
+import {
+  solveEvidenceText,
+  projectJsonText,
+  reproBundleJsonText,
+  filenameForProject,
+  filenameForPreviewDocument,
+  filenameForSolveResult,
+} from '../../shared/solve_exports.js';
 
 const STYLE_ID = 'vemcad-solve-demo-styles';
 const DEMO_ORDER = ['solvableLine', 'conflictingLine', 'passthroughUnsupported'];
@@ -107,24 +115,6 @@ function diagnosticCountText(state) {
   return `diagnostics=${count}`;
 }
 
-function solveEvidenceText(envelope, summary) {
-  if (!envelope || !summary) return 'No solve result yet.';
-  const lines = [
-    `ok=${envelope.ok === true ? 'true' : 'false'}`,
-    Number.isFinite(summary.httpStatus) ? `http=${summary.httpStatus}` : null,
-    summary.status ? `status=${summary.status}` : null,
-    summary.errorCode ? `error=${summary.errorCode}` : null,
-    summary.structuralState ? `state=${summary.structuralState}` : null,
-    Number.isFinite(summary.dofEstimate) ? `dof=${summary.dofEstimate}` : null,
-    Number.isFinite(summary.conflictGroupCount) ? `conflicts=${summary.conflictGroupCount}` : null,
-    Number.isFinite(summary.redundantConstraintEstimate) ? `redundant=${summary.redundantConstraintEstimate}` : null,
-    Number.isFinite(summary.iterations) ? `iters=${summary.iterations}` : null,
-    Number.isFinite(summary.finalError) ? `err=${summary.finalError}` : null,
-    Number.isFinite(summary.diagnosticCount) ? `diagnostics=${summary.diagnosticCount}` : null,
-  ].filter(Boolean);
-  return lines.join('\n') || 'Solve result has no summary.';
-}
-
 function demoUrlFor(root, key) {
   const href = root.ownerDocument?.defaultView?.location?.href
     ?? globalThis.window?.location?.href
@@ -165,39 +155,6 @@ async function defaultCopyText(text, root) {
     if (copied) return;
   }
   throw new Error('clipboard is unavailable');
-}
-
-function filenameForProject(project, key) {
-  const raw = project?.project?.id || key || 'vemcad-project';
-  const safe = String(raw).replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'vemcad-project';
-  return `${safe}.vemcad-project.json`;
-}
-
-function projectJsonText(project) {
-  return `${JSON.stringify(project, null, 2)}\n`;
-}
-
-function reproBundleJsonText({ project, solveEnvelope, solveEvidence, demoKey, shareUrl }) {
-  return `${JSON.stringify({
-    schema: 'vemcad-solve-demo-repro/v1',
-    demo: demoKey,
-    share_url: shareUrl || null,
-    project,
-    solve_result: solveEnvelope,
-    solve_evidence: solveEvidence || null,
-  }, null, 2)}\n`;
-}
-
-function filenameForPreviewDocument(document, key) {
-  const raw = document?.document_id || key || 'vemcad-preview';
-  const safe = String(raw).replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'vemcad-preview';
-  return `${safe}.cadgf-document.json`;
-}
-
-function filenameForSolveResult(envelope, project, key) {
-  const raw = project?.project?.id || envelope?.value?.evaluatedView?.project?.id || key || 'vemcad-solve-result';
-  const safe = String(raw).replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'vemcad-solve-result';
-  return `${safe}.solve-result.json`;
 }
 
 async function downloadJson(value, filename, root) {
