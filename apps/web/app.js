@@ -145,21 +145,19 @@ async function mountEditorSolveRegion({ workspace, params = null } = {}) {
     if (!doc || !documentState) return null;
     const editorRoot = doc.getElementById('cad-editor-root');
     if (!editorRoot) return null;
-    let region = doc.getElementById('vemcad-solve-region');
-    if (!region) {
-      region = doc.createElement('aside');
-      region.id = 'vemcad-solve-region';
-      region.className = 'vemcad-solve-region';
-      editorRoot.appendChild(region);
-    }
-    const [bridgeMod, panelMod, controllerMod, editorSolveMod] = await Promise.all([
+    const [bridgeMod, panelMod, controllerMod, editorSolveMod, entryMod] = await Promise.all([
       import('./shared/runtime_bridge.js'),
       import('./workbench/panels/solve_panel.js'),
       import('./workbench/solver/solve_workbench.js'),
       import('./workbench/solver/editor_solve.js'),
+      import('./workbench/solver/editor_solve_entry.js'),
     ]);
-    return editorSolveMod.mountEditorSolvePanel({
-      root: region,
+    // Lightweight floating entry: a launcher that toggles a floating card holding the panel
+    // (default closed). The verified panel mounts into the entry's region; not a layout dock.
+    const entry = entryMod.buildSolveEntry({ document: doc, host: editorRoot });
+    if (!entry) return null;
+    const mounted = editorSolveMod.mountEditorSolvePanel({
+      root: entry.regionRoot,
       documentState,
       exportProject: bridgeMod.exportRuntimeProjectFromDocumentState,
       createPanel: panelMod.createSolveWorkbenchPanel,
@@ -178,6 +176,17 @@ async function mountEditorSolveRegion({ workspace, params = null } = {}) {
         if (editorSolveMod.shouldClearHighlight(selection.entityIds, ids)) selection.setSelection([], null);
       },
     });
+    // If the document could not be exported to a solvable project, don't leave a launcher that
+    // opens an empty card — tear the entry back down and surface the same failure result.
+    if (mounted?.ok !== true) {
+      entry.dock?.remove?.();
+      return mounted;
+    }
+    return {
+      ...mounted,
+      entry,
+      destroy() { mounted.destroy?.(); entry.dock?.remove?.(); },
+    };
   } catch {
     return null;
   }
