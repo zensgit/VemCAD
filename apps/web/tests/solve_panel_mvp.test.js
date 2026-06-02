@@ -159,3 +159,53 @@ test('panel keeps blocked solve status visible', async () => {
   assert.equal(root.children[3].textContent, 'No CADGF preview document.');
   assert.equal(root.children.at(-1).children[0].textContent, 'SOLVE_UNSATISFIED: conflict');
 });
+
+test('panel shows conflicting entities + the solver hint on a conflict', async () => {
+  const document = makeDocument();
+  const root = makeElement('section', document);
+  createSolveWorkbenchPanel({
+    root,
+    project: SOLVE_WORKBENCH_DEMOS.solvableLine,
+    controller: makeController({
+      status: 'blocked',
+      summary: {
+        status: 'blocked', structuralState: 'overconstrained', dofEstimate: 0,
+        conflictGroupCount: 1, redundantConstraintEstimate: 0, iterations: 5, finalError: 1,
+        conflictEntityIds: [7, 9],
+        conflictAdvice: 'Relax or remove one conflicting constraint near the anchor.',
+      },
+      previewDocument: null,
+      diagnostics: [{ code: 'SOLVE_UNSATISFIED', message: 'conflict' }],
+    }),
+  });
+
+  findByTag(root, 'button').click();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const advice = root.children[4]; // title, status, details, preview, ADVICE, button, h3, diag
+  assert.match(advice.textContent, /Conflicting: 7, 9/);
+  assert.match(advice.textContent, /Relax or remove one conflicting constraint/);
+  assert.equal(advice.dataset.hasConflict, 'true');
+});
+
+test('panel shows no advice line on a clean (conflict-free) solve', async () => {
+  const document = makeDocument();
+  const root = makeElement('section', document);
+  createSolveWorkbenchPanel({
+    root,
+    project: SOLVE_WORKBENCH_DEMOS.solvableLine,
+    controller: makeController({
+      status: 'solved',
+      summary: { status: 'solved', structuralState: 'wellconstrained', conflictGroupCount: 0, conflictEntityIds: [], conflictAdvice: null },
+      previewDocument: { schema_version: 1, entities: [] },
+      diagnostics: [],
+    }),
+  });
+
+  findByTag(root, 'button').click();
+  await new Promise((resolve) => setImmediate(resolve));
+
+  const advice = root.children[4];
+  assert.equal(advice.textContent, '');
+  assert.equal(advice.dataset.hasConflict, 'false');
+});

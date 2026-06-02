@@ -32,6 +32,15 @@ function summaryLine(summary) {
   return parts.length ? parts.join(' · ') : 'Solve completed without structural analysis.';
 }
 
+// One actionable line for an over-constrained solve: WHICH entities conflict + the solver's hint
+// on what to do. Empty string when there is no conflict, so a clean solve shows nothing here.
+function conflictLine(summary) {
+  const ids = Array.isArray(summary?.conflictEntityIds) ? summary.conflictEntityIds : [];
+  if (ids.length === 0) return '';
+  const advice = summary?.conflictAdvice ? ` — ${summary.conflictAdvice}` : '';
+  return `Conflicting: ${ids.join(', ')}${advice}`;
+}
+
 function renderDiagnostics(list, container) {
   clear(container);
   if (!list.length) {
@@ -74,6 +83,7 @@ export function createSolveWorkbenchPanel({
   const status = appendText(root, 'p', '', 'vemcad-solve-panel__status');
   const details = appendText(root, 'p', '', 'vemcad-solve-panel__details');
   const preview = appendText(root, 'p', '', 'vemcad-solve-panel__preview');
+  const advice = appendText(root, 'p', '', 'vemcad-solve-panel__advice');
   const runButton = root.ownerDocument.createElement('button');
   runButton.type = 'button';
   runButton.textContent = labels.solve ?? 'Solve';
@@ -88,6 +98,9 @@ export function createSolveWorkbenchPanel({
     status.textContent = label;
     status.dataset.status = state.status;
     details.textContent = summaryLine(state.summary);
+    const conflict = conflictLine(state.summary);
+    advice.textContent = conflict;
+    advice.dataset.hasConflict = conflict ? 'true' : 'false';
     renderPreviewMeta(state.previewDocument, preview);
     renderDiagnostics(state.diagnostics ?? [], diagnostics);
     runButton.disabled = state.status === 'solving';

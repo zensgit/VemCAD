@@ -83,6 +83,10 @@ test('summarizeSolveEnvelope treats unsatisfied solves as blocked user-fixable s
       conflict_group_count: 1,
       redundant_constraint_estimate: 0,
       conflict_entity_ids: ['L1', 'C1'],
+      action_panels: [
+        { id: 'primary_redundancy', category: 'redundancy', enabled: true, hint: 'not this one' },
+        { id: 'primary_conflict', category: 'conflict', enabled: true, hint: 'Relax or remove one conflicting constraint near the anchor.' },
+      ],
     },
     diagnostics: [],
   }, { httpStatus: 422 });
@@ -93,11 +97,14 @@ test('summarizeSolveEnvelope treats unsatisfied solves as blocked user-fixable s
   assert.equal(summary.conflictGroupCount, 1);
   assert.equal(summary.structuralState, 'overconstrained');
   assert.deepEqual(summary.conflictEntityIds, ['L1', 'C1']); // surfaced from analysis for the editor to highlight
+  // the primary CONFLICT panel's hint (not the redundancy panel) is surfaced for the user
+  assert.equal(summary.conflictAdvice, 'Relax or remove one conflicting constraint near the anchor.');
 });
 
-test('summarizeSolveEnvelope defaults conflictEntityIds to [] when analysis omits them', () => {
+test('summarizeSolveEnvelope defaults conflictEntityIds/conflictAdvice when analysis omits them', () => {
   const summary = summarizeSolveEnvelope({ ok: true, value: { solve: { ok: true } }, diagnostics: [] });
   assert.deepEqual(summary.conflictEntityIds, []);
+  assert.equal(summary.conflictAdvice, null);
 });
 
 test('deriveCadgfPreviewDocument derives from the evaluated view, not from failed envelopes', () => {
