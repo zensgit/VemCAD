@@ -145,13 +145,11 @@ async function mountEditorSolveRegion({ workspace, params = null } = {}) {
     if (!doc || !documentState) return null;
     const editorRoot = doc.getElementById('cad-editor-root');
     if (!editorRoot) return null;
-    const [bridgeMod, panelMod, controllerMod, editorSolveMod, entryMod, exportsMod] = await Promise.all([
+    const [bridgeMod, entryMod, exportsMod, nativeSolveMod] = await Promise.all([
       import('./shared/runtime_bridge.js'),
-      import('./workbench/panels/solve_panel.js'),
-      import('./workbench/solver/solve_workbench.js'),
-      import('./workbench/solver/editor_solve.js'),
       import('./workbench/solver/editor_solve_entry.js'),
       import('./workbench/solver/editor_solve_exports.js'),
+      import('./workbench/solver/editor_native_solve_panel.js'),
     ]);
     // Lightweight floating entry: a launcher that toggles a floating card holding the panel
     // (default closed). The verified panel mounts into the entry's region; not a layout dock.
@@ -162,80 +160,57 @@ async function mountEditorSolveRegion({ workspace, params = null } = {}) {
     const entry = entryMod.buildSolveEntry({ document: doc, host: doc.body || editorRoot });
     if (!entry) return null;
 
-    // Panel collaborators are stable across re-mounts (workspace is fixed); only the document
-    // snapshot changes (e.g. after an import).
-    const panelDeps = {
-      documentState,
-      exportProject: bridgeMod.exportRuntimeProjectFromDocumentState,
-      createPanel: panelMod.createSolveWorkbenchPanel,
-      createController: controllerMod.createSolveWorkbenchController,
-      // Auto-apply solved geometry back into the editor via the undoable command bus.
-      // Guarded: no commandBus -> editor_solve degrades to read-only (solve + display only).
-      applyUpdates: ({ updates }) => workspace?.commandBus?.execute('entity.applyGeometry', { updates }),
-      // Highlight conflicting entities (over-constrained solve) by selecting them in the editor.
-      highlightEntities: (ids) => workspace?.selection?.setSelection?.(ids, ids?.[0] ?? null),
-      // Clear a conflict highlight on a later conflict-free solve, but ONLY if the selection is
-      // still the ids we set (the user did not change it since) -> never wipes a user selection.
-      clearHighlight: (ids) => {
-        const selection = workspace?.selection;
-        if (!selection || typeof selection.setSelection !== 'function') return;
-        if (editorSolveMod.shouldClearHighlight(selection.entityIds, ids)) selection.setSelection([], null);
-      },
+    // Editor uses the NATIVE solver path: its own (VarRef) constraints (authored via
+    // select->constraint) are solved via solver.export-project -> /solve-cadgf -> writeback, since
+    // the semantic /solve line carries no editor constraints. The Import/Export I/O row stays
+    // (geometry-level Project JSON in/out); a successful import re-mounts so the row re-reads the
+    // imported document. (Semantic conflict-highlight / repro / CADGF-preview belong to the
+    // semantic line — demo / imported semantic projects — not the editor's native path.)
+    const reExportProject = () => {
+      const exported = bridgeMod.exportRuntimeProjectFromDocumentState(documentState);
+      return exported && exported.ok === true ? exported.value : null;
     };
-
-    // current = { mounted, exportsRow, unsubExports }. A successful import re-mounts (refresh) so
-    // the panel + exports snapshot the freshly-imported document; teardown disposes EVERY old
-    // handle (the exports subscription, the row DOM, and editor_solve's own subscription/panel)
-    // so a re-mount never leaves a stale subscriber updating a detached row.
     let current = null;
     const teardownCurrent = () => {
       if (!current) return;
-      try { current.unsubExports?.(); } catch { /* ignore */ }
       current.exportsRow?.destroy?.();
-      current.mounted?.destroy?.();
+      current.native?.destroy?.();
       current = null;
     };
     const mountInner = () => {
-      const mounted = editorSolveMod.mountEditorSolvePanel({ root: entry.regionRoot, ...panelDeps });
-      if (mounted?.ok !== true) return { mounted, ok: false };
+      const native = nativeSolveMod.mountEditorNativeSolve({
+        root: entry.regionRoot,
+        document: doc,
+        // The workspace exposes its command bus as `commands` (not `commandBus`); used for both
+        // solver.export-project and the entity.applyGeometry writeback.
+        commandBus: workspace?.commands,
+      });
       let exportsRow = null;
-      let unsubExports = null;
       try {
         exportsRow = exportsMod.mountEditorSolveExports({
           root: entry.card,
           document: doc,
-          getProject: () => mounted.project,
-          getSolveState: () => mounted.controller?.getState?.() ?? {},
+          getProject: reExportProject,
+          // The native path has no semantic solve envelope, so repro / CADGF-preview (semantic
+          // artifacts) stay disabled here; Import + Export Project JSON work at the geometry level.
+          getSolveState: () => ({}),
           getShareUrl: () => doc.defaultView?.location?.href ?? globalThis.location?.href ?? null,
-          // Load a project (or repro bundle) into the editor document. Returns the bridge's
-          // {ok,...}; the row only re-mounts on ok === true.
           loadProject: (project) => bridgeMod.importRuntimeProjectToDocumentState(documentState, project),
           onImported: () => refresh(),
         });
-        const unsub = mounted.controller?.subscribe?.(() => exportsRow?.update?.());
-        unsubExports = typeof unsub === 'function' ? unsub : null;
       } catch {
         exportsRow = null;
-        unsubExports = null;
       }
-      return { mounted, exportsRow, unsubExports, ok: true };
+      return { native, exportsRow };
     };
     const refresh = () => { teardownCurrent(); current = mountInner(); };
 
     current = mountInner();
-    // If the document could not be exported to a solvable project, don't leave a launcher that
-    // opens an empty card — tear the entry back down and surface the same failure result.
-    if (!current.ok) {
-      entry.dock?.remove?.();
-      return current.mounted;
-    }
     return {
-      get ok() { return current?.mounted?.ok ?? false; },
-      get project() { return current?.mounted?.project; },
-      get controller() { return current?.mounted?.controller; },
-      get panel() { return current?.mounted?.panel; },
-      get exports() { return current?.exportsRow; },
+      ok: true,
       entry,
+      get native() { return current?.native; },
+      get exports() { return current?.exportsRow; },
       refresh,
       destroy() { teardownCurrent(); entry.dock?.remove?.(); },
     };
