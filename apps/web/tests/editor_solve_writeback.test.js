@@ -8,7 +8,16 @@ import assert from 'node:assert/strict';
 // catch a wrong key — a wrong key would merge as a junk field, normalize would drop it, and the
 // geometry would silently not move. This test closes that hop with the real document.)
 import { DocumentState } from '../../../deps/cadgamefusion/tools/web_viewer/state/documentState.js';
-import { translateEvaluatedViewToUpdates } from '../workbench/solver/editor_solve.js';
+import { SelectionState } from '../../../deps/cadgamefusion/tools/web_viewer/state/selectionState.js';
+import { translateEvaluatedViewToUpdates, shouldClearHighlight } from '../workbench/solver/editor_solve.js';
+
+// Mirror of app.js's clearHighlight closure (clear only if the selection is still ours), exercised
+// against the REAL SelectionState so the runtime link (entityIds + setSelection + shouldClearHighlight)
+// is proven, not assumed — the DI tests stub clearHighlight and can't catch a SelectionState API drift.
+function clearHighlightAgainst(selection, ids) {
+  if (!selection || typeof selection.setSelection !== 'function') return;
+  if (shouldClearHighlight(selection.entityIds, ids)) selection.setSelection([], null);
+}
 
 test('writeback: translated patches actually move line/circle/arc geometry in a real DocumentState', () => {
   const doc = new DocumentState();
@@ -43,4 +52,23 @@ test('writeback: translated patches actually move line/circle/arc geometry in a 
   const movedArc = doc.getEntity(arc.id);
   assert.deepEqual({ x: movedArc.center.x, y: movedArc.center.y }, { x: 5, y: 6 });
   assert.equal(movedArc.radius, 5, 'radius untouched');
+});
+
+test('clear highlight: clears OUR conflict highlight from a real SelectionState, once', () => {
+  const selection = new SelectionState();
+  selection.setSelection([1, 2], 1);            // solver highlighted the conflicting entities
+  assert.deepEqual([...selection.entityIds].sort(), [1, 2]);
+
+  clearHighlightAgainst(selection, [1, 2]);     // conflict-free solve -> clear our highlight
+  assert.deepEqual(selection.entityIds, []);
+  assert.equal(selection.primaryId, null);
+});
+
+test('clear highlight: does NOT wipe a selection the user changed after the highlight', () => {
+  const selection = new SelectionState();
+  selection.setSelection([1, 2], 1);            // solver highlight
+  selection.setSelection([5], 5);               // user then selected something else
+  clearHighlightAgainst(selection, [1, 2]);     // must NOT clear the user's [5]
+  assert.deepEqual(selection.entityIds, [5]);
+  assert.equal(selection.primaryId, 5);
 });

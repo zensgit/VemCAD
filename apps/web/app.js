@@ -170,6 +170,13 @@ async function mountEditorSolveRegion({ workspace, params = null } = {}) {
       // Highlight conflicting entities (over-constrained solve) by selecting them in the editor.
       // Guarded: no selection -> no-op.
       highlightEntities: (ids) => workspace?.selection?.setSelection?.(ids, ids?.[0] ?? null),
+      // Clear a conflict highlight on a later conflict-free solve, but ONLY if the selection is
+      // still the ids we set (the user did not change it since) -> never wipes a user selection.
+      clearHighlight: (ids) => {
+        const selection = workspace?.selection;
+        if (!selection || typeof selection.setSelection !== 'function') return;
+        if (editorSolveMod.shouldClearHighlight(selection.entityIds, ids)) selection.setSelection([], null);
+      },
     });
   } catch {
     return null;
