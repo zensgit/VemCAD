@@ -13,8 +13,7 @@ const repoRoot = path.resolve(__dirname, '..', '..', '..');
 // yet landed on the pinned submodule (ba5f882) — those symbols/files do not exist
 // there. Skip them until that hardening lands in CADGameFusion + a VemCAD pointer
 // bump (A→C). The product-side cases (apps/web/app.js) below run unconditionally.
-const SUBMODULE_ENTRY_SKIP =
-  'pending CADGameFusion web_viewer bootstrap entry API on the pinned submodule (A→C)';
+const SUBMODULE_ENTRY_SKIP = false;
 
 function installDomStubs({ search = '' } = {}) {
   const elements = new Map();
