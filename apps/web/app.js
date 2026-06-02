@@ -132,12 +132,51 @@ function triggerProductOfflineCaching(scheduleOfflineCaching, context) {
   }
 }
 
+// Default editor-solve mounter: in editor mode, mount a READ-ONLY solve panel (solve the
+// current document → diagnostics + preview; no geometry writeback) into a dedicated region
+// of the editor root. Opportunistic + resilient — any failure (no DOM, no document, modules
+// unavailable) returns null and never blocks editor startup. Real collaborators are imported
+// lazily here so app.js itself stays free of submodule-coupled static imports.
+async function mountEditorSolveRegion({ workspace, params = null } = {}) {
+  void params;
+  try {
+    const doc = globalThis.document;
+    const documentState = workspace?.state?.document;
+    if (!doc || !documentState) return null;
+    const editorRoot = doc.getElementById('cad-editor-root');
+    if (!editorRoot) return null;
+    let region = doc.getElementById('vemcad-solve-region');
+    if (!region) {
+      region = doc.createElement('aside');
+      region.id = 'vemcad-solve-region';
+      region.className = 'vemcad-solve-region';
+      editorRoot.appendChild(region);
+    }
+    const [bridgeMod, panelMod, controllerMod, editorSolveMod] = await Promise.all([
+      import('./shared/runtime_bridge.js'),
+      import('./workbench/panels/solve_panel.js'),
+      import('./workbench/solver/solve_workbench.js'),
+      import('./workbench/solver/editor_solve.js'),
+    ]);
+    return editorSolveMod.mountEditorSolvePanel({
+      root: region,
+      documentState,
+      exportProject: bridgeMod.exportRuntimeProjectFromDocumentState,
+      createPanel: panelMod.createSolveWorkbenchPanel,
+      createController: controllerMod.createSolveWorkbenchController,
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function bootstrapVemcadWebApp({
   params = null,
   previewBootstrap = bootstrapLegacyPreviewRuntime,
   scheduleOfflineCaching = scheduleProductOfflineCaching,
   ensureWorkspaceBootstrappedImpl = ensureWorkspaceBootstrapped,
   loadSolveDemoModule: loadSolveDemo = loadSolveDemoModule,
+  mountEditorSolveImpl = mountEditorSolveRegion,
 } = {}) {
   const resolvedParams = resolveSearchParams(params);
   const mode = (resolvedParams.get('mode') || '').trim().toLowerCase();
@@ -160,8 +199,9 @@ export async function bootstrapVemcadWebApp({
   if (EDITOR_MODES.has(mode)) {
     setEditorMode();
     const workspace = await ensureWorkspaceBootstrappedImpl({ params: resolvedParams });
+    const solve = await mountEditorSolveImpl({ workspace, params: resolvedParams });
     triggerProductOfflineCaching(scheduleOfflineCaching, { mode: 'editor' });
-    return { mode: 'editor', bridge, workspace };
+    return { mode: 'editor', bridge, workspace, solve };
   }
 
   setPreviewMode();
