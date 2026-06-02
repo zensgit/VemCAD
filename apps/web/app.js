@@ -154,7 +154,11 @@ async function mountEditorSolveRegion({ workspace, params = null } = {}) {
     ]);
     // Lightweight floating entry: a launcher that toggles a floating card holding the panel
     // (default closed). The verified panel mounts into the entry's region; not a layout dock.
-    const entry = entryMod.buildSolveEntry({ document: doc, host: editorRoot });
+    // Host it on <body>, NOT inside #cad-editor-root: the dock is position:fixed, and a
+    // transform/filter/contain on the editor canvas (or any ancestor) would otherwise make
+    // `fixed` resolve against that element instead of the viewport. body has no such ancestor,
+    // so placement is correct by construction. (editorRoot existence already gated editor mode.)
+    const entry = entryMod.buildSolveEntry({ document: doc, host: doc.body || editorRoot });
     if (!entry) return null;
     const mounted = editorSolveMod.mountEditorSolvePanel({
       root: entry.regionRoot,
