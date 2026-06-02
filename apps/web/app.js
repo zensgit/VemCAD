@@ -167,6 +167,9 @@ async function mountEditorSolveRegion({ workspace, params = null } = {}) {
       // Auto-apply solved geometry back into the editor via the undoable command bus.
       // Guarded: no commandBus -> editor_solve degrades to read-only (solve + display only).
       applyUpdates: ({ updates }) => workspace?.commandBus?.execute('entity.applyGeometry', { updates }),
+      // Highlight conflicting entities (over-constrained solve) by selecting them in the editor.
+      // Guarded: no selection -> no-op.
+      highlightEntities: (ids) => workspace?.selection?.setSelection?.(ids, ids?.[0] ?? null),
     });
   } catch {
     return null;

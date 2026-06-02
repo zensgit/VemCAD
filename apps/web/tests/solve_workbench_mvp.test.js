@@ -82,6 +82,7 @@ test('summarizeSolveEnvelope treats unsatisfied solves as blocked user-fixable s
       structural_state: 'overconstrained',
       conflict_group_count: 1,
       redundant_constraint_estimate: 0,
+      conflict_entity_ids: ['L1', 'C1'],
     },
     diagnostics: [],
   }, { httpStatus: 422 });
@@ -91,6 +92,12 @@ test('summarizeSolveEnvelope treats unsatisfied solves as blocked user-fixable s
   assert.equal(summary.errorCode, 'SOLVE_UNSATISFIED');
   assert.equal(summary.conflictGroupCount, 1);
   assert.equal(summary.structuralState, 'overconstrained');
+  assert.deepEqual(summary.conflictEntityIds, ['L1', 'C1']); // surfaced from analysis for the editor to highlight
+});
+
+test('summarizeSolveEnvelope defaults conflictEntityIds to [] when analysis omits them', () => {
+  const summary = summarizeSolveEnvelope({ ok: true, value: { solve: { ok: true } }, diagnostics: [] });
+  assert.deepEqual(summary.conflictEntityIds, []);
 });
 
 test('deriveCadgfPreviewDocument derives from the evaluated view, not from failed envelopes', () => {

@@ -138,7 +138,7 @@ test('translateEvaluatedViewToUpdates: skips no-id, unknown kind, malformed coor
 
 // --- auto-apply: a successful solve writes solved geometry back via applyUpdates ---
 
-function mountWithController(controller, applyUpdates) {
+function mountWithController(controller, applyUpdates, highlightEntities) {
   const project = { header: { format: 'VEMCAD-PROJECT' }, entities: [], constraints: [] };
   return mountEditorSolvePanel({
     root: fakeRoot(),
@@ -147,6 +147,7 @@ function mountWithController(controller, applyUpdates) {
     createPanel: () => ({ destroy() {} }),
     createController: () => controller,
     applyUpdates,
+    highlightEntities,
   });
 }
 
@@ -190,6 +191,48 @@ test('mountEditorSolvePanel: read-only when applyUpdates is not injected (no thr
   assert.equal(result.ok, true);
   const evaluatedView = { entities: [{ id: 1, kind: 'line', line: [[1, 2], [9, 8]] }] };
   assert.doesNotThrow(() => controller.emit({ status: 'satisfied', envelope: { ok: true, value: { evaluatedView } } }));
+});
+
+// --- conflict highlight: a conflicting solve highlights the offending entities ---
+// Independent of envelope.ok (conflicts come back as a FAILED solve), keyed off the curated
+// summary.conflictEntityIds.
+
+test('mountEditorSolvePanel: highlights conflicting entities on a failed (conflict) solve', () => {
+  const controller = fakeSolveController();
+  const highlight = recorder();
+  mountWithController(controller, undefined, highlight);
+
+  // conflict => envelope.ok false, summary carries the resolved ids
+  controller.emit({ status: 'blocked', envelope: { ok: false, value: null }, summary: { conflictEntityIds: ['L1', 'C1'] } });
+
+  assert.equal(highlight.calls.length, 1);
+  assert.deepEqual(highlight.calls[0][0], ['L1', 'C1']);
+
+  // a notify replay of the SAME summary must not re-highlight (object-identity guard)
+  const summary = { conflictEntityIds: ['L2'] };
+  controller.emit({ status: 'blocked', envelope: { ok: false }, summary });
+  controller.emit({ status: 'blocked', envelope: { ok: false }, summary });
+  assert.equal(highlight.calls.length, 2);
+  assert.deepEqual(highlight.calls[1][0], ['L2']);
+});
+
+test('mountEditorSolvePanel: does NOT highlight when there are no conflicts (never disturbs selection)', () => {
+  const controller = fakeSolveController();
+  const highlight = recorder();
+  mountWithController(controller, undefined, highlight);
+
+  controller.emit({ status: 'satisfied', envelope: { ok: true, value: { evaluatedView: { entities: [] } } }, summary: { conflictEntityIds: [] } });
+  controller.emit({ status: 'failed', envelope: { ok: false }, summary: { conflictEntityIds: [] } });
+  controller.emit({ status: 'solving', envelope: null, summary: null });
+
+  assert.equal(highlight.calls.length, 0);
+});
+
+test('mountEditorSolvePanel: no highlightEntities injected -> no throw on a conflict solve', () => {
+  const controller = fakeSolveController();
+  const result = mountWithController(controller, undefined, undefined);
+  assert.equal(result.ok, true);
+  assert.doesNotThrow(() => controller.emit({ status: 'blocked', envelope: { ok: false }, summary: { conflictEntityIds: ['L1'] } }));
 });
 
 // --- app.js wiring: editor mode invokes the (injectable) editor-solve mounter -
