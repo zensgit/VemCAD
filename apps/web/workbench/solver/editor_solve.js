@@ -13,12 +13,18 @@
 // entity id — export coerces the editor's numeric id into the project id and import keeps it
 // numeric, so `evaluatedView` entities come back keyed by the editor's own ids.
 //
-// Degrades to READ-ONLY when `applyUpdates` is not injected (solve + display only, no
-// mutation), so the module stays useful and testable without the editor command bus.
+// CONFLICT HIGHLIGHT: when a solve reports conflicts (an over-constrained/unsatisfied solve,
+// so envelope.ok === false), the offending editor entities — resolved server-side from the
+// solver's conflicting variable keys via the adapter pointMap, surfaced as
+// `summary.conflictEntityIds` — are highlighted through the injected `highlightEntities`
+// (app.js routes it to the editor selection). Independent of the auto-apply success gate.
+//
+// Degrades to READ-ONLY when `applyUpdates` / `highlightEntities` are not injected (solve +
+// display only, no mutation), so the module stays useful and testable without the editor.
 //
 // Pure composition: every collaborator (exportProject / createPanel / createController /
-// applyUpdates) is injected, so this module has no submodule-coupled imports and is
-// unit-testable without the editor, the bridge, or the solver. app.js supplies the real ones.
+// applyUpdates / highlightEntities) is injected, so this module has no submodule-coupled
+// imports and is unit-testable without the editor, the bridge, or the solver. app.js wires them.
 
 export const EDITOR_SOLVE_EXPORT_FAILED = 'EDITOR_SOLVE_EXPORT_FAILED';
 
@@ -70,6 +76,7 @@ export function mountEditorSolvePanel({
   createPanel,
   createController,
   applyUpdates,
+  highlightEntities,
   endpoint,
   fetchImpl,
   labels = {},
@@ -103,21 +110,37 @@ export function mountEditorSolvePanel({
   const controller = createController(controllerOptions);
   const panel = createPanel({ root, project, controller, labels });
 
-  // Auto-apply: when a solve SUCCEEDS (envelope.ok + a solved view), write the solved geometry
-  // back into the editor through the injected applyUpdates. The object-identity guard makes it
-  // apply once per solved view (a fresh evaluatedView per solve), so a notify replay never
-  // double-applies. Guarded on subscribe so a bare/test controller (no subscribe) stays valid;
-  // guarded on applyUpdates so the panel degrades to read-only when no writeback is wired.
+  // React to solve results. Two independent effects, both keyed by object-identity so a notify
+  // replay never re-fires within one solve. Guarded on subscribe so a bare/test controller (no
+  // subscribe) stays valid.
+  //   1. Auto-apply (SUCCESS only): on envelope.ok + a solved view, write the solved geometry back
+  //      via applyUpdates (read-only if not injected); guard on the evaluatedView object.
+  //   2. Conflict highlight (ANY outcome): conflicts come back as a FAILED/unsatisfied solve
+  //      (envelope.ok === false), so this must NOT reuse the auto-apply gate. Keyed off the
+  //      curated summary.conflictEntityIds (resolved server-side); highlights only when there are
+  //      conflicts (never clears the user's selection on a clean solve); guard on the summary.
   let lastAppliedView = null;
+  let lastHighlightSummary = null;
   let unsubscribe = () => {};
   if (typeof controller.subscribe === 'function') {
     unsubscribe = controller.subscribe((state) => {
       const evaluatedView = state?.envelope?.ok === true ? state.envelope?.value?.evaluatedView : null;
-      if (!evaluatedView || evaluatedView === lastAppliedView) return;
-      lastAppliedView = evaluatedView;
-      if (typeof applyUpdates !== 'function') return;
-      const updates = translateEvaluatedViewToUpdates(evaluatedView);
-      if (updates.length > 0) applyUpdates({ updates });
+      if (evaluatedView && evaluatedView !== lastAppliedView) {
+        lastAppliedView = evaluatedView;
+        if (typeof applyUpdates === 'function') {
+          const updates = translateEvaluatedViewToUpdates(evaluatedView);
+          if (updates.length > 0) applyUpdates({ updates });
+        }
+      }
+
+      const summary = state?.summary ?? null;
+      if (summary && summary !== lastHighlightSummary) {
+        lastHighlightSummary = summary;
+        const conflictIds = Array.isArray(summary.conflictEntityIds) ? summary.conflictEntityIds : [];
+        if (conflictIds.length > 0 && typeof highlightEntities === 'function') {
+          highlightEntities(conflictIds);
+        }
+      }
     });
   }
 

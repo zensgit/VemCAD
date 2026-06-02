@@ -46,6 +46,10 @@ export function summarizeSolveEnvelope(envelope, { httpStatus = null } = {}) {
     conflictGroupCount: Number.isFinite(analysis?.conflict_group_count) ? analysis.conflict_group_count : null,
     redundantConstraintEstimate: Number.isFinite(analysis?.redundant_constraint_estimate) ? analysis.redundant_constraint_estimate : null,
     diagnosticCount: diagnosticsOf(envelope).length,
+    // Editor entity ids the solver flagged as conflicting (resolved server-side via the adapter
+    // pointMap). Surfaced EXPLICITLY here so it survives into controller state for the editor to
+    // highlight; summary is the controller's curated UI view of the envelope.
+    conflictEntityIds: Array.isArray(analysis?.conflict_entity_ids) ? analysis.conflict_entity_ids : [],
   };
 }
 

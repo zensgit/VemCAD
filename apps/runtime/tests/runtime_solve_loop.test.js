@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createProjectModel } from '../project/index.js';
-import { solveProject, solveAndDeriveScene, applySolvedVars, buildEvaluatedProjectView } from '../solver/index.js';
+import { solveProject, solveAndDeriveScene, applySolvedVars, buildEvaluatedProjectView, resolveConflictEntityIds } from '../solver/index.js';
+import { buildSolverProject } from '../solver/adapter.js';
 
 const FIXED = '2026-05-25T00:00:00.000Z';
 const CLOCK = { now: () => '2026-09-09T09:09:09.000Z' };
@@ -116,4 +117,67 @@ test('buildEvaluatedProjectView overlays evaluated coords without mutating the i
   assert.equal(view.ok, true);
   assert.deepEqual(view.value.entities[0].line, [[0, 9], [1, 9]]);
   assert.deepEqual(project.entities.find((e) => e.id === 'L1').line, [[0, 5], [1, 5]]); // unchanged
+});
+
+// --- conflict entity resolution (variable_key -> pointMap -> editor entity id) -------------
+
+test('resolveConflictEntityIds: maps conflict variable keys back to owning entities, deduped', () => {
+  // a line's start+end points (__p0/__p1) both roll up to L1; a circle center (__p2) -> C1
+  const pointMap = {
+    __p0: { entity: 'L1', role: 'start' },
+    __p1: { entity: 'L1', role: 'end' },
+    __p2: { entity: 'C1', role: 'center' },
+  };
+  const analysis = {
+    action_panels: [
+      { id: 'primary_conflict', category: 'conflict', scope: 'primary', enabled: true,
+        variable_keys: ['__p0.x', '__p0.y', '__p1.x'] },           // -> L1 (deduped)
+      { id: 'smallest_conflict', category: 'conflict', scope: 'smallest', enabled: true,
+        variable_keys: ['__p2.x'] },                                // -> C1
+      { id: 'primary_redundancy', category: 'redundancy', scope: 'primary', enabled: true,
+        variable_keys: ['__p0.x'] },                                // ignored (not conflict)
+      { id: 'disabled_conflict', category: 'conflict', scope: 'primary', enabled: false,
+        variable_keys: ['__p2.y'] },                                // ignored (disabled)
+    ],
+  };
+  assert.deepEqual(resolveConflictEntityIds(analysis, pointMap), ['L1', 'C1']);
+});
+
+test('resolveConflictEntityIds: skips unresolvable keys and tolerates missing inputs', () => {
+  const pointMap = { __p0: { entity: 'L1', role: 'start' } };
+  const analysis = { action_panels: [
+    { id: 'primary_conflict', category: 'conflict', enabled: true, variable_keys: ['__p0.x', '__pX.y', 'nodot', 42] },
+  ] };
+  assert.deepEqual(resolveConflictEntityIds(analysis, pointMap), ['L1']);
+  assert.deepEqual(resolveConflictEntityIds(null, pointMap), []);
+  assert.deepEqual(resolveConflictEntityIds(analysis, null), []);
+  assert.deepEqual(resolveConflictEntityIds({}, pointMap), []);
+});
+
+test('solveProject enriches analysis with conflict_entity_ids resolved via the real pointMap', () => {
+  const project = projectWith({ entities: [{ id: 'L1', kind: 'line', layerId: 0, line: [[0, 0], [10, 0]] }] });
+  // get the REAL minted ids this project produces (both endpoints of L1)
+  const minted = Object.keys(buildSolverProject(project).value.pointMap);
+  assert.equal(minted.length, 2);
+  const conflictRunner = () => ({
+    ok: false, message: 'conflicting constraints', iterations: 1, final_error: 1,
+    analysis: {
+      dof_estimate: 0, structural_state: 'overconstrained', conflict_group_count: 1, redundant_constraint_estimate: 0,
+      action_panels: [{
+        id: 'primary_conflict', category: 'conflict', scope: 'primary', enabled: true,
+        variable_keys: [`${minted[0]}.x`, `${minted[1]}.y`],
+      }],
+    },
+  });
+  const res = solveProject(project, { runner: conflictRunner });
+  assert.equal(res.ok, false);
+  assert.equal(res.error_code, 'SOLVE_UNSATISFIED');
+  assert.deepEqual(res.analysis.conflict_entity_ids, ['L1']); // both minted points roll up to L1
+});
+
+test('solveProject sets conflict_entity_ids to [] on a clean solve (no conflict panels)', () => {
+  const res = solveProject(projectWith({ entities: [{ id: 'L1', kind: 'line', layerId: 0, line: [[0, 1], [2, 3]] }] }), { runner: flattenYRunner });
+  assert.equal(res.ok, true);
+  const analysisDiag = res.diagnostics.find((d) => d.code === 'SOLVE_ANALYSIS');
+  assert.deepEqual(analysisDiag.analysis.conflict_entity_ids, []);
 });

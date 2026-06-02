@@ -89,6 +89,30 @@ function analysisDiagnostics(analysis) {
   }];
 }
 
+// Resolve the editor entity ids involved in the solver's CONFLICT action panels by mapping each
+// conflicting solver variable key ("<mintedPointId>.<coord>") back through the adapter pointMap
+// (mintedId -> { entity, role }). This is id-keyed, so it is robust to the solver's internal
+// constraint reordering / evaluable-filtering (NO constraint-index alignment is assumed); minted
+// point ids are dot-free, so a key splits cleanly at its single dot. Owning entities dedup (a
+// line's start+end points roll up to the one line). Returns editor entity ids ready to highlight.
+export function resolveConflictEntityIds(analysis, pointMap) {
+  if (!pointMap || typeof pointMap !== 'object') return [];
+  const panels = Array.isArray(analysis?.action_panels) ? analysis.action_panels : [];
+  const ids = new Set();
+  for (const panel of panels) {
+    if (panel?.category !== 'conflict' || panel?.enabled !== true) continue;
+    const keys = Array.isArray(panel.variable_keys) ? panel.variable_keys : [];
+    for (const key of keys) {
+      if (typeof key !== 'string') continue;
+      const dot = key.lastIndexOf('.');
+      const mintedId = dot > 0 ? key.slice(0, dot) : key;
+      const mapped = pointMap[mintedId];
+      if (mapped && mapped.entity !== undefined && mapped.entity !== null) ids.add(mapped.entity);
+    }
+  }
+  return [...ids];
+}
+
 // Solve a project: build solver-input, run the solver (injectable runner;
 // defaults to the CLI shell-out), write solved vars back to a transient
 // evaluated view. Does NOT touch the input project (seed). Returns
@@ -109,6 +133,12 @@ export function solveProject(project, options = {}) {
   if (!out || typeof out !== 'object') {
     return fail(ERROR_SOLVE_FAILED, 'solve runner returned no result object', diagnostics);
   }
+  // Enrich the analysis with the editor entity ids involved in conflicts, resolved server-side
+  // via the adapter pointMap (the only place the minted-point <-> entity map lives). It rides
+  // WITH the analysis so it reaches the controller on BOTH paths — conflicts surface as ok:false.
+  const analysis = out.analysis && typeof out.analysis === 'object'
+    ? { ...out.analysis, conflict_entity_ids: resolveConflictEntityIds(out.analysis, pointMap) }
+    : out.analysis;
   // A solver failure (unsatisfiable / non-converged) must NOT be treated as a
   // solve: return ok:false WITHOUT writing back or deriving, preserving the
   // structured analysis (conflict / redundancy / action panels) and message.
@@ -117,8 +147,8 @@ export function solveProject(project, options = {}) {
       ok: false,
       error_code: ERROR_SOLVE_UNSATISFIED,
       error: typeof out.message === 'string' && out.message ? out.message : 'solver did not converge / constraints unsatisfiable',
-      diagnostics: [...diagnostics, ...analysisDiagnostics(out.analysis)],
-      analysis: out.analysis,
+      diagnostics: [...diagnostics, ...analysisDiagnostics(analysis)],
+      analysis,
       solve: { ok: false, iterations: out.iterations, finalError: out.final_error },
     };
   }
@@ -133,7 +163,7 @@ export function solveProject(project, options = {}) {
       evaluatedGeometry,
       solve: { ok: !!out.ok, iterations: out.iterations, finalError: out.final_error },
     },
-    [...diagnostics, ...analysisDiagnostics(out.analysis)],
+    [...diagnostics, ...analysisDiagnostics(analysis)],
   );
 }
 

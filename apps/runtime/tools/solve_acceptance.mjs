@@ -79,6 +79,7 @@ const cases = [
   {
     name: 'conflict',
     expectFail: true, // two incompatible distances on the same pair -> unsatisfiable
+    conflictEntities: ['P1', 'P2'], // the solver's conflicting variable keys must resolve to these
     project: project([point('P1', [0, 0]), point('P2', [3, 0])], [
       { id: 'd10', type: 'distance', value: 10, refs: [{ entity: 'P1', at: 'self' }, { entity: 'P2', at: 'self' }] },
       { id: 'd20', type: 'distance', value: 20, refs: [{ entity: 'P1', at: 'self' }, { entity: 'P2', at: 'self' }] },
@@ -93,10 +94,21 @@ let failed = 0;
 for (const c of cases) {
   if (c.expectFail) {
     const r = solveProject(c.project, { runner });
-    if (!r.ok && r.error_code === 'SOLVE_UNSATISFIED' && r.analysis) {
-      console.log(`OK   ${c.name} (correctly rejected; state=${r.analysis.structural_state})`);
+    const rejected = !r.ok && r.error_code === 'SOLVE_UNSATISFIED' && r.analysis;
+    // Conflict-entity resolution against the REAL solver: the conflicting variable keys must
+    // resolve (via the adapter pointMap) to exactly the expected editor entities. This validates
+    // the variable_key format that the unit fixtures only assume.
+    let entitiesOk = true;
+    if (rejected && c.conflictEntities) {
+      const got = [...(r.analysis.conflict_entity_ids ?? [])].sort();
+      const want = [...c.conflictEntities].sort();
+      entitiesOk = JSON.stringify(got) === JSON.stringify(want);
+      if (!entitiesOk) console.error(`FAIL ${c.name}: conflict_entity_ids = ${JSON.stringify(got)}, expected ${JSON.stringify(want)}`);
+    }
+    if (rejected && entitiesOk) {
+      console.log(`OK   ${c.name} (correctly rejected; state=${r.analysis.structural_state}${c.conflictEntities ? `; conflict entities=${JSON.stringify(r.analysis.conflict_entity_ids)}` : ''})`);
     } else {
-      console.error(`FAIL ${c.name}: expected SOLVE_UNSATISFIED + analysis, got ${JSON.stringify({ ok: r.ok, code: r.error_code, hasAnalysis: !!r.analysis })}`);
+      if (!rejected) console.error(`FAIL ${c.name}: expected SOLVE_UNSATISFIED + analysis, got ${JSON.stringify({ ok: r.ok, code: r.error_code, hasAnalysis: !!r.analysis })}`);
       failed += 1;
     }
     continue;
