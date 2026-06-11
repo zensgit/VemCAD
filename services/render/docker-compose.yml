@@ -1,0 +1,18 @@
+# Dev runner for the render service (Phase 1 A6). Not a production manifest —
+# Phase 1 is non-production (image = CI artifact + dev compose only; nothing
+# points Yuantus at it). Network isolation per render is asserted here.
+services:
+  render:
+    build:
+      context: ../..            # VemCAD repo root (submodule must be checked out)
+      dockerfile: services/render/Dockerfile
+      target: runtime
+    image: vemcad-render:dev
+    ports:
+      - "127.0.0.1:8077:8077"   # internal-only bind (no auth in Phase 1)
+    environment:
+      RENDER_WORKERS: "2"
+      # Per-tenant font store (A5) — mount a host dir and point --font-dir here.
+      # RENDER_FONT_DIR: /fonts
+    # volumes:
+    #   - ./fonts:/fonts:ro

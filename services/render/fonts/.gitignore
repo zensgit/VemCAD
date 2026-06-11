@@ -1,0 +1,5 @@
+# Fetched OFL fonts are not committed (size); fetch via tools/fetch_fonts.sh.
+*
+!.gitkeep
+!.gitignore
+!README.md

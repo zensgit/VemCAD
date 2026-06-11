@@ -1,0 +1,13 @@
+# Render image build context = repo root, but only services/render +
+# deps/cadgamefusion are needed. Exclude everything else, then re-include
+# those two, then drop heavy nested build/cache dirs.
+*
+!services/render
+!deps/cadgamefusion
+**/.git
+**/build
+**/build_*
+**/__pycache__
+**/.pytest_cache
+**/vcpkg_installed
+**/node_modules
