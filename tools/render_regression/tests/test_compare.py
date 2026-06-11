@@ -33,7 +33,7 @@ def test_identical_renders_score_high(tmp_path):
     a = draw(tmp_path / "a.png"); b = draw(tmp_path / "b.png")
     r = compare(a, b)
     assert r.aligned and r.comparable
-    assert r.geometry_ink_iou >= 0.97
+    assert r.ink_iou >= 0.97
     assert r.band == "pass"
     assert r.trust == "gate"
 
@@ -43,7 +43,7 @@ def test_small_shift_absorbed_by_alignment(tmp_path):
     b = draw(tmp_path / "b.png", shift=(2, 1))   # 2px shift
     r = compare(a, b)
     # crop-to-bbox removes the global shift; residual within tolerance → pass
-    assert r.geometry_ink_iou >= 0.95
+    assert r.ink_iou >= 0.95
     assert r.band in ("pass", "review")
 
 
@@ -51,7 +51,7 @@ def test_missing_geometry_drops_score(tmp_path):
     a = draw(tmp_path / "a.png", extra_line=True)   # has the red line
     b = draw(tmp_path / "b.png", extra_line=False)  # missing it
     r = compare(a, b)
-    assert r.geometry_ink_iou < 0.97   # divergence detected
+    assert r.ink_iou < 0.97   # divergence detected
     assert r.band in ("review", "fallback")
 
 
@@ -59,15 +59,65 @@ def test_blank_candidate_is_fallback(tmp_path):
     a = draw(tmp_path / "a.png")
     b = draw(tmp_path / "b.png", blank=True)
     r = compare(a, b)
-    assert r.geometry_ink_iou == 0.0
+    assert r.ink_iou == 0.0
     assert r.band == "fallback"
 
 
-def test_both_blank_match(tmp_path):
+def test_both_blank_is_fallback_not_silent_pass(tmp_path):
+    # Both-blank scores 1.0 numerically but a gated drawing being blank is a
+    # failure — band must be fallback so it cannot silently pass the gate.
     a = draw(tmp_path / "a.png", blank=True)
     b = draw(tmp_path / "b.png", blank=True)
     r = compare(a, b)
-    assert r.geometry_ink_iou == 1.0
+    assert r.band == "fallback"
+
+
+def _grid(path, n=20, bg=(255, 255, 255), ink=(0, 0, 0), size=(420, 300)):
+    im = Image.new("RGB", size, bg)
+    d = ImageDraw.Draw(im)
+    d.rectangle([5, 5, size[0] - 5, size[1] - 5], outline=ink, width=2)
+    for i in range(n):
+        y = 15 + i * (size[1] - 30) // n
+        d.line([10, y, size[0] - 10, y], fill=ink, width=1)
+    im.save(path)
+    return path
+
+
+def test_dense_thin_line_self_compare_passes(tmp_path):
+    # Regression for the NEAREST-resize false-FAIL: identical dense 1px line art
+    # must score pass, not review (the self-baseline tier depends on this).
+    a = _grid(tmp_path / "a.png"); b = _grid(tmp_path / "b.png")
+    r = compare(a, b)
+    assert r.ink_iou >= 0.97, r.ink_iou
+    assert r.band == "pass"
+
+
+def test_wrong_color_routed_to_review(tmp_path):
+    # Grayscale ink-IoU is blind to color; a B4/layer-color regression (same
+    # geometry, wrong ink color) must not silently pass.
+    a = draw(tmp_path / "a.png", ink=(255, 255, 255), bg=(30, 30, 35))
+    b = draw(tmp_path / "b.png", ink=(255, 0, 0), bg=(30, 30, 35))  # red ink
+    r = compare(a, b)
+    assert r.color_dist > 60.0
+    assert r.band != "pass"   # demoted to review by color divergence
+
+
+def _rect(path, box, bg=(30, 30, 35), ink=(255, 255, 255), size=(400, 400)):
+    im = Image.new("RGB", size, bg)
+    ImageDraw.Draw(im).rectangle(box, outline=ink, width=3)
+    im.save(path)
+    return path
+
+
+def test_stretched_shape_routed_to_review(tmp_path):
+    # Same outline, genuinely different ink-bbox aspect (a vertical-stretch
+    # render bug). ink-IoU is high after bbox-crop; the aspect guard keeps it
+    # out of 'pass'.
+    a = _rect(tmp_path / "a.png", [40, 40, 360, 210])   # 320x170, aspect 1.88
+    b = _rect(tmp_path / "b.png", [40, 40, 360, 300])   # 320x260, aspect 1.23
+    r = compare(a, b)
+    assert r.aspect_delta > 0.06, r.aspect_delta
+    assert r.band != "pass"
 
 
 def test_light_and_dark_bg_both_detect_ink(tmp_path):
@@ -75,7 +125,7 @@ def test_light_and_dark_bg_both_detect_ink(tmp_path):
     a = draw(tmp_path / "a.png", bg=(255, 255, 255), ink=(0, 0, 0))
     b = draw(tmp_path / "b.png", bg=(255, 255, 255), ink=(0, 0, 0))
     r = compare(a, b)
-    assert r.geometry_ink_iou >= 0.97
+    assert r.ink_iou >= 0.97
 
 
 def test_not_comparable_skips_and_flags(tmp_path):

@@ -33,6 +33,15 @@ class BaselineEntry:
     tier: str             # self | ref-render | acad
     sha256: str           # of the baseline image
     approver: str         # who signed off this baseline (PR reviewer)
+    # §5/§7 trust: how the baseline image was captured. self-baselines are
+    # offscreen render_cli (gate-trust); a ref-render baseline may be
+    # viewport-capture (advisory — must not gate). Recorded so regress can
+    # thread it into compare()'s trust weighting.
+    capture_method: str = "offscreen-render"
+    # The Linux-canonical image/host the baseline was captured on. A self-
+    # baseline MUST come from the A6 container, never a dev mac (CoreText vs
+    # FreeType); regress warns when this is unset/foreign.
+    captured_on: str = ""
     note: str = ""
 
 
@@ -51,9 +60,25 @@ class BaselineStore:
         return drawing + "@" + tier
 
     def _load(self) -> None:
-        doc = json.loads(self.path.read_text("utf-8"))
-        for raw in doc.get("baselines", []):
-            e = BaselineEntry(**raw)
+        try:
+            doc = json.loads(self.path.read_text("utf-8"))
+        except (OSError, ValueError) as ex:
+            raise ValueError("baseline manifest %s is unreadable/corrupt: %s"
+                             % (self.path, ex))
+        fields = set(BaselineEntry.__dataclass_fields__)
+        required = {"drawing", "tier", "sha256", "approver"}
+        for i, raw in enumerate(doc.get("baselines", [])):
+            if not isinstance(raw, dict):
+                raise ValueError("baseline entry %d is not an object" % i)
+            missing = required - raw.keys()
+            if missing:
+                raise ValueError("baseline entry %d missing field(s): %s"
+                                 % (i, ", ".join(sorted(missing))))
+            if raw["tier"] not in TIERS:
+                raise ValueError("baseline entry %d has unknown tier %r (expected %s)"
+                                 % (i, raw["tier"], "/".join(TIERS)))
+            # Ignore unknown keys (forward-compat) rather than crashing.
+            e = BaselineEntry(**{k: v for k, v in raw.items() if k in fields})
             self.entries[self._key(e.drawing, e.tier)] = e
 
     def save(self) -> None:

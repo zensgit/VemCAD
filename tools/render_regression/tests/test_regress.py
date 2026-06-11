@@ -98,3 +98,37 @@ def test_real_golden_manifest_loads_and_is_consistent():
     for d in golden["drawings"]:
         assert (gdir / (d["name"] + ".dxf")).is_file(), d["name"]
         assert "render" in d and "category" in d
+
+
+def test_baseline_missing_image_fails_closed_on_gated(tmp_path):
+    # Entry recorded in the manifest but the image absent in this run's out_dir
+    # (the fresh-CI-checkout case) must FAIL CLOSED for a gated drawing — never
+    # silently pass (the review's central operability blocker).
+    golden = _golden(["d1"])
+    store = BaselineStore(tmp_path / "b.json")
+    out = tmp_path / "out"; out.mkdir()
+    img = tmp_path / "rec.png"; _draw(img)
+    store.record("d1", "self", img, approver="t")   # entry exists...
+    def rfn(d, p): _draw(p); return True              # ...but no _baseline_d1.png staged
+    rep = regress.run(golden, store, rfn, out)
+    assert rep["rows"][0]["outcome"] == "BASELINE-MISSING"
+    assert rep["gated_failures"] == 1   # fail closed
+
+
+def test_malformed_manifest_raises_clean_error(tmp_path):
+    import json as _json
+    bad = tmp_path / "b.json"
+    bad.write_text(_json.dumps({"baselines": [{"drawing": "d", "tier": "self"}]}), "utf-8")  # missing sha256/approver
+    try:
+        BaselineStore(bad)
+        assert False, "expected ValueError"
+    except ValueError as e:
+        assert "missing field" in str(e)
+    # unknown tier
+    bad.write_text(_json.dumps({"baselines": [
+        {"drawing": "d", "tier": "bogus", "sha256": "x", "approver": "a"}]}), "utf-8")
+    try:
+        BaselineStore(bad)
+        assert False, "expected ValueError"
+    except ValueError as e:
+        assert "unknown tier" in str(e)
