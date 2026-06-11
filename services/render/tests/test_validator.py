@@ -211,3 +211,52 @@ def test_cli_validate_and_expect_level(tmp_path):
     (pdir / "twin.dxf").unlink()
     assert cli_main(["validate", str(pdir), "--quiet", "--expect-level", "standard"]) == 3
     assert cli_main(["validate", str(pdir), "--quiet", "--expect-level", "minimal"]) == 0
+
+
+def test_package_id_traversal_rejected():
+    m = base_manifest([], level="minimal", package_id="../../etc/evil")
+    res = validate_package(m, {})
+    assert not res.ok_manifest and res.validated_level == "rejected"
+
+
+def test_missing_recommended_fields_warn_not_reject():
+    # discipline/created_at/level missing must NOT reject (check-in always wins)
+    m = base_manifest([entry("twin-dxf", TWIN, "t.dxf")], level="minimal")
+    del m["discipline"]
+    del m["created_at"]
+    res = validate_package(m, {sha256_bytes(TWIN): TWIN})
+    assert res.ok_manifest
+    # no discipline → cannot validate as 2d → source-only, but NOT rejected
+    assert res.validated_level == "source-only"
+    assert any(w["code"] == "missing-field" for w in res.warnings)
+
+
+def test_cardinality_extras_quarantined():
+    a = b"0\nSECTION\n2\nENTITIES\n0\nEOF\nAAA"
+    b = b"0\nSECTION\n2\nENTITIES\n0\nEOF\nBBB"
+    files = [entry("twin-dxf", a, "a.dxf"), entry("twin-dxf", b, "b.dxf")]
+    m = base_manifest(files, level="minimal")
+    res = validate_package(m, {sha256_bytes(a): a, sha256_bytes(b): b})
+    assert any(q["reason"] == "cardinality-exceeded" for q in res.quarantined)
+
+
+def test_declaration_only_font_not_quarantined():
+    files = [entry("twin-dxf", TWIN, "t.dxf")]
+    files.append({
+        "role": "font-shx", "file_name": "gbcbig.shx", "sha256": "c" * 64,
+        "params": {"font_file_name": "gbcbig.shx", "bytes_omitted_reason": "license"},
+    })
+    m = base_manifest(files, level="minimal")
+    res = validate_package(m, {sha256_bytes(TWIN): TWIN})  # font bytes NOT delivered
+    assert not any(q["sha256"] == "c" * 64 for q in res.quarantined)
+
+
+def test_a2b_does_not_render_quarantined_twin(tmp_path):
+    from app.packagestore import PackageStore
+    store = PackageStore(tmp_path)
+    bad = b"AutoCAD Binary DXF\r\n\x1a\x00" + b"\x00" * 32  # quarantined: binary dxf
+    m = base_manifest([entry("twin-dxf", bad, "t.dxf")], level="minimal", package_id="pkg-q")
+    res = validate_package(m, {sha256_bytes(bad): bad})
+    store.save(m, {sha256_bytes(bad): bad}, res.report())
+    report = store.get_report("pkg-q")
+    assert any(q["reason"] == "binary-dxf-not-accepted" for q in report["quarantined"])

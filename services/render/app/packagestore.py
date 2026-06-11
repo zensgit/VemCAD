@@ -21,6 +21,14 @@ from typing import Dict, Optional, Tuple
 
 DEFAULT_TENANT = "default"
 
+# package_id / tenant are attacker-controlled and flow into filesystem paths;
+# restrict to a safe charset and forbid path separators / dot-segments.
+_SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+
+def is_safe_id(value: str) -> bool:
+    return bool(_SAFE_ID.match(value or "")) and value not in (".", "..")
+
 
 def schema_major(schema_version: str) -> Optional[int]:
     m = re.match(r"^(\d+)\.", str(schema_version) + ".")
@@ -58,8 +66,16 @@ class PackageStore:
     def _identity_dir(self, identity: str) -> Path:
         return self.root / identity[:2] / identity
 
+    def _index_path(self, tenant: str, package_id: str) -> Path:
+        return self.root / "_index" / tenant / (package_id + ".json")
+
     def package_dir(self, identity: str, package_id: str) -> Path:
-        return self._identity_dir(identity) / package_id
+        if not is_safe_id(package_id):
+            raise ValueError("unsafe package_id")
+        d = (self._identity_dir(identity) / package_id).resolve()
+        if self.root.resolve() not in d.parents:
+            raise ValueError("package path escapes store root")
+        return d
 
     def save(
         self,
@@ -73,6 +89,18 @@ class PackageStore:
         ones that were actually received."""
         identity = identity_key(manifest, tenant)
         package_id = str(manifest.get("package_id"))
+        if not is_safe_id(package_id) or not is_safe_id(tenant):
+            raise ValueError("unsafe package_id or tenant")
+        # Index is tenant-scoped; a package_id colliding under a DIFFERENT
+        # identity must not hijack the pointer (cross-producer / cross-tenant).
+        idx_path = self._index_path(tenant, package_id)
+        if idx_path.is_file():
+            try:
+                existing = json.loads(idx_path.read_text("utf-8"))
+            except (OSError, ValueError):
+                existing = {}
+            if existing.get("identity") not in (None, identity):
+                raise ValueError("package_id already bound to a different identity")
         pdir = self.package_dir(identity, package_id)
         paydir = pdir / "payloads"
         paydir.mkdir(parents=True, exist_ok=True)
@@ -107,21 +135,27 @@ class PackageStore:
                 "utf-8",
             )
 
-        (self.root / "_index" / (package_id + ".json")).write_text(
+        idx_path.parent.mkdir(parents=True, exist_ok=True)
+        idx_path.write_text(
             json.dumps({"identity": identity, "tenant": tenant}, ensure_ascii=False),
             "utf-8",
         )
         return {"identity": identity, "superseded_by_existing": superseded_by_existing}
 
-    def locate(self, package_id: str) -> Optional[Path]:
-        idx = self.root / "_index" / (package_id + ".json")
+    def locate(self, package_id: str, tenant: str = DEFAULT_TENANT) -> Optional[Path]:
+        if not is_safe_id(package_id) or not is_safe_id(tenant):
+            return None
+        idx = self._index_path(tenant, package_id)
         if not idx.is_file():
             return None
         try:
             meta = json.loads(idx.read_text("utf-8"))
         except (OSError, ValueError):
             return None
-        pdir = self.package_dir(meta["identity"], package_id)
+        try:
+            pdir = self.package_dir(meta["identity"], package_id)
+        except (KeyError, ValueError):
+            return None
         return pdir if pdir.is_dir() else None
 
     def get_report(self, package_id: str) -> Optional[dict]:

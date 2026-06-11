@@ -20,6 +20,8 @@ from .validator import validate_package
 _RENDERABLE_ROLES = ("twin-dxf", "twin-dxf-flattened")
 
 _READ_CHUNK = 1 << 20
+_MANIFEST_CAP = 16 * 1024 * 1024  # a manifest is JSON, not a payload
+_PACKAGE_CAP = 1024 * 1024 * 1024  # contract §2.4 package total ceiling
 
 
 def _error(status_code: int, error_code: str, message: str) -> JSONResponse:
@@ -80,32 +82,57 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         }
         return JSONResponse(status_code=200 if ok else 503, content=body)
 
+    async def _read_capped(part: UploadFile, cap: int):
+        chunks, total, hasher = [], 0, hashlib.sha256()
+        while True:
+            chunk = await part.read(_READ_CHUNK)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > cap:
+                return None, total
+            hasher.update(chunk)
+            chunks.append(chunk)
+        return b"".join(chunks), total
+
     @app.post("/package")
     async def receive_package(
         manifest: UploadFile = File(...),
         payload: List[UploadFile] = File(default=[]),
     ):
+        manifest_bytes, _ = await _read_capped(manifest, _MANIFEST_CAP)
+        if manifest_bytes is None:
+            return _error(413, "PAYLOAD_TOO_LARGE", "manifest exceeds %d bytes" % _MANIFEST_CAP)
         try:
-            mdata = json.loads((await manifest.read()).decode("utf-8"))
+            mdata = json.loads(manifest_bytes.decode("utf-8"))
         except (UnicodeDecodeError, ValueError) as e:
             return _error(422, "BAD_MANIFEST", "manifest is not valid JSON: %s" % e)
 
+        # Stream payload parts, aborting the instant the cumulative package
+        # ceiling is crossed (never buffer a part larger than the budget).
         payloads = {}
-        total = 0
+        budget = _PACKAGE_CAP
         for part in payload:
-            data = await part.read()
-            total += len(data)
-            if total > 1024 * 1024 * 1024:  # contract §2.4 default package ceiling
+            data, _ = await _read_capped(part, budget)
+            if data is None:
                 return _error(413, "PAYLOAD_TOO_LARGE", "package exceeds 1 GiB ceiling")
+            budget -= len(data)
             payloads[hashlib.sha256(data).hexdigest()] = data
 
         result = await anyio.to_thread.run_sync(validate_package, mdata, payloads)
         report = result.report()
         if not result.ok_manifest:
-            # Contract §9: an unparseable/unknown-major manifest is the only
-            # outright rejection.
-            return _error(422, "PACKAGE_REJECTED", report.get("error") or "manifest rejected")
-        upsert = await anyio.to_thread.run_sync(store.save, mdata, payloads, report)
+            # Contract §9: an unparseable / unknown-major / identity-broken
+            # manifest is the only outright rejection — return the full report.
+            body = dict(report)
+            body["status"] = "error"
+            body["error_code"] = "PACKAGE_REJECTED"
+            body["error"] = report.get("error") or "manifest rejected"
+            return JSONResponse(status_code=422, content=body)
+        try:
+            upsert = await anyio.to_thread.run_sync(store.save, mdata, payloads, report)
+        except ValueError as e:
+            return _error(409, "IDENTITY_CONFLICT", str(e))
         body = dict(report)
         body["status"] = "ok"
         body["upsert"] = upsert
@@ -145,10 +172,19 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             mdata = store.get_manifest(package_id)
             if mdata is None:
                 return _error(404, "PACKAGE_NOT_FOUND", "no package %s" % package_id)
+            # Never render a payload that validation quarantined (§9: quarantined
+            # entries are dropped from the effective set, kept only for diagnosis).
+            stored_report = store.get_report(package_id) or {}
+            quarantined_shas = {
+                str(q.get("sha256", "")).lower() for q in stored_report.get("quarantined", [])
+            }
             sha = None
             for entry in mdata.get("files", []):
                 if isinstance(entry, dict) and entry.get("role") == role:
-                    sha = str(entry.get("sha256", "")).lower()
+                    cand = str(entry.get("sha256", "")).lower()
+                    if cand in quarantined_shas:
+                        continue
+                    sha = cand
                     break
             content = store.get_payload(package_id, sha) if sha else None
             if content is None:
