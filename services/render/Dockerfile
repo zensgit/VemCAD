@@ -16,6 +16,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential cmake ninja-build \
         qt6-base-dev qt6-svg-dev libgl1-mesa-dev \
+        libeigen3-dev \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
