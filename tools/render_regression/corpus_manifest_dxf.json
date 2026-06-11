@@ -1,0 +1,565 @@
+{
+  "schema": "vemcad.corpus_manifest",
+  "version": "1.0",
+  "frozen_at": "2026-06-10",
+  "source_dir": "~/Downloads/训练图纸/训练图纸_dxf",
+  "usage": "internal-qa-regression-only (X4 confirmed 2026-06-10)",
+  "excluded": [
+    ".dwl",
+    ".dwl2",
+    ".bak"
+  ],
+  "count": 110,
+  "files": [
+    {
+      "file_name": "BTJ01230901522-00汽水分离器v1.dxf",
+      "sha256": "da806919474eda76cb9a6674b3111b92f9643a710876f68bf7c981a398b254e7",
+      "size_bytes": 1769252
+    },
+    {
+      "file_name": "BTJ01230901522-00汽水分离器v2.dxf",
+      "sha256": "ff231e18a97220ea997c4a65c098213f574058c8244f4a78510c7ab975540fea",
+      "size_bytes": 1769252
+    },
+    {
+      "file_name": "BTJ01231101522-00自动进料装置v1.dxf",
+      "sha256": "762fd3af9d00eb4bcda4e21bc5f37765c95a5b6fa8f5e660cf09b28f0e5eca8b",
+      "size_bytes": 1137123
+    },
+    {
+      "file_name": "BTJ01231101522-00自动进料装置v2.dxf",
+      "sha256": "046b5b983469ea4a5c430dcea8480a45da2b71928985bece8575f21350185070",
+      "size_bytes": 1129318
+    },
+    {
+      "file_name": "BTJ01231201522-00拖车DN1500v1.dxf",
+      "sha256": "f251280fc8956db3f58a0bae0f69cef2e2eef2c8321660537192a9e155ac49d3",
+      "size_bytes": 715852
+    },
+    {
+      "file_name": "BTJ01231201522-00拖车DN1500v2.dxf",
+      "sha256": "6374300430659e1f3f832a4c9a7790e3baa81afdb8ca2939b5b046eef28ef397",
+      "size_bytes": 715846
+    },
+    {
+      "file_name": "BTJ01231301522-00蜗轮蜗杆传动出料机构v1.dxf",
+      "sha256": "0c61cecf24a59e977c6a496dbb7a671fe8845b9323040cc7519183d17e76db30",
+      "size_bytes": 1930936
+    },
+    {
+      "file_name": "BTJ01231301522-00蜗轮蜗杆传动出料机构v2.dxf",
+      "sha256": "1c42b96099aee82d7306b893a19e681be2264fbf3ed1974932650ddb893ddd3a",
+      "size_bytes": 1929044
+    },
+    {
+      "file_name": "BTJ01231301522-00蜗轮蜗杆传动出料机构v3.dxf",
+      "sha256": "4028c9a2ef6228fef7ce5922152a771ae29beef05f4c229320d5954f8d4de5ea",
+      "size_bytes": 1922785
+    },
+    {
+      "file_name": "BTJ01231301522-01轴向定位轴承v1.dxf",
+      "sha256": "2b499c0fe7113bc0d2edf4cc281756f20c41b56d3399eb4b18f33722319d689a",
+      "size_bytes": 702216
+    },
+    {
+      "file_name": "BTJ01231301522-01轴向定位轴承v2.dxf",
+      "sha256": "e296f22354fca859f89d1cf44463a6fbeb3718a8270cadf2575d5444ff1e1340",
+      "size_bytes": 702203
+    },
+    {
+      "file_name": "BTJ01231501522-00短轴承座(盖)v1.dxf",
+      "sha256": "3a7d728f26c0ad6b5e5a6b999ea76d471d51f1fed88a3d167e04978b3c3bdef6",
+      "size_bytes": 816587
+    },
+    {
+      "file_name": "BTJ01231501522-00短轴承座(盖)v2.dxf",
+      "sha256": "0f15fabcb3ba2ae131407a691c7fea9f5019d01bbc9f9a7405763e21e0846fca",
+      "size_bytes": 836901
+    },
+    {
+      "file_name": "BTJ01231501522-00短轴承座(盖)v3.dxf",
+      "sha256": "12c457fe17b9ae3d31a1e4749c186d11edf93558947d030e5d84cb2f4c645d32",
+      "size_bytes": 837203
+    },
+    {
+      "file_name": "BTJ01232801522-01电加热箱v1.dxf",
+      "sha256": "bc23cd3e94c0ab81371c5189ee769bf14aded173813da41b84958c89db9bce58",
+      "size_bytes": 2936201
+    },
+    {
+      "file_name": "BTJ01232801522-01电加热箱v2.dxf",
+      "sha256": "ee6fdcc726640bf2fda4aa7662ca5304a5f91bdc178aa97b7632b60461012d4f",
+      "size_bytes": 2936140
+    },
+    {
+      "file_name": "BTJ01239601522-03扭转弹簧v1.dxf",
+      "sha256": "3c70e4215cdef0cd0980efeaf815a3e96282d0594027e63f17b4f90584187a4a",
+      "size_bytes": 480873
+    },
+    {
+      "file_name": "BTJ01239601522-03扭转弹簧v2.dxf",
+      "sha256": "e5023629a2260a7241e1727e8fe2e8f9b1e647d6c7f6b22bfb4a318a94d7b65b",
+      "size_bytes": 481219
+    },
+    {
+      "file_name": "BTJ01239601522-03扭转弹簧v3.dxf",
+      "sha256": "399f092270261cd7ceea27ec40accdf157cd3dcaf73d848cd1a8f3ad13993670",
+      "size_bytes": 481197
+    },
+    {
+      "file_name": "BTJ01239901522-00拖轮组件v1.dxf",
+      "sha256": "9620d57fe3a7469bfcf742f0005d78c75a02224d8594d5fda916f257e9edbe7f",
+      "size_bytes": 1630730
+    },
+    {
+      "file_name": "BTJ01239901522-00拖轮组件v2.dxf",
+      "sha256": "f8acf12aea4910fe5669b87bdde3a82f02c0a1736e18a25a23d855fc4366fb12",
+      "size_bytes": 1630767
+    },
+    {
+      "file_name": "BTJ02230101102-12手轮组件v1.dxf",
+      "sha256": "844b6d7c2df12daafba7b744dbd885bbb9bb733168eae6db7c2fc861a7764474",
+      "size_bytes": 1978057
+    },
+    {
+      "file_name": "BTJ02230101102-12手轮组件v2.dxf",
+      "sha256": "24c035372e6f0ac4cf2360f75043dbda27cc49313790fd2473b8f569e356518a",
+      "size_bytes": 1978060
+    },
+    {
+      "file_name": "BTJ02230301120-03保护罩组件v1.dxf",
+      "sha256": "68c02ff24fde084aa3487d95413b4ec537924524545a77f70a4fb98c4b05994a",
+      "size_bytes": 593411
+    },
+    {
+      "file_name": "BTJ02230301120-03保护罩组件v2.dxf",
+      "sha256": "474c6c2134f4d8e6b962c173a259f36207fe4916843e63d543ccc406e9d7e297",
+      "size_bytes": 593342
+    },
+    {
+      "file_name": "BTJ14240301522-00防爆视灯组件v1.dxf",
+      "sha256": "c555a944991406c217e48fef0958d5563703fcf48fcd28e1b0a90f4a1b3520ae",
+      "size_bytes": 725230
+    },
+    {
+      "file_name": "BTJ14240301522-00防爆视灯组件v2.dxf",
+      "sha256": "07b44e610b0ea36fef8169336809188279d24da8c547936111adddec4059f5a7",
+      "size_bytes": 725231
+    },
+    {
+      "file_name": "J0224014-09液压开盖组件v1.dxf",
+      "sha256": "ed2b97667a592c0896961bea875ccbdb15ef030f00d154a117d6ea5f576b0c6a",
+      "size_bytes": 790993
+    },
+    {
+      "file_name": "J0224014-09液压开盖组件v2.dxf",
+      "sha256": "68b96f8ce53560479937c8d90c26d0afd016eef3cbcd0b9d48ccfe2d93d7b383",
+      "size_bytes": 790974
+    },
+    {
+      "file_name": "J0224025-06-01-03出料凸缘v1.dxf",
+      "sha256": "e1ade2d7b06844ad835080045aee6b43a607d7fdc4aa1ab266b361f09cd1dd1e",
+      "size_bytes": 473363
+    },
+    {
+      "file_name": "J0224025-06-01-03出料凸缘v2.dxf",
+      "sha256": "4205cb52387acbc95437280f057c3198c0560a3954381d2333d957c279856ec5",
+      "size_bytes": 469741
+    },
+    {
+      "file_name": "J0224036-10搅拌减速机机罩v1.dxf",
+      "sha256": "5695e4c691ba3cf14e3a512eb6fec8d363a9b96cf8528f9a45ab1bff058cef89",
+      "size_bytes": 1088504
+    },
+    {
+      "file_name": "J0224036-10搅拌减速机机罩v2.dxf",
+      "sha256": "fa634ba42b7c50a84b5f39096e754203025226edba1cb1b4b701ce9a5ef41298",
+      "size_bytes": 1088290
+    },
+    {
+      "file_name": "J0224036-12真空组件v1.dxf",
+      "sha256": "bc67d985f45e4bbe652485efda54cd2d048454f3a10107d6527163448c62ac5e",
+      "size_bytes": 700286
+    },
+    {
+      "file_name": "J0224036-12真空组件v2.dxf",
+      "sha256": "310401de4a14ed0ba7c3b28222b7310402eb7d9f9d515a491d623b346d7049c1",
+      "size_bytes": 719824
+    },
+    {
+      "file_name": "J0224070-04-07捕集口v1.dxf",
+      "sha256": "7b226bc73186c4334120b7af516bfbd406f9dc6f6121c8433093a6002c3888d7",
+      "size_bytes": 537012
+    },
+    {
+      "file_name": "J0224070-04-07捕集口v2.dxf",
+      "sha256": "212582975be08420d77ce2f86d231a4e4f34352c6c3dffe28b59e2d853468176",
+      "size_bytes": 578845
+    },
+    {
+      "file_name": "J0224071-11-02过滤芯组件v1.dxf",
+      "sha256": "9532522938d36fb3c70de9e99a17eb1a9375a89fe83dcb58b5728e41df527346",
+      "size_bytes": 496037
+    },
+    {
+      "file_name": "J0224071-11-02过滤芯组件v2.dxf",
+      "sha256": "f83bb8cb43a515e05ee42210f08b085e5cfeb5d4192c2f8e90b33b36f7e849d8",
+      "size_bytes": 501076
+    },
+    {
+      "file_name": "J0224071-11捕集器组件v1.dxf",
+      "sha256": "2bd19cd83113f791177a27d84c74fc897e88179e43dd1d97d8a9cf8e94cb076a",
+      "size_bytes": 754900
+    },
+    {
+      "file_name": "J0224071-11捕集器组件v2.dxf",
+      "sha256": "46d862601525b35448c41c5d69fa148b498f3cab932d89a3f9cfede77b8eed14",
+      "size_bytes": 761795
+    },
+    {
+      "file_name": "J0225001-09-04旋转组件v1.dxf",
+      "sha256": "370071718d396917d03fd88ffaf9b25d263a5e02db5331e3d878d0e7868812f2",
+      "size_bytes": 699455
+    },
+    {
+      "file_name": "J0225001-09-04旋转组件v2.dxf",
+      "sha256": "8d262368e38487ff70eaa63cc53c501d7d92194b20cc17f51f777527688b5d85",
+      "size_bytes": 699547
+    },
+    {
+      "file_name": "J0225004-04-04轴头组件v1.dxf",
+      "sha256": "6da9133dabb617ebd71e156e5aaae1943df5a84b8f4d30a28daeef58e57f7edc",
+      "size_bytes": 838133
+    },
+    {
+      "file_name": "J0225004-04-04轴头组件v2.dxf",
+      "sha256": "8f10dfd64355c3bfa1abb99710cebbb9e3ec68c0beaad53edf73ccc3719b0bb4",
+      "size_bytes": 838044
+    },
+    {
+      "file_name": "J0225004-04-05下封板v1.dxf",
+      "sha256": "e2369cbe7bf56e8a7bd0cbd6ddcc1f08b4e1040006e4e374c8064d7e050ce074",
+      "size_bytes": 459168
+    },
+    {
+      "file_name": "J0225004-04-05下封板v2.dxf",
+      "sha256": "12f1f41bf9f80496dddd58481cdc6fc713565acc1275ed3d03742fbd9aa0d173",
+      "size_bytes": 459166
+    },
+    {
+      "file_name": "J0225004-04搅拌桨组件v1.dxf",
+      "sha256": "e58378fd288dd08ed34d3160f46bbc8e25ded58c84028424495906848483a8c1",
+      "size_bytes": 758991
+    },
+    {
+      "file_name": "J0225004-04搅拌桨组件v2.dxf",
+      "sha256": "69751aba79952673c1b0a48a5411d69e72dabdb13f63e424ff33de4a79d8ec40",
+      "size_bytes": 758475
+    },
+    {
+      "file_name": "J0225004-08搅拌轴组件v1.dxf",
+      "sha256": "06803aaccb439c00514bbbc63cceaf5e4a66330f4a074d5cf319ca96b44f6cf8",
+      "size_bytes": 768585
+    },
+    {
+      "file_name": "J0225004-08搅拌轴组件v2.dxf",
+      "sha256": "2f3f91b738a86cc1516a2d2fed2f69b895cd03db976051cdffa1b221332804bd",
+      "size_bytes": 768573
+    },
+    {
+      "file_name": "J0225009-04-03阀体v1.dxf",
+      "sha256": "dc415dc0c24c7a1a2b74ff89e0f4683e85061b81b8bac8dff77b83010188470c",
+      "size_bytes": 1259288
+    },
+    {
+      "file_name": "J0225009-04-03阀体v2.dxf",
+      "sha256": "bb29fc98132a22f674138e5d921cc4875d29ca8f38bd34c1dfcf44ede60cdf46",
+      "size_bytes": 1262790
+    },
+    {
+      "file_name": "J0225034-05罐体部分v1.dxf",
+      "sha256": "987de5c71d7816e73a1fd196df203844f16e0956e0aa5d090d4fe7aad6766601",
+      "size_bytes": 6395986
+    },
+    {
+      "file_name": "J0225034-05罐体部分v2.dxf",
+      "sha256": "0b360ae87be6713c4c8e7850dabfe4d7e5853d27dab7943f7a339d76b57762ea",
+      "size_bytes": 6398369
+    },
+    {
+      "file_name": "J0225047-04罐体部分v1.dxf",
+      "sha256": "30359704dbed61d108b3f4433a9d79956b5f2e20861bb3aa526d538e61585cb9",
+      "size_bytes": 4810339
+    },
+    {
+      "file_name": "J0225047-04罐体部分v2.dxf",
+      "sha256": "670a88d87a6cde962a5a0bf8a7fce5ab4c92658019df22ab0eaeff464bba0016",
+      "size_bytes": 4847361
+    },
+    {
+      "file_name": "J0225047-04罐体部分v3.dxf",
+      "sha256": "e7e6f9080eddbd9a40f767a63ba7bbb3b2e63af9a91c45a2ef28ba90295d97d1",
+      "size_bytes": 4841455
+    },
+    {
+      "file_name": "J0225048-02-07侧推料组件v1.dxf",
+      "sha256": "9dcb0f9fd310810be268c9c05706ea8d5a93d7b157a0c5bbc9b9be51fa451f00",
+      "size_bytes": 1916001
+    },
+    {
+      "file_name": "J0225048-02-07侧推料组件v2.dxf",
+      "sha256": "bd9ab96c27d9e453f36814d50c4af05548bda805057fb09c1c39b1e03889f477",
+      "size_bytes": 2027658
+    },
+    {
+      "file_name": "J0225054-15-01支承座v1.dxf",
+      "sha256": "be1706da2ac7f2127e7615f6b049423b68e4a8490e96c23b481154f9afb7832f",
+      "size_bytes": 799577
+    },
+    {
+      "file_name": "J0225054-15-01支承座v2.dxf",
+      "sha256": "ccab2ed978a6271fd685518cb1e512b0eb45a8b69a53f1d8cf047dc227054a89",
+      "size_bytes": 828230
+    },
+    {
+      "file_name": "J0225054-15罐体支腿v1.dxf",
+      "sha256": "a5875ae07299bd660c0beff574f1b22e49408939db6e5f8a8e82e6889cffc173",
+      "size_bytes": 777500
+    },
+    {
+      "file_name": "J0225054-15罐体支腿v2.dxf",
+      "sha256": "89b0c18f924f257134e3ad575b250c2417b6a6ab9ef5c83acea9fff813b2fdf5",
+      "size_bytes": 770972
+    },
+    {
+      "file_name": "J0525002-04-02过滤托架v1.dxf",
+      "sha256": "b0f9ed403734d8a8a69d5f1f94630a085efd69a1dea0bffa86350cafbb014e8c",
+      "size_bytes": 1567647
+    },
+    {
+      "file_name": "J0525002-04-02过滤托架v2.dxf",
+      "sha256": "141f4cc2e0b4eaf2775ff7020182673a946b1e347d3525b7f177f6da3fa1ec64",
+      "size_bytes": 1590406
+    },
+    {
+      "file_name": "J0525002-04-02过滤托架v3.dxf",
+      "sha256": "5d6bd9bb750e02dadcb41940100d1e0f19e7663cf7a7d30403d9d9fc9cd487d2",
+      "size_bytes": 1589545
+    },
+    {
+      "file_name": "J0525002-04-02过滤托架v4.dxf",
+      "sha256": "d0a6dfc6e68863e530248b06459d82c30b4d3681320feec9ba5bcc30b369f6f9",
+      "size_bytes": 1591065
+    },
+    {
+      "file_name": "J0724006-01下锥体组件v1.dxf",
+      "sha256": "5bc185651c2c489ec9accb07de8ca97d148c7d33830932afe65effc465058f36",
+      "size_bytes": 3475839
+    },
+    {
+      "file_name": "J0724006-01下锥体组件v2.dxf",
+      "sha256": "34daf6c467cad635500cba686bf0ee24f72e01e0bceebcc686a9312e1be62ee0",
+      "size_bytes": 3476637
+    },
+    {
+      "file_name": "J0724006-01下锥体组件v3.dxf",
+      "sha256": "0b4bc6b4963f3444ed97ab02bb9837214afa0301276e19ecc8547cadaa734c89",
+      "size_bytes": 3538034
+    },
+    {
+      "file_name": "J0724006-02搅拌器组件v1.dxf",
+      "sha256": "f57e41d6c5abe8199e70479741f95aacff5adf6f740cde9b889be2fb331fe30f",
+      "size_bytes": 3973386
+    },
+    {
+      "file_name": "J0724006-02搅拌器组件v2.dxf",
+      "sha256": "0741598235b6b2800931036a3460fcb43bcf6086edd03df7b3eff7c7d7d9e88e",
+      "size_bytes": 4041550
+    },
+    {
+      "file_name": "J0724006-05上封头组件v1.dxf",
+      "sha256": "4bb90222c6172e91010ae6c81d9d9042a02949b00b0f171f679e3fb95d9d3dc6",
+      "size_bytes": 2915182
+    },
+    {
+      "file_name": "J0724006-05上封头组件v2.dxf",
+      "sha256": "4fee4d5bd984561bc642e3e4b1f34e03bde3fb72e97f4ceb756436afc07cd874",
+      "size_bytes": 2779671
+    },
+    {
+      "file_name": "J0724006-05上封头组件v3.dxf",
+      "sha256": "ae3f93f3c3f7dec24ddde1c871a16279deeaa3a7708a1c161f05930100a9e3f7",
+      "size_bytes": 2819914
+    },
+    {
+      "file_name": "J1424042-00出料正压隔离器v1.dxf",
+      "sha256": "6901d2aca72654db0ca0f6ce527bd439c713acf9c3fa3a51cca35a29e2cf31d4",
+      "size_bytes": 2683151
+    },
+    {
+      "file_name": "J1424042-00出料正压隔离器v2-yuantus.dxf",
+      "sha256": "fe77c1caa35a1f29ce88c80a136904ac167afa64d3c2876138db5d7c6050fecb",
+      "size_bytes": 2684598
+    },
+    {
+      "file_name": "J1424042-51-01-08对接法兰v1.dxf",
+      "sha256": "385eb99dceb0b23457c39348f3afc32c61d9fe3a7ad47da333011f2d8232e5f7",
+      "size_bytes": 473485
+    },
+    {
+      "file_name": "J1424042-51-01-08对接法兰v2.dxf",
+      "sha256": "55d3ed0bbfca16dbc95a3ba9fa2624c4e6265b507b83c0291e4fa9815f2eeaf1",
+      "size_bytes": 486850
+    },
+    {
+      "file_name": "J2824002-06上封头组件v1.dxf",
+      "sha256": "445a24193da68de8d1bbbd2ac624b2aa81d5261d7a82b493f16f4a5b5e82fd83",
+      "size_bytes": 934789
+    },
+    {
+      "file_name": "J2824002-06上封头组件v2.dxf",
+      "sha256": "c1373df1f88799df9873a11eeda59c3a33ea17bd4322b8507ec9e95710680340",
+      "size_bytes": 1046205
+    },
+    {
+      "file_name": "J2825002-06上筒体组件v1.dxf",
+      "sha256": "1b4ad97b9cd2f101d663f4f7a552019633f0aac746506912e7814fccd5974b96",
+      "size_bytes": 1234847
+    },
+    {
+      "file_name": "J2825002-06上筒体组件v2.dxf",
+      "sha256": "bc9a8530936ff08eb847a02672e144ad82bc614f69e093e94adaadf1120c87e5",
+      "size_bytes": 1260674
+    },
+    {
+      "file_name": "J2825002-06上筒体组件v3.dxf",
+      "sha256": "6ee5202b6430c579c875d099d4ecbabcd6b6b3a6146de2ffd314ca64585fc740",
+      "size_bytes": 1253593
+    },
+    {
+      "file_name": "J2825002-09下轴承支架组件v1.dxf",
+      "sha256": "46eb0182836a097cfc6dd699776f0eb13ab53e9ce534fb1f7ffbc20e3bc8b6c7",
+      "size_bytes": 1090419
+    },
+    {
+      "file_name": "J2825002-09下轴承支架组件v2.dxf",
+      "sha256": "6c3c886e94751be19a20845506470f61c045f2022a16139914724b8bbe6f94ab",
+      "size_bytes": 1099200
+    },
+    {
+      "file_name": "J2825003-05下筒体组件v1.dxf",
+      "sha256": "f9f1e713d61f72454dd61312c126cf4ecbd0e4d767d472c1d2f05d02990ba78e",
+      "size_bytes": 1347605
+    },
+    {
+      "file_name": "J2825003-05下筒体组件v2.dxf",
+      "sha256": "2a98c05e93590087343528ea4edff728ee62f6845b261ffd366a1fcbc9297e2d",
+      "size_bytes": 1356311
+    },
+    {
+      "file_name": "J2925001-00再沸器v1.dxf",
+      "sha256": "0c972eadd4b106c4bd3132abc550d3c8d00a45b4fe0aa04ff45b243fa0328786",
+      "size_bytes": 4365891
+    },
+    {
+      "file_name": "J2925001-00再沸器v2.dxf",
+      "sha256": "888d8e177d44eb3a472dfe721dd5cc95d1444bf6615f3cae19e31f35d5ca36d2",
+      "size_bytes": 4442900
+    },
+    {
+      "file_name": "J2925001-00再沸器v3.dxf",
+      "sha256": "d286cea919962e01328925205401f8fa230dfbe83e33fc529f698b9ab86b13fb",
+      "size_bytes": 4393192
+    },
+    {
+      "file_name": "J2925001-01-01人孔法兰v1.dxf",
+      "sha256": "090dd3e2ea8970938cadbb11d981a19bd3d9c00ac231c27cc24e53cf6b011658",
+      "size_bytes": 378091
+    },
+    {
+      "file_name": "J2925001-01-01人孔法兰v2.dxf",
+      "sha256": "6cbac19d11c62a6f8bf2537a8e5508be48dc5743c809722fe525728a90dc88c3",
+      "size_bytes": 382599
+    },
+    {
+      "file_name": "J2925001-01人孔v1.dxf",
+      "sha256": "150f0d17dd26489794857f941637c82ed43c8bc70893bcf7e719287e09243f93",
+      "size_bytes": 726072
+    },
+    {
+      "file_name": "J2925001-01人孔v2.dxf",
+      "sha256": "9cb368f0515a192ac907641ac7eba128f2ff1ce7664d19e01c8b269eeccf5d4c",
+      "size_bytes": 736769
+    },
+    {
+      "file_name": "J2925001-05管束v1.dxf",
+      "sha256": "fffedf7801c5572729dce15a4376ee179be567d18285411bc85ec581d9da06aa",
+      "size_bytes": 1289373
+    },
+    {
+      "file_name": "J2925001-05管束v2.dxf",
+      "sha256": "1adc2ded1dc228a917d3d55af680a4d0290500749d2da733e47c8fda2ef1a8b5",
+      "size_bytes": 1336882
+    },
+    {
+      "file_name": "J2925004-04-01底板v1.dxf",
+      "sha256": "ee6351a613772fcf5b530254691a0415f28b6f367c5c739e33da5e788524352d",
+      "size_bytes": 1806748
+    },
+    {
+      "file_name": "J2925004-04-01底板v2.dxf",
+      "sha256": "6e7c5163862fc22bdfa5a1c7c8b7234efe90cf2381c82f22eac60ccca658d338",
+      "size_bytes": 1811161
+    },
+    {
+      "file_name": "J3025001-12轴承座v1.dxf",
+      "sha256": "88aea7fc6d4b6296290f7f6e8c9c170183648378ec984ceac7a3af38af82dd1a",
+      "size_bytes": 589737
+    },
+    {
+      "file_name": "J3025001-12轴承座v2.dxf",
+      "sha256": "f121b0e3af5d3d11eaee49ae48f18c92bd4fd152368e60a5cb9d2cd417d7f7ac",
+      "size_bytes": 600240
+    },
+    {
+      "file_name": "LTJ012303106-0001超声波法兰.dxf",
+      "sha256": "5f47302f4f5a0614c2fa2b0b264d965898cfca88bbe6762b59d7c8bb2549cc1f",
+      "size_bytes": 629349
+    },
+    {
+      "file_name": "LTJ012303106-0001超声波法兰v1.dxf",
+      "sha256": "76e60676101008aeabbd389340aba074f8724872a85064785b5f077223f32d90",
+      "size_bytes": 622572
+    },
+    {
+      "file_name": "LTJ012303106-0001超声波法兰v2.dxf",
+      "sha256": "52fc14559765353fdcae8263b96e65273ab95d8166a58dfd0df817deda7a197c",
+      "size_bytes": 625671
+    },
+    {
+      "file_name": "LTJ012303106-0030连接法兰(大)v1.dxf",
+      "sha256": "2fa54a2956ea252988a57abc58b087d303d39a2b8fb983f3fbaffd1bc927655b",
+      "size_bytes": 714587
+    },
+    {
+      "file_name": "LTJ012303106-0030连接法兰(大)v2.dxf",
+      "sha256": "ff209fd610a81015ec62b240d38493e47e58a14e52ca83a9305b5e044123b2c5",
+      "size_bytes": 714591
+    },
+    {
+      "file_name": "LTJ012306102-0084调节螺栓v1.dxf",
+      "sha256": "76948b80554b2e4dbc8053023de095002f04b933cbdda34502506b0238cd029a",
+      "size_bytes": 426399
+    },
+    {
+      "file_name": "LTJ012306102-0084调节螺栓v2.dxf",
+      "sha256": "5fbc733c07395ccc8b48f5f71dfba54470c4f5e2c0f222261eefab060757d42c",
+      "size_bytes": 527749
+    },
+    {
+      "file_name": "比较_LTJ012306102-0084调节螺栓v1 vs LTJ012306102-0084调节螺栓v2.dxf",
+      "sha256": "ee38ab0bb1f2e2b689dda847e4a1a9e5c9a242c0c9e52ce3860886561e98c224",
+      "size_bytes": 456157
+    }
+  ]
+}
