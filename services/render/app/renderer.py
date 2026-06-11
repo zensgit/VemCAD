@@ -2,6 +2,7 @@
 render_cli invocation, saturation back-pressure (plan A2a/A3)."""
 
 import asyncio
+import json
 import re
 import tempfile
 from dataclasses import dataclass
@@ -145,6 +146,7 @@ class RenderService:
             src = workdir / "input.dxf"
             src.write_bytes(content)
             out = workdir / ("out." + params.fmt)
+            cli_report_path = workdir / "render_report.json"
             argv = [
                 str(self.settings.render_cli),
                 "--input", str(src),
@@ -152,11 +154,13 @@ class RenderService:
                 "--width", str(params.width),
                 "--height", str(params.height),
                 "--bg", params.bg,
+                "--report", str(cli_report_path),
             ]
+            # A5: feed the per-tenant font directory to render_cli (B1 --font-dir),
+            # so drawing fonts the host OS lacks resolve from our store. The dir's
+            # fingerprint is already in the cache key, so changing fonts re-renders.
             if self.settings.font_dir:
-                # Forward-compat: render_cli grows --font-dir in B1; harmless to
-                # omit until then — the fingerprint is already in the cache key.
-                pass
+                argv += ["--font-dir", str(self.settings.font_dir)]
             res = self.sandbox.run(argv, workdir, timeout_s=timeout_s)
             if res.timed_out:
                 raise RenderFailed("render timed out", "timeout after %.0fs" % self.settings.timeout_s)
@@ -167,20 +171,27 @@ class RenderService:
                 )
             if not out.is_file() or out.stat().st_size == 0:
                 raise RenderFailed("render produced no output", res.stderr.strip())
+            cli_report = None
+            if cli_report_path.is_file():
+                try:
+                    cli_report = json.loads(cli_report_path.read_text("utf-8"))
+                except (OSError, ValueError):
+                    cli_report = None
             report = {
-                # Service-side audit record. The name deliberately differs from
-                # B1's renderer-emitted "vemcad.render_report" (view rect/scale,
-                # entity counts, font records), which will be embedded here
-                # under "render_cli_report" once render_cli grows it.
+                # Service-side audit record; B1's renderer-emitted
+                # "vemcad.render_report" (view rect/scale, counts, font records)
+                # is embedded under "render_cli_report".
                 "schema": "vemcad.render_service_report",
                 "schema_version": "0.1",
                 "params": params.as_dict(),
                 "content_sha256": content_sha,
                 "render_cli_sha256": self.cli_sha,
+                "font_dir": str(self.settings.font_dir) if self.settings.font_dir else None,
                 "font_fingerprint": self.font_fp,
                 "duration_s": round(res.duration_s, 3),
                 "network_isolated": res.network_isolated,
                 "render_cli_stdout": res.stdout.strip(),
+                "render_cli_report": cli_report,
             }
             return self.cache.put(key, params.fmt, out, report)
 
