@@ -1,0 +1,55 @@
+name: render-image
+
+# Phase 1 A6: build the render service image (heavy render_cli compile runs
+# here, not on dev machines) and smoke it. Publishes to GHCR on main.
+on:
+  pull_request:
+    paths:
+      - "services/render/**"
+      - ".github/workflows/render-image.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/render/**"
+
+jobs:
+  build-and-smoke:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive   # deps/cadgamefusion + its libdxfrw
+
+      - name: Fetch OFL 仿宋/楷体 fonts (best-effort)
+        run: bash services/render/tools/fetch_fonts.sh || true
+
+      - name: Build image
+        run: docker build -f services/render/Dockerfile -t vemcad-render:ci .
+
+      - name: Font layer smoke — CJK fonts present
+        run: |
+          docker run --rm --entrypoint fc-list vemcad-render:ci :lang=zh \
+            | tee /tmp/fc.txt
+          grep -qi "noto" /tmp/fc.txt || (echo "no Noto CJK in image" && exit 1)
+
+      - name: Service smoke — healthz + render a constructed sample
+        run: |
+          docker run -d --network none --name r -p 127.0.0.1:8077:8077 vemcad-render:ci
+          for i in $(seq 1 30); do
+            if docker exec r python3 -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8077/healthz')" 2>/dev/null; then ok=1; break; fi
+            sleep 2
+          done
+          docker exec r python3 -c "import urllib.request,json;print(urllib.request.urlopen('http://127.0.0.1:8077/healthz').read().decode())"
+          test -n "${ok:-}" || (docker logs r && exit 1)
+          docker rm -f r
+
+      - name: Push to GHCR (main only)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          IMG=ghcr.io/${{ github.repository_owner }}/vemcad-render:$(git rev-parse --short HEAD)
+          docker tag vemcad-render:ci "$IMG"
+          docker push "$IMG"
