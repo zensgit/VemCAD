@@ -23,8 +23,21 @@ from typing import Callable, Dict, List, Optional
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from compare import compare  # noqa: E402
+import numpy as np  # noqa: E402
+from PIL import Image  # noqa: E402
+
+from compare import compare, INK_FLOOR  # noqa: E402
 from baseline import BaselineStore  # noqa: E402
+
+
+def _ink_fraction(path: Path) -> float:
+    """Fraction of non-background pixels (background = frame-border median)."""
+    g = np.asarray(Image.open(path).convert("L"), dtype=np.float64)
+    b = 3
+    edge = np.concatenate([g[:b, :].ravel(), g[-b:, :].ravel(),
+                           g[:, :b].ravel(), g[:, -b:].ravel()])
+    bg = float(np.median(edge))
+    return float((np.abs(g - bg) > 32.0).mean())
 
 # (drawing dict, output png path) -> True on a successful non-empty render.
 RenderFn = Callable[[dict, Path], bool]
@@ -59,30 +72,44 @@ def run(golden: dict, baselines: BaselineStore, render_fn: RenderFn,
         if not render_fn(d, out):
             row.update(outcome="FAIL", reason="render-failed", band="fallback")
             rows.append(row); continue
-        # Non-blank check is always enforced (the A8 gate, folded in here).
+        # Non-blank check (the A8 gate, folded in): a blank render of a gated
+        # drawing fails regardless of any baseline.
+        if _ink_fraction(out) < INK_FLOOR:
+            row.update(outcome="BLANK", reason="render produced a blank image", band="fallback")
+            rows.append(row); continue
         base = baselines.best(name)
         if base is None:
             row.update(outcome="NO-BASELINE", band="n/a",
                        reason="no baseline recorded (run --update-baseline self)")
             rows.append(row); continue
         base_img = out_dir / ("_baseline_" + name + ".png")
-        # The baseline image is supplied by the artifact store; here it is the
-        # previously recorded render. Verify bytes match the manifest sha256.
+        # Baseline image comes from the artifact store / a prior recording run.
+        # A gated drawing whose baseline image is absent/mismatched FAILS CLOSED
+        # — never silently passes (else CI goes green comparing nothing).
         if not base_img.is_file() or not baselines.verify_image(name, base.tier, base_img):
-            row.update(outcome="BASELINE-MISSING", band="n/a", tier=base.tier,
+            row.update(outcome="BASELINE-MISSING", tier=base.tier,
+                       band="fallback" if gate else "n/a",
                        reason="baseline image absent/mismatched in artifact store")
             rows.append(row); continue
-        res = compare(base_img, out)
-        row.update(outcome="OK", tier=base.tier, score=res.geometry_ink_iou,
+        res = compare(base_img, out, capture_method=getattr(base, "capture_method", "offscreen-render"))
+        row.update(outcome="OK", tier=base.tier, score=res.ink_iou,
                    ssim=res.ssim, band=res.band, trust=res.trust,
+                   aspect_delta=res.aspect_delta, color_dist=res.color_dist,
                    comparable=res.comparable, dx=res.dx, dy=res.dy)
         rows.append(row)
 
-    # Gated failure = a gate-trust comparison in the fallback band, or a render
-    # failure on a gated drawing. NO-BASELINE / advisory / record never gate.
-    failures = [r for r in rows if r["gate"] and (
-        r.get("reason") == "render-failed"
-        or (r.get("trust") == "gate" and r.get("band") == "fallback"))]
+    # Gated failure: a gated drawing that render-failed, came out blank, has a
+    # missing/mismatched baseline, or whose gate-trust comparison is fallback.
+    # advisory/record trust and NO-BASELINE never gate.
+    def _is_gated_failure(r: dict) -> bool:
+        if not r["gate"]:
+            return False
+        if r.get("reason") in ("render-failed", "render produced a blank image"):
+            return True
+        if r.get("outcome") == "BASELINE-MISSING":
+            return True
+        return r.get("trust") == "gate" and r.get("band") == "fallback"
+    failures = [r for r in rows if _is_gated_failure(r)]
     return {
         "schema": "vemcad.render_regression_report",
         "total": len(rows), "gated_failures": len(failures),

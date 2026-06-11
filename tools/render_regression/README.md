@@ -44,4 +44,13 @@
 - `golden/golden.json` —— D1 金样集 v1（2D 子集）；FIELD/ACAD_TABLE/XREF/天正
   类列于 `deferred`（插件产出或 Phase 2）。D3 负责把 pytest + 端到端接入 CI。
 
-测试：`python3 -m pytest tools/render_regression/tests -q`（18，合成图，无需 render_cli）。
+**已知缺口（对冻结计划 §5 的诚实偏差，待 B 线补）**：D2 v0 **没有文字/几何
+分离打分**——§5 要求"文字区/几何区分开打分（字体替换期几何分才门控）"，但
+真正的分离需要渲染端提供文字掩膜（render report 现仅给文字计数，非像素区域）。
+v0 的门控指标 `ink_iou` 是文字+几何合并值（**故不命名 geometry_***），且文字
+密集金样置 `gate=false`，使字体替换期不会误判门控。补救方向：render_cli 输出
+文字 bbox/分层渲染 → 拆 `text_iou` + `geometry_iou`、仅几何门控。另外 ink_iou
+对**颜色**与**纵横比**回归本身盲（灰度+bbox 归一），故 compare 另出
+`color_dist`/`aspect_delta`，超阈值把 pass 降级 review，不让其静默通过。
+
+测试：`python3 -m pytest tools/render_regression/tests -q`（23，合成图，无需 render_cli）。
