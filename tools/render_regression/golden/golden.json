@@ -1,0 +1,37 @@
+{
+  "schema": "vemcad.render_golden",
+  "schema_version": "0.1",
+  "note": "D1 golden set v1 (Phase 1, 2D subset). Vendor-free constructed DXF. FIELD / ACAD_TABLE / XREF / 天正 categories are plugin-produced or hand-unauthorable and are deferred (see deferred[]); the lines-text BOM stands in for the parts-list category, which is the dominant real-world 明细栏 form.",
+  "drawings": [
+    {"name": "multi_frame", "category": "multi-frame",
+     "render": {"width": 1600, "height": 1131, "bg": "white"},
+     "expect": "non-blank", "gate": true,
+     "notes": "一图多框: two A4 frames side by side in model space."},
+    {"name": "lines_text_bom", "category": "parts-list-lines-text",
+     "render": {"width": 1200, "height": 800, "bg": "white"},
+     "expect": "non-blank", "gate": true,
+     "notes": "明细栏 as lines+text (not an ACAD_TABLE object) — the common form."},
+    {"name": "cjk_text", "category": "cjk-text",
+     "render": {"width": 1600, "height": 800, "bg": "white"},
+     "expect": "non-blank", "gate": true,
+     "notes": "Font resolution; geometry-region gates during the font-substitution period."},
+    {"name": "garbage_extents", "category": "garbage-extents",
+     "render": {"width": 1200, "height": 600, "bg": "white", "window": "0,0,200,100"},
+     "expect": "non-blank", "gate": true,
+     "notes": "Stray entity at 1e6 blows $EXTMAX; B5 --window frames the sheet rect."},
+    {"name": "block_ellipse", "category": "block-ellipse",
+     "render": {"width": 800, "height": 500, "bg": "dark"},
+     "expect": "non-blank", "gate": true,
+     "notes": "Guards the #385 block-expanded-ellipse path."},
+    {"name": "wide_coords", "category": "off-origin",
+     "render": {"width": 800, "height": 400, "bg": "white"},
+     "expect": "non-blank", "gate": true,
+     "notes": "Frame far off origin (5e6); extents fit must still frame it."}
+  ],
+  "deferred": [
+    {"category": "FIELD", "reason": "needs an ACAD_FIELD dict — plugin-produced; render-side renders the cached text fine, metadata assertion needs the plugin."},
+    {"category": "ACAD_TABLE", "reason": "TABLE rendering is Phase 2; golden would be metadata/BOM-only, not a fidelity score."},
+    {"category": "XREF", "reason": "needs an external ref + bind; plugin produces the twin. Golden expectation = incomplete-preview declaration (validator-side, covered by test_validator)."},
+    {"category": "tiangong-proxy", "reason": "X2 pending — needs a real 天正 sample from the dedup corpus."}
+  ]
+}
