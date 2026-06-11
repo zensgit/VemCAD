@@ -30,4 +30,7 @@ fetch() {
 
 fetch "$ZQFS_URL" "ZhuqueFangsong-Regular.ttf"
 fetch "$LXGW_URL" "LXGWWenKai-Regular.ttf"
-echo "done. (verify OFL license files are bundled before redistribution)"
+# OFL requires the license to travel with the font on redistribution.
+fetch "https://raw.githubusercontent.com/TrionesType/zhuque/master/LICENSE" "ZhuqueFangsong-OFL.txt"
+fetch "https://raw.githubusercontent.com/lxgw/LxgwWenKai/main/OFL.txt" "LXGWWenKai-OFL.txt"
+echo "done."
