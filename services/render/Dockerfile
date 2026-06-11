@@ -36,6 +36,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 # package — guarantees 黑体/宋体 + CJK fallback without a network fetch).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         libqt6gui6 libqt6svg6 libqt6core6 \
+        qt6-qpa-plugins \
         libgl1 libegl1 \
         fontconfig fonts-noto-cjk \
         ca-certificates \
