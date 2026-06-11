@@ -37,7 +37,9 @@ jobs:
 
       - name: Service smoke — healthz + render a constructed sample
         run: |
-          docker run -d --network none --name r -p 127.0.0.1:8077:8077 vemcad-render:ci
+          # --network none isolates the render (port publish would be ignored);
+          # the smoke reaches uvicorn via in-container loopback through docker exec.
+          docker run -d --network none --name r vemcad-render:ci
           for i in $(seq 1 30); do
             if docker exec r python3 -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8077/healthz')" 2>/dev/null; then ok=1; break; fi
             sleep 2

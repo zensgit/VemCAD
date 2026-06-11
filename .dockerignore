@@ -5,8 +5,8 @@
 !services/render
 !deps/cadgamefusion
 **/.git
-**/build
-**/build_*
+**/build/
+**/build_*/
 **/__pycache__
 **/.pytest_cache
 **/vcpkg_installed

@@ -26,7 +26,7 @@ RUN cmake -S /src/cadgamefusion -B /build -G Ninja \
         -DCMAKE_BUILD_TYPE=Release -DBUILD_EDITOR_QT=ON \
     && cmake --build /build --target render_cli -j "$(nproc)" \
     && cp /build/editor/qt/render_cli /usr/local/bin/render_cli \
-    && /usr/local/bin/render_cli --help >/dev/null 2>&1 || true
+    && ( /usr/local/bin/render_cli --help >/dev/null 2>&1 || true )
 
 # ── Stage 2: fonts — runtime base with CJK fonts (verifiable standalone) ────
 FROM debian:bookworm-slim AS fonts
