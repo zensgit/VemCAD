@@ -1,10 +1,12 @@
 """FastAPI app for the render service (plan A2a/A3). Factory: create_app()."""
 
+import hashlib
 from contextlib import asynccontextmanager
 from typing import Optional
 
 import anyio
 from fastapi import FastAPI, File, Query, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 
 from .config import Settings, load_settings
@@ -33,10 +35,25 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app = FastAPI(title="vemcad-render", version="0.1.0", lifespan=lifespan)
     app.state.svc = svc
 
+    # Every error leaves through the same structured envelope — including
+    # FastAPI's own request validation (e.g. width=abc), which would
+    # otherwise return its {"detail": [...]} shape.
+    @app.exception_handler(RequestValidationError)
+    async def _validation_error(_: Request, exc: RequestValidationError):
+        errors = exc.errors()
+        first = errors[0] if errors else {}
+        loc = ".".join(str(p) for p in first.get("loc", ()))
+        return _error(422, "BAD_PARAMS", ("%s: %s" % (loc, first.get("msg", "invalid request"))).strip(": "))
+
+    @app.exception_handler(Exception)
+    async def _internal_error(_: Request, exc: Exception):
+        return _error(500, "INTERNAL", "%s: %s" % (type(exc).__name__, exc))
+
     @app.get("/healthz")
     async def healthz():
         smoke = state["smoke"]
         ok = svc.available and bool(smoke.get("ok"))
+        # 503 when degraded so probes/LBs can key on the status code.
         body = {
             "status": "ok" if ok else "degraded",
             "render_cli": {
@@ -52,7 +69,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             },
             "workers": {"max": cfg.workers, "active": svc.active},
         }
-        return JSONResponse(status_code=200, content=body)
+        return JSONResponse(status_code=200 if ok else 503, content=body)
 
     @app.post("/render")
     async def render(
@@ -75,8 +92,17 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         if name.endswith(".dwg"):
             return _error(415, "UNSUPPORTED_INPUT", "v0 accepts DXF only (send the twin-dxf)")
 
+        # Early reject when the client declares an oversized body.
+        declared = request.headers.get("content-length")
+        if declared and declared.isdigit() and int(declared) > cfg.max_upload_bytes + 64 * 1024:
+            return _error(
+                413, "PAYLOAD_TOO_LARGE",
+                "input exceeds %d bytes (/render direct-upload cap)" % cfg.max_upload_bytes,
+            )
+
         chunks = []
         total = 0
+        hasher = hashlib.sha256()  # hash incrementally — keeps big hashes off the loop later
         while True:
             chunk = await file.read(_READ_CHUNK)
             if not chunk:
@@ -87,13 +113,14 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
                     413, "PAYLOAD_TOO_LARGE",
                     "input exceeds %d bytes (/render direct-upload cap)" % cfg.max_upload_bytes,
                 )
+            hasher.update(chunk)
             chunks.append(chunk)
         if total == 0:
             return _error(422, "EMPTY_INPUT", "empty upload")
         content = b"".join(chunks)
 
         try:
-            path, key, hit = await svc.render_bytes(content, params)
+            path, key, hit = await svc.render_bytes(content, params, content_sha=hasher.hexdigest())
         except BusyError:
             return _error(429, "BUSY", "render workers saturated, retry later")
         except RenderFailed as e:

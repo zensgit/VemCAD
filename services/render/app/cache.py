@@ -72,20 +72,31 @@ class RenderCache:
         except (OSError, ValueError):
             return None
 
-    def put(self, key: str, fmt: str, src: Path, report: dict) -> Path:
-        d = self._dir(key)
-        d.mkdir(parents=True, exist_ok=True)
-        dst = self.artifact_path(key, fmt)
-        # Atomic publish: copy to a temp name in the same dir, then rename.
-        fd, tmp = tempfile.mkstemp(dir=str(d), suffix=".tmp")
+    def _atomic_write(self, dst: Path, write_fn) -> None:
+        fd, tmp = tempfile.mkstemp(dir=str(dst.parent), suffix=".tmp")
         try:
-            with os.fdopen(fd, "wb") as out, open(src, "rb") as inp:
-                for chunk in iter(lambda: inp.read(1 << 20), b""):
-                    out.write(chunk)
+            with os.fdopen(fd, "wb") as out:
+                write_fn(out)
             os.replace(tmp, dst)
         finally:
             if os.path.exists(tmp):
                 os.unlink(tmp)
-        rp = self.report_path(key)
-        rp.write_text(json.dumps(report, ensure_ascii=False, indent=1), "utf-8")
+
+    def put(self, key: str, fmt: str, src: Path, report: dict) -> Path:
+        d = self._dir(key)
+        d.mkdir(parents=True, exist_ok=True)
+        # Report first (atomically), so a published artifact never exists
+        # without its audit record; both writes are temp+rename, so a lost
+        # same-key race simply re-publishes identical content (last wins).
+        payload = json.dumps(report, ensure_ascii=False, indent=1).encode("utf-8")
+        self._atomic_write(self.report_path(key), lambda out: out.write(payload))
+
+        dst = self.artifact_path(key, fmt)
+
+        def copy(out):
+            with open(src, "rb") as inp:
+                for chunk in iter(lambda: inp.read(1 << 20), b""):
+                    out.write(chunk)
+
+        self._atomic_write(dst, copy)
         return dst
