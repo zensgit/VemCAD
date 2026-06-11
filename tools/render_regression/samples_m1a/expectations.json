@@ -1,0 +1,4 @@
+{
+ "garbage_extents.dxf": "blank-ok",
+ "degenerate_empty.dxf": "error"
+}
