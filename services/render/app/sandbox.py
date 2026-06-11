@@ -1,10 +1,11 @@
 """Subprocess sandbox for untrusted-input rendering (plan A3).
 
 The Linux canonical deployment adds container-level network isolation
-(`--network none`); on macOS dev machines we opportunistically wrap with
-`sandbox-exec` (deny network) and always record whether isolation applied.
-The same runner class is reused by the package validator and the regression
-comparator (plan A3: all payload parsing inside the sandbox worker class).
+(`--network none`, asserted via RENDER_ASSUME_NO_NETWORK=1); on macOS dev
+machines we opportunistically wrap with `sandbox-exec` (deny network) and
+always record whether isolation applied. The same runner class is reused by
+the package validator and the regression comparator (plan A3: all payload
+parsing inside the sandbox worker class).
 """
 
 import os
@@ -16,10 +17,22 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Optional
 
 _MACOS_DENY_NET_PROFILE = "(version 1)(allow default)(deny network*)"
 _TAIL = 4096
+
+# Qt/fontconfig need these to reach a non-system Qt build and the font cache;
+# scrubbing them breaks (or silently degrades) rendering on the Linux image.
+_ENV_PASSTHROUGH = (
+    "LD_LIBRARY_PATH",
+    "QT_PLUGIN_PATH",
+    "QT_QPA_FONTDIR",
+    "FONTCONFIG_PATH",
+    "FONTCONFIG_FILE",
+    "LANG",
+    "LC_ALL",
+)
 
 
 @dataclass
@@ -33,13 +46,21 @@ class SandboxResult:
 
 
 class SandboxRunner:
-    def __init__(self, timeout_s: float, mem_limit_mb: int, allow_sandbox_exec: bool = True):
+    def __init__(
+        self,
+        timeout_s: float,
+        mem_limit_mb: int,
+        allow_sandbox_exec: bool = True,
+        cache_home: Optional[Path] = None,
+    ):
         self.timeout_s = timeout_s
         self.mem_limit_mb = mem_limit_mb
         self.allow_sandbox_exec = allow_sandbox_exec
+        # Persistent XDG cache (fontconfig) so every render does not rebuild
+        # the font cache inside a throwaway tempdir.
+        self.cache_home = cache_home
 
-    def _preexec(self):  # pragma: no cover - runs in the child
-        os.setsid()
+    def _limits(self):  # pragma: no cover - runs in the forked child
         mem = self.mem_limit_mb * 1024 * 1024
         for limit in (resource.RLIMIT_AS, resource.RLIMIT_DATA):
             try:
@@ -52,34 +73,53 @@ class SandboxRunner:
         except (ValueError, OSError):
             pass
 
-    def run(self, argv: List[str], workdir: Path) -> SandboxResult:
+    def _build_env(self, workdir: Path, extra_env: Optional[Dict[str, str]]) -> Dict[str, str]:
+        env = {
+            "QT_QPA_PLATFORM": "offscreen",
+            "HOME": str(workdir),
+            "TMPDIR": str(workdir),
+            "PATH": "/usr/bin:/bin",
+            "XDG_CACHE_HOME": str(self.cache_home or workdir),
+        }
+        for key in _ENV_PASSTHROUGH:
+            val = os.environ.get(key)
+            if val:
+                env[key] = val
+        if extra_env:
+            env.update(extra_env)
+        return env
+
+    def run(
+        self,
+        argv: List[str],
+        workdir: Path,
+        extra_env: Optional[Dict[str, str]] = None,
+        timeout_s: Optional[float] = None,
+    ) -> SandboxResult:
         wrapped = list(argv)
         network_isolated = False
         if sys.platform == "darwin" and self.allow_sandbox_exec and shutil.which("sandbox-exec"):
             wrapped = ["sandbox-exec", "-p", _MACOS_DENY_NET_PROFILE] + wrapped
             network_isolated = True
         elif sys.platform.startswith("linux"):
-            # Container-level `--network none` is asserted by deployment, not here.
+            # Container-level `--network none` is asserted by deployment.
             network_isolated = os.environ.get("RENDER_ASSUME_NO_NETWORK") == "1"
 
-        env = {
-            "QT_QPA_PLATFORM": "offscreen",
-            "HOME": str(workdir),
-            "TMPDIR": str(workdir),
-            "PATH": "/usr/bin:/bin",
-        }
+        timeout = timeout_s if timeout_s is not None else self.timeout_s
         start = time.monotonic()
         proc = subprocess.Popen(
             wrapped,
             cwd=str(workdir),
-            env=env,
+            env=self._build_env(workdir, extra_env),
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            preexec_fn=self._preexec,
+            errors="replace",
+            start_new_session=True,  # setsid in C — no thread-unsafe setsid in preexec
+            preexec_fn=self._limits,  # rlimits only; minimal post-fork body
         )
         try:
-            out, err = proc.communicate(timeout=self.timeout_s)
+            out, err = proc.communicate(timeout=timeout)
             timed_out = False
         except subprocess.TimeoutExpired:
             try:

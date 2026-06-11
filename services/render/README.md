@@ -45,3 +45,14 @@ python3 -m uvicorn app.main:app --factory --host 127.0.0.1 --port 8077
 | `RENDER_TIMEOUT_S` | 120 | 单次渲染超时 |
 | `RENDER_MEM_LIMIT_MB` | 2048 | 子进程地址空间上限（Linux 强制，macOS 尽力） |
 | `RENDER_SANDBOX_EXEC` | 1 | macOS 是否用 sandbox-exec 禁网包裹（0 关闭） |
+| `RENDER_ASSUME_NO_NETWORK` | 未设 | Linux 容器以 `--network none` 运行时设为 `1`，使渲染报告如实记录 `network_isolated`（A6 镜像负责设置） |
+
+## 备注
+
+- **缓存键中"渲染器版本"的规范定义 = render_cli 二进制 sha256**（方案文字
+  "子模块 SHA"的运行时等价物，亦覆盖 worktree 开发二进制；随 A7 落档）。
+- 渲染类测试在无二进制环境自动 skip——**CI 渲染通道必须对 skip 判失败**
+  （D3 接线时用构建产物跑全量并断言 0 skipped），防止快乐路径静默失测。
+- 每个产物旁存 `<key>.report.json`（`vemcad.render_service_report`：参数、
+  哈希、耗时、`network_isolated`）。B1 落地后 render_cli 自身的
+  `vemcad.render_report`（view rect/实体计数/字体记录）将内嵌于其下。

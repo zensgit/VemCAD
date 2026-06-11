@@ -71,14 +71,21 @@ class RenderParams:
         }
 
 
+SMOKE_TIMEOUT_S = 30.0
+SMOKE_MIN_BYTES = 1000  # blank/background-only PNG sits well below this
+
+
 class RenderService:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.cache = RenderCache(settings.cache_dir)
+        xdg_cache = settings.cache_dir / "xdg-cache"
+        xdg_cache.mkdir(parents=True, exist_ok=True)
         self.sandbox = SandboxRunner(
             timeout_s=settings.timeout_s,
             mem_limit_mb=settings.mem_limit_mb,
             allow_sandbox_exec=settings.allow_sandbox_exec,
+            cache_home=xdg_cache,
         )
         self.cli_sha: Optional[str] = (
             sha256_file(settings.render_cli) if settings.render_cli else None
@@ -96,11 +103,18 @@ class RenderService:
             return 0
         return sum(1 for p in d.iterdir() if p.is_file())
 
-    async def render_bytes(self, content: bytes, params: RenderParams) -> Tuple[Path, str, bool]:
-        """Returns (artifact path, cache key, was_cache_hit)."""
+    async def render_bytes(
+        self, content: bytes, params: RenderParams, content_sha: Optional[str] = None
+    ) -> Tuple[Path, str, bool]:
+        """Returns (artifact path, cache key, was_cache_hit).
+
+        `content_sha` may be precomputed (the HTTP layer hashes incrementally
+        while reading the upload, keeping the event loop free of large hashes).
+        """
         if not self.available:
             raise RenderFailed("render_cli unavailable", "no binary configured")
-        content_sha = sha256_bytes(content)
+        if content_sha is None:
+            content_sha = sha256_bytes(content)
         key = cache_key(content_sha, params.as_dict(), self.cli_sha, self.font_fp)
         hit = self.cache.get(key, params.fmt)
         if hit is not None:
@@ -114,7 +128,14 @@ class RenderService:
             self.active -= 1
         return path, key, False
 
-    def _render_sync(self, content: bytes, content_sha: str, params: RenderParams, key: str) -> Path:
+    def _render_sync(
+        self,
+        content: bytes,
+        content_sha: str,
+        params: RenderParams,
+        key: str,
+        timeout_s: Optional[float] = None,
+    ) -> Path:
         # Double-check after winning the slot: another worker may have produced it.
         hit = self.cache.get(key, params.fmt)
         if hit is not None:
@@ -136,7 +157,7 @@ class RenderService:
                 # Forward-compat: render_cli grows --font-dir in B1; harmless to
                 # omit until then — the fingerprint is already in the cache key.
                 pass
-            res = self.sandbox.run(argv, workdir)
+            res = self.sandbox.run(argv, workdir, timeout_s=timeout_s)
             if res.timed_out:
                 raise RenderFailed("render timed out", "timeout after %.0fs" % self.settings.timeout_s)
             if res.exit_code != 0:
@@ -147,7 +168,11 @@ class RenderService:
             if not out.is_file() or out.stat().st_size == 0:
                 raise RenderFailed("render produced no output", res.stderr.strip())
             report = {
-                "schema": "vemcad.render_report",
+                # Service-side audit record. The name deliberately differs from
+                # B1's renderer-emitted "vemcad.render_report" (view rect/scale,
+                # entity counts, font records), which will be embedded here
+                # under "render_cli_report" once render_cli grows it.
+                "schema": "vemcad.render_service_report",
                 "schema_version": "0.1",
                 "params": params.as_dict(),
                 "content_sha256": content_sha,
@@ -160,7 +185,10 @@ class RenderService:
             return self.cache.put(key, params.fmt, out, report)
 
     def smoke(self) -> dict:
-        """Startup/health smoke: render the built-in synthetic drawing."""
+        """Startup/health smoke: render the built-in synthetic drawing
+        (geometry + a TEXT entity, so silent font breakage shows up as a
+        size collapse). Bounded by its own short timeout so startup never
+        blocks for the full render timeout."""
         if not self.available:
             return {"ok": False, "detail": "render_cli unavailable"}
         params = RenderParams.parse("png", 400, 250, "dark", "extents")
@@ -168,7 +196,14 @@ class RenderService:
             content = SMOKE_DXF.encode("ascii")
             content_sha = sha256_bytes(content)
             key = cache_key(content_sha, params.as_dict(), self.cli_sha, self.font_fp)
-            path = self._render_sync(content, content_sha, params, key)
-            return {"ok": True, "bytes": path.stat().st_size}
+            path = self._render_sync(
+                content, content_sha, params, key,
+                timeout_s=min(SMOKE_TIMEOUT_S, self.settings.timeout_s),
+            )
+            size = path.stat().st_size
+            if size < SMOKE_MIN_BYTES:
+                return {"ok": False, "detail": "suspiciously small output (%d B)" % size,
+                        "bytes": size}
+            return {"ok": True, "bytes": size}
         except RenderFailed as e:
             return {"ok": False, "detail": "%s: %s" % (e, e.detail)}
