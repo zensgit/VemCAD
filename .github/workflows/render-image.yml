@@ -44,13 +44,9 @@ jobs:
           docker run -d --network none --name "$name" vemcad-render:ci
           # Poll healthz; print the body regardless of status so a 503
           # (degraded) surfaces render_cli.smoke.detail instead of being swallowed.
-          probe='import urllib.request,urllib.error,sys
-try:
-    print(urllib.request.urlopen("http://127.0.0.1:8077/healthz").read().decode()); sys.exit(0)
-except urllib.error.HTTPError as e:
-    print("HTTP",e.code,e.read().decode()); sys.exit(1)
-except Exception as e:
-    print("not-up:",e); sys.exit(2)'
+          # Single-line probe ($'...' expands \n at runtime — keeps the YAML
+          # literal block valid; a real multi-line string would break it).
+          probe=$'import urllib.request,urllib.error,sys\ntry:\n print(urllib.request.urlopen("http://127.0.0.1:8077/healthz").read().decode());sys.exit(0)\nexcept urllib.error.HTTPError as e:\n print("HTTP",e.code,e.read().decode());sys.exit(1)\nexcept Exception as e:\n print("not-up:",e);sys.exit(2)'
           ok=
           for i in $(seq 1 45); do
             if docker exec "$name" python3 -c "$probe"; then ok=1; break; fi
