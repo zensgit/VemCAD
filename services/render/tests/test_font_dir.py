@@ -1,6 +1,8 @@
 """A5: the service forwards --font-dir to render_cli (B1) and embeds the
 render_cli report. Requires a render_cli that supports --font-dir/--report
-(post-B1); auto-skips otherwise."""
+(post-B1) AND a bundleable system CJK font, so it auto-skips on the Linux
+CI image — the Linux 0-skipped render gate (README) must therefore scope to
+the render lane, not this macOS-bound wiring test."""
 import json
 
 from fastapi.testclient import TestClient
@@ -54,13 +56,10 @@ def test_font_dir_forwarded_and_report_embedded(settings, tmp_path):
                    files={"file": ("cjk.dxf", CJK_DXF, "application/octet-stream")})
         assert r.status_code == 200, r.text
         key = r.headers["X-Render-Key"]
-        # The cache sidecar carries the embedded render_cli report with font records.
-        report = cfg.cache_dir.joinpath(key[:2], key + ".report.json")
-        # find report via store layout
-        import glob
-        matches = glob.glob(str(cfg.cache_dir / "**" / (key + ".report.json")), recursive=True)
-        assert matches, "render report sidecar missing"
-        rep = json.loads(open(matches[0]).read())
+        # Deterministic cache sidecar path (matches RenderCache.report_path).
+        sidecar = cfg.cache_dir / key[:2] / (key + ".report.json")
+        assert sidecar.is_file(), "render report sidecar missing"
+        rep = json.loads(sidecar.read_text("utf-8"))
         assert rep["font_dir"] == str(fontdir)
         cli = rep["render_cli_report"]
         assert cli and cli["schema"] == "vemcad.render_report"
