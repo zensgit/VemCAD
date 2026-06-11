@@ -42,13 +42,27 @@ jobs:
           # Container name must be >=2 chars (Docker rejects single-char names).
           name=vemcad_render_smoke
           docker run -d --network none --name "$name" vemcad-render:ci
+          # Poll healthz; print the body regardless of status so a 503
+          # (degraded) surfaces render_cli.smoke.detail instead of being swallowed.
+          probe='import urllib.request,urllib.error,sys
+try:
+    print(urllib.request.urlopen("http://127.0.0.1:8077/healthz").read().decode()); sys.exit(0)
+except urllib.error.HTTPError as e:
+    print("HTTP",e.code,e.read().decode()); sys.exit(1)
+except Exception as e:
+    print("not-up:",e); sys.exit(2)'
           ok=
           for i in $(seq 1 45); do
-            if docker exec "$name" python3 -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8077/healthz')" 2>/dev/null; then ok=1; break; fi
+            if docker exec "$name" python3 -c "$probe"; then ok=1; break; fi
             sleep 2
           done
-          docker exec "$name" python3 -c "import urllib.request;print(urllib.request.urlopen('http://127.0.0.1:8077/healthz').read().decode())" || true
-          if [ -z "$ok" ]; then docker logs "$name"; docker rm -f "$name"; exit 1; fi
+          if [ -z "$ok" ]; then
+            echo "=== healthz body (final) ==="; docker exec "$name" python3 -c "$probe" || true
+            echo "=== direct render_cli probe ==="
+            docker exec "$name" sh -c 'printf "0\nSECTION\n2\nENTITIES\n0\nLINE\n8\n0\n10\n0\n20\n0\n11\n10\n21\n10\n0\nENDSEC\n0\nEOF\n" > /tmp/t.dxf; render_cli --input /tmp/t.dxf --out /tmp/t.png --width 200 --height 200; echo "render_cli exit=$?"' || true
+            echo "=== container logs ==="; docker logs "$name"
+            docker rm -f "$name"; exit 1
+          fi
           docker rm -f "$name"
 
       - name: Push to GHCR (main only)
