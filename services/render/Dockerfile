@@ -26,8 +26,12 @@ COPY deps/cadgamefusion /src/cadgamefusion
 RUN cmake -S /src/cadgamefusion -B /build -G Ninja \
         -DCMAKE_BUILD_TYPE=Release -DBUILD_EDITOR_QT=ON \
     && cmake --build /build --target render_cli -j "$(nproc)" \
-    && cp /build/editor/qt/render_cli /usr/local/bin/render_cli \
-    && ( /usr/local/bin/render_cli --help >/dev/null 2>&1 || true )
+    # Stage render_cli + the cadgamefusion-built shared libs it links
+    # (libcore.so, libcore_c.so, libdxfrw.so, …) — the binary alone fails at
+    # runtime with "libcore_c.so: cannot open shared object file".
+    && mkdir -p /artifacts/bin /artifacts/lib \
+    && cp /build/editor/qt/render_cli /artifacts/bin/render_cli \
+    && find /build -name '*.so*' -type f -exec cp -v {} /artifacts/lib/ \;
 
 # ── Stage 2: fonts — runtime base with CJK fonts (verifiable standalone) ────
 FROM debian:bookworm-slim AS fonts
@@ -53,7 +57,9 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 python3-pip python3-venv \
     && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /usr/local/bin/render_cli /usr/local/bin/render_cli
+COPY --from=builder /artifacts/bin/render_cli /usr/local/bin/render_cli
+COPY --from=builder /artifacts/lib/ /usr/local/lib/
+RUN ldconfig
 WORKDIR /app
 COPY services/render/requirements.txt /app/requirements.txt
 RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
