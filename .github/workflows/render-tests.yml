@@ -1,0 +1,36 @@
+name: render-tests
+
+# Phase 1 D3 (per-PR fast gate): the pure-Python logic of the render service
+# (validator, cache, params, sandbox config) and the regression harness
+# (compare/baseline/regress) — no render_cli needed (render-dependent tests
+# auto-skip). Sub-2-minute; the heavy image build + golden end-to-end live in
+# render-image.yml.
+on:
+  pull_request:
+    paths:
+      - "services/render/**"
+      - "tools/render_regression/**"
+      - ".github/workflows/render-tests.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/render/**"
+      - "tools/render_regression/**"
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deps
+        run: |
+          python -m pip install -U pip
+          pip install -r services/render/requirements-dev.txt
+          pip install numpy pillow            # render_regression harness
+      - name: Service unit tests (render_cli-dependent cases auto-skip)
+        run: python -m pytest services/render/tests -q
+      - name: Regression harness tests (synthetic image pairs)
+        run: python -m pytest tools/render_regression/tests -q

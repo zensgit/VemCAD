@@ -6,11 +6,15 @@ on:
   pull_request:
     paths:
       - "services/render/**"
+      - "tools/render_regression/**"     # golden set / harness used by the E2E step
+      - "deps/cadgamefusion"             # submodule bump = render_cli change → rebuild
       - ".github/workflows/render-image.yml"
   push:
     branches: [main]
     paths:
       - "services/render/**"
+      - "tools/render_regression/**"
+      - "deps/cadgamefusion"
 
 jobs:
   build-and-smoke:
@@ -60,6 +64,22 @@ jobs:
             docker rm -f "$name"; exit 1
           fi
           docker rm -f "$name"
+
+      - name: Golden end-to-end — render each golden via the image, check non-blank + determinism
+        run: |
+          mkdir -p /tmp/golden_out
+          # Render inside the container (it has render_cli + Qt + fonts); the
+          # golden DXFs + driver are mounted read-only; output to a host volume.
+          docker run --rm --network none \
+            -v "$PWD/tools/render_regression:/rr:ro" \
+            -v /tmp/golden_out:/out \
+            --entrypoint python3 vemcad-render:ci \
+            /rr/ci_render_golden.py --golden /rr/golden/golden.json \
+              --golden-dir /rr/golden --out /out --passes 2
+          # Host-side compare/non-blank/determinism (numpy/PIL).
+          python3 -m pip install -q numpy pillow
+          python3 tools/render_regression/ci_e2e_check.py \
+            --golden tools/render_regression/golden/golden.json --render-dir /tmp/golden_out
 
       - name: Push to GHCR (main only)
         if: github.ref == 'refs/heads/main'
