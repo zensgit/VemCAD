@@ -24,7 +24,7 @@ def test_package_roundtrip_and_a2b_render(settings, fixture_dxf):
         package_id="pkg-rt-1",
     )
     with TestClient(create_app(settings)) as c:
-        r = c.post if False else post_package(c, manifest, [fixture_dxf, png])
+        r = post_package(c, manifest, [fixture_dxf, png])
         assert r.status_code == 200, r.text
         body = r.json()
         assert body["status"] == "ok"

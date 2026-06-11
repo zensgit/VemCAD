@@ -14,12 +14,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from .packagestore import schema_major
+from .packagestore import is_safe_id, schema_major
 
 SCHEMA_NAME = "vemcad.cad_package"
 KNOWN_MAJOR = 0
 
 LEVELS = ["source-only", "minimal", "standard", "rich"]
+
+# Contract §2.4 ceilings consumers MUST enforce (violations quarantine, never reject).
+MAX_ENTRIES = 256
+MAX_PAYLOAD_BYTES = 512 * 1024 * 1024
+MAX_RASTER_PIXELS = 64_000_000
+_RASTER_ROLES = ("ref-render", "thumbnail", "underlay-image")
 
 _SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 _BG_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -95,6 +101,10 @@ def _required_str(d: dict, key: str) -> bool:
 
 
 def _manifest_basics_ok(m: dict, result: ValidationResult) -> bool:
+    """Contract §9: ONLY an unparseable manifest, an unknown major, or a
+    structurally unusable identity rejects — everything else degrades to a
+    warning + level floor (the designer's check-in always wins). Identity-
+    critical = the fields §2.2 keys on + the report key (package_id)."""
     if m.get("schema") != SCHEMA_NAME:
         result.error = "unknown schema: %r" % (m.get("schema"),)
         return False
@@ -102,29 +112,31 @@ def _manifest_basics_ok(m: dict, result: ValidationResult) -> bool:
     if major is None or major != KNOWN_MAJOR:
         result.error = "unknown schema_version major: %r" % (m.get("schema_version"),)
         return False
-    for key in ("package_id", "level", "discipline", "created_at"):
-        if not _required_str(m, key):
-            result.error = "missing/invalid top-level field: %s" % key
-            return False
+    if not _required_str(m, "package_id") or not is_safe_id(m.get("package_id", "")):
+        result.error = "missing or unsafe package_id"
+        return False
     producer = m.get("producer")
-    if not isinstance(producer, dict) or not all(
-        _required_str(producer, k) for k in ("kind", "host_app", "plugin_name", "plugin_version")
-    ):
-        result.error = "missing/invalid producer block"
+    if not isinstance(producer, dict) or not _required_str(producer, "plugin_name") \
+            or not _required_str(producer, "host_app"):
+        result.error = "missing producer.plugin_name / host_app (identity)"
         return False
     source = m.get("source")
-    if (
-        not isinstance(source, dict)
-        or not _required_str(source, "file_name")
-        or not _required_str(source, "sha256")
-        or not _SHA_RE.match(source.get("sha256", ""))
-    ):
-        result.error = "missing/invalid source block"
-        return False
-    if not isinstance(m.get("files"), list):
-        result.error = "files must be a list"
+    if not isinstance(source, dict) or not _SHA_RE.match(source.get("sha256", "")):
+        result.error = "missing/invalid source.sha256 (identity)"
         return False
     return True
+
+
+def _warn_missing_recommended(m: dict, result: ValidationResult):
+    """Non-fatal shape problems → warnings, not rejection (contract §9)."""
+    if not _required_str(m, "discipline"):
+        _warn(result, "missing-field", "discipline missing — treated as unknown")
+    if not _required_str(m, "created_at"):
+        _warn(result, "missing-field", "created_at missing")
+    if not isinstance(m.get("producer", {}).get("plugin_version"), str):
+        _warn(result, "missing-field", "producer.plugin_version missing — upsert uses 0")
+    if not isinstance(m.get("files"), list):
+        _warn(result, "files-not-list", "files is not a list — treated as empty")
 
 
 def _metadata_well_formed(meta, result: ValidationResult) -> bool:
@@ -150,32 +162,48 @@ def _metadata_well_formed(meta, result: ValidationResult) -> bool:
 
 def _parse_entries(m: dict, payloads: Dict[str, bytes], result: ValidationResult) -> List[Entry]:
     entries: List[Entry] = []
-    for raw in m.get("files", []):
+    files = m.get("files")
+    if not isinstance(files, list):
+        files = []
+    for idx, raw in enumerate(files):
         if not isinstance(raw, dict):
             result.quarantined.append({"role": None, "sha256": None, "reason": "entry-not-object"})
             continue
         role = raw.get("role")
         sha = str(raw.get("sha256", "")).lower()
+        params = raw.get("params") if isinstance(raw.get("params"), dict) else {}
         e = Entry(
             role=str(role),
             sha256=sha,
             file_name=str(raw.get("file_name", "")),
             size_bytes=raw.get("size_bytes") if isinstance(raw.get("size_bytes"), int) else None,
-            params=raw.get("params") if isinstance(raw.get("params"), dict) else {},
+            params=params,
         )
         if role not in ROLE_CARDINALITY:
             # Unknown roles are ignored with a warning (contract §2.3 forward compat).
             _warn(result, "unknown-role", "ignoring unknown role %r" % role, file_name=e.file_name)
             continue
-        if not _SHA_RE.match(sha):
+        if idx >= MAX_ENTRIES:  # §2.4: quarantine entries past the cap, never reject
+            e.quarantined, e.reason = True, "entry-ceiling"
+        elif role in ("font-shx", "font-ttf") and e.payload is None and params.get("bytes_omitted_reason") \
+                and sha and payloads.get(sha) is None:
+            # §8 declaration-only font entry: legal, not a missing payload.
+            e.reason = "declaration-only"
+        elif not _SHA_RE.match(sha):
             e.quarantined, e.reason = True, "invalid-sha256"
         else:
             e.payload = payloads.get(sha)
             if e.payload is None:
                 e.quarantined, e.reason = True, "payload-missing"
-            elif e.size_bytes is not None and e.size_bytes != len(e.payload):
+            elif e.size_bytes is None:
+                e.quarantined, e.reason = True, "size-missing"  # §2.1 MUST carry size
+            elif e.size_bytes != len(e.payload):
                 e.quarantined, e.reason = True, "size-mismatch"
-        if not e.quarantined:
+            elif len(e.payload) > MAX_PAYLOAD_BYTES:
+                e.quarantined, e.reason = True, "payload-too-large"
+            elif role in _RASTER_ROLES and _raster_pixels(params) > MAX_RASTER_PIXELS:
+                e.quarantined, e.reason = True, "raster-too-large"
+        if not e.quarantined and e.payload is not None:
             e.quarantined, e.reason = _role_format_violation(e)
         if e.quarantined:
             result.quarantined.append(
@@ -183,6 +211,13 @@ def _parse_entries(m: dict, payloads: Dict[str, bytes], result: ValidationResult
             )
         entries.append(e)
     return entries
+
+
+def _raster_pixels(params: dict) -> int:
+    try:
+        return int(params.get("width_px", 0)) * int(params.get("height_px", 0))
+    except (TypeError, ValueError):
+        return 0
 
 
 def _role_format_violation(e: Entry):
@@ -207,10 +242,13 @@ def _role_format_violation(e: Entry):
 
 
 def _ref_render_conforming(e: Entry, result: ValidationResult) -> bool:
+    # Reached only for 2d-drawing packages — §7 baseline view is model-space
+    # extents (layout:<name> allowed as an additional capture). iso/named-view
+    # are the 3D producers' forms, not valid here.
     p = e.params
     problems = []
     view = p.get("view")
-    if not (view == "extents" or str(view).startswith(("layout:", "named-view:")) or view == "iso"):
+    if not (view == "extents" or str(view).startswith("layout:")):
         problems.append("view")
     try:
         w, h = int(p.get("width_px")), int(p.get("height_px"))
@@ -218,9 +256,14 @@ def _ref_render_conforming(e: Entry, result: ValidationResult) -> bool:
             problems.append("long-edge<%d" % REF_RENDER_MIN_LONG_EDGE)
     except (TypeError, ValueError):
         problems.append("width_px/height_px")
-    if not _BG_RE.match(str(p.get("background", ""))):
+    bg = str(p.get("background", ""))
+    method = p.get("capture_method")
+    if not _BG_RE.match(bg):
         problems.append("background")
-    if p.get("capture_method") not in CAPTURE_METHODS:
+    elif method in ("offscreen-render", "plot-raster") and bg.upper() != "#FFFFFF":
+        # §7: white REQUIRED on the controllable routes.
+        problems.append("background-not-white")
+    if method not in CAPTURE_METHODS:
         problems.append("capture_method")
     if p.get("captured_at_event") not in CAPTURED_AT:
         problems.append("captured_at_event")
@@ -283,10 +326,11 @@ def validate_package(manifest: dict, payloads: Dict[str, bytes]) -> ValidationRe
         return result
     result.ok_manifest = True
     result.package_id = manifest["package_id"]
-    result.claimed_level = manifest.get("level")
+    result.claimed_level = manifest.get("level") if isinstance(manifest.get("level"), str) else None
     notes = manifest.get("notes")
     if isinstance(notes, list):
         result.notes_echo = notes
+    _warn_missing_recommended(manifest, result)
 
     if manifest.get("discipline") != "2d-drawing":
         _warn(result, "3d-not-supported-v0",
@@ -316,17 +360,25 @@ def validate_package(manifest: dict, payloads: Dict[str, bytes]) -> ValidationRe
         result.validated_level = "standard"
     else:
         result.validated_level = "minimal"
-        if result.claimed_level in ("standard", "rich"):
-            missing = []
+
+    # Claimed-level satisfaction (§9 check 4): warn whenever earned < claimed,
+    # regardless of which level the package fell to.
+    claimed = result.claimed_level
+    if claimed in LEVELS and LEVELS.index(result.validated_level) < LEVELS.index(claimed):
+        missing = []
+        if claimed in ("standard", "rich"):
             if not twin_ok:
                 missing.append("twin-dxf")
             if not ref_ok:
                 missing.append("conforming ref-render")
-            _warn(result, "level-downgraded",
-                  "claimed %s but surviving payloads only satisfy %s (missing: %s)"
-                  % (result.claimed_level, result.validated_level, ", ".join(missing)))
+        if not meta_ok:
+            missing.append("well-formed metadata")
+        _warn(result, "level-downgraded",
+              "claimed %s but surviving payloads satisfy %s%s"
+              % (claimed, result.validated_level,
+                 (" (missing: %s)" % ", ".join(missing)) if missing else ""))
 
-    if result.claimed_level == "rich":
+    if claimed == "rich":
         _warn(result, "rich-not-granted-v0",
               "rich is never granted by the v0 validator (plan A4 ceiling)")
     return result

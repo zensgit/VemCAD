@@ -56,3 +56,21 @@ python3 -m uvicorn app.main:app --factory --host 127.0.0.1 --port 8077
 - 每个产物旁存 `<key>.report.json`（`vemcad.render_service_report`：参数、
   哈希、耗时、`network_isolated`）。B1 落地后 render_cli 自身的
   `vemcad.render_report`（view rect/实体计数/字体记录）将内嵌于其下。
+
+## 包验证器（`/package`、`validate_package`）
+
+实现契约 §9（2D 至 standard 封顶，A4 上限）：仅"manifest 不可解析 / 未知
+major / 身份字段缺失（package_id、source.sha256、producer.plugin_name/
+host_app）"拒收，其余一律降级+生效等级兜底（检入永不被阻塞）；按 payload
+逐项隔离（sha/size/格式/§2.4 上限）；`rich` 永不授予；3D discipline 仅记
+unsupported note。身份 upsert 键 = (tenant, source.sha256, plugin_name,
+host_app, schema_major)，按租户隔离索引、拒绝跨身份劫持同 package_id、指针
+不回退到更低 plugin_version。package_id/tenant 经安全字符校验，禁止路径穿越。
+
+**记录性偏差（待 A7/PR-S7b 正式落档）：**
+- **完整性/pending-TTL 简化**：契约 §2.1 设想"载荷未到齐→pending 态+TTL"。
+  v0 简化为：缺失载荷立即按 payload 隔离并定稿，同身份再提交走 upsert
+  顶替——无 pending/TTL 状态机。
+- **包总量 1 GiB 上限以 413 拒收**（传输层防护）而非按条隔离；按条隔离
+  适用于 manifest 内声明的单条超限（≤256 条、单载荷≤512 MiB、栅格≤64 MP，
+  均已实现为隔离）。
