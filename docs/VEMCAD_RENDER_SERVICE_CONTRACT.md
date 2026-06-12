@@ -39,7 +39,7 @@ store layout, the A6 image internals.
 
 | error_code | HTTP | Endpoint(s) | Meaning |
 |---|---|---|---|
-| `BAD_PARAMS` | 422 | /render | invalid format/width/height/bg/view |
+| `BAD_PARAMS` | 422 | /render, /package | invalid params, or any framework request-validation failure (the handler is app-wide — e.g. a missing `manifest` part on /package) |
 | `EMPTY_INPUT` | 422 | /render | empty upload, or neither file nor package_id |
 | `UNSUPPORTED_INPUT` | 415 | /render | `.dwg` upload (v0 accepts DXF only) |
 | `PAYLOAD_TOO_LARGE` | 413 | /render, /package | over the upload/package cap |
@@ -169,7 +169,10 @@ an unparseable/unknown-major/identity-broken manifest → `422 PACKAGE_REJECTED`
   the `latest` pointer to a lower `plugin_version`; cross-identity reuse of a
   `package_id` → `409`.
 
-## 6. Recorded deviations (folded in from `services/render/README.md`)
+## 6. Recorded deviations
+
+This is the authoritative superset; `services/render/README.md` records #1–#2,
+the rest are added here (keep the two in sync on change).
 
 1. **Completeness / pending-TTL simplification** — `cad_package` §2.1 envisages
    "payloads incomplete → pending state + TTL". v0 quarantines a missing
