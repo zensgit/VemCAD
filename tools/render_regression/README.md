@@ -53,4 +53,29 @@ v0 的门控指标 `ink_iou` 是文字+几何合并值（**故不命名 geometry
 对**颜色**与**纵横比**回归本身盲（灰度+bbox 归一），故 compare 另出
 `color_dist`/`aspect_delta`，超阈值把 pass 降级 review，不让其静默通过。
 
-测试：`python3 -m pytest tools/render_regression/tests -q`（23，合成图，无需 render_cli）。
+## 版本可视化对比（diff.py，L1 旗舰引擎）
+
+依赖同上：numpy + PIL。这是**收费项**"图纸版本可视化对比"的可验证内核——
+给同一张图的两个版本渲染（Rev A=参照、Rev B=候选），输出三色高亮图让审图
+一眼看出改了哪。
+
+- `diff.py` —— **复用 compare 的对齐与墨迹掩膜**（二值化→墨迹 bbox 裁剪→统一
+  画布→小平移搜索），对齐后逐墨迹像素分类：
+  - `unchanged`（灰 `170,170,170`）—— 两版都有墨迹（容差内）；
+  - `removed`（红 `220,30,30`）—— 只在 A、B 里没了；
+  - `added`（绿 `30,160,30`）—— B 里新增。
+  分类带**膨胀容差**（默认 2px，同 compare），故 ≤tol 的 AA/hinting 抖动不算改动；
+  小平移先被对齐吸收。产出 3 色 overlay PNG + `DiffResult`（`changed_fraction`
+  = (added+removed)/墨迹并集 ∈[0,1]，及 `unchanged/added/removed` 像素数、`dx/dy`）。
+- **可比性同 §5 铁律**：两版渲染必须共享 `background+color_mapping+视图空间`，
+  否则 `comparable=False` → skip-and-flag（不出假对比）。两版皆空 → `both-blank`。
+- **纯图入/图出**——不在此渲染（两张输入由渲染服务产出）。合成 PIL 对验证
+  （确定性、无需 render_cli）。
+- CLI：`python3 tools/render_regression/diff.py REV_A.png REV_B.png --out overlay.png`
+  → stdout 打 JSON 摘要、写 overlay。
+- **产品化形态**：渲染服务 `POST /diff`（收两版 DXF / 两份渲染）→ overlay+摘要；
+  Yuantus `/cad/diff?v1=&v2=` 走版本库取两版 → 调服务 → 前端展示。属 L1 收费功能
+  （见 `docs/VEMCAD_RENDER_PRODUCTIZATION_NOTE_20260613.md`）。
+
+测试：`python3 -m pytest tools/render_regression/tests -q`（32 = D2 回归台 23 +
+版本对比 9，合成图，无需 render_cli）。
