@@ -13,6 +13,13 @@ Classes (dilation-tolerant, so ≤tol-px AA/hinting jitter is NOT flagged):
   unchanged = ref ink with a candidate ink pixel within tol  → grey
   removed   = ref ink with NO candidate ink within tol       → red   (in A, gone in B)
   added     = candidate ink with NO ref ink within tol       → green (new in B)
+
+Orientation is fixed (A = old, B = new), so the summary is deliberately NOT
+swap-symmetric: `changed_fraction` normalises by (unchanged+added+removed) —
+i.e. ref ink plus genuinely-new cand ink — not a true pixel union. One tolerance
+consequence to keep in mind when reading overlays: a within-tol line *thickening*
+reads as no-change, while *thinning* reads as a small removal. That matches the
+tolerant philosophy (we suppress sub-tol jitter), and is fine for revision review.
 """
 
 from __future__ import annotations
@@ -50,7 +57,7 @@ class DiffResult:
     unchanged_px: int
     added_px: int
     removed_px: int
-    changed_fraction: float       # (added+removed) / total-ink-union  ∈ [0,1]
+    changed_fraction: float       # (added+removed) / (unchanged+added+removed) ∈ [0,1]
     canvas: Tuple[int, int]
     overlay_path: Optional[str]
     comparable: bool
@@ -63,12 +70,15 @@ class DiffResult:
 
 
 def _classify(ref: np.ndarray, cand: np.ndarray, tol: int):
-    """Return (unchanged, removed, added) boolean masks on aligned inputs."""
-    ref_cover = _dilate(cand, tol)   # where candidate ink reaches (± tol)
-    cand_cover = _dilate(ref, tol)
-    unchanged = np.logical_and(ref, ref_cover)
-    removed = np.logical_and(ref, np.logical_not(ref_cover))
-    added = np.logical_and(cand, np.logical_not(cand_cover))
+    """Return (unchanged, removed, added) boolean masks on aligned inputs.
+    Named for the ink whose *reach* (dilation) each test consults: a ref pixel
+    is unchanged/removed by whether the CANDIDATE reaches it; a cand pixel is
+    added by whether the REFERENCE never reached it."""
+    cand_reach = _dilate(cand, tol)   # where candidate ink reaches (± tol)
+    ref_reach = _dilate(ref, tol)     # where reference ink reaches (± tol)
+    unchanged = np.logical_and(ref, cand_reach)                # ref ink the candidate still covers
+    removed = np.logical_and(ref, np.logical_not(cand_reach))  # ref ink the candidate no longer reaches
+    added = np.logical_and(cand, np.logical_not(ref_reach))    # cand ink the reference never reached
     return unchanged, removed, added
 
 

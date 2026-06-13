@@ -77,5 +77,5 @@ v0 的门控指标 `ink_iou` 是文字+几何合并值（**故不命名 geometry
   Yuantus `/cad/diff?v1=&v2=` 走版本库取两版 → 调服务 → 前端展示。属 L1 收费功能
   （见 `docs/VEMCAD_RENDER_PRODUCTIZATION_NOTE_20260613.md`）。
 
-测试：`python3 -m pytest tools/render_regression/tests -q`（29 = D2 回归台 23 +
-版本对比 6，合成图，无需 render_cli）。
+测试：`python3 -m pytest tools/render_regression/tests -q`（32 = D2 回归台 23 +
+版本对比 9，合成图，无需 render_cli）。
