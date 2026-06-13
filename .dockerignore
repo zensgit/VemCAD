@@ -1,9 +1,17 @@
 # Render image build context = repo root, but only services/render +
-# deps/cadgamefusion are needed. Exclude everything else, then re-include
-# those two, then drop heavy nested build/cache dirs.
+# deps/cadgamefusion are needed, plus the shared diff engine the image COPYs
+# (tools/render_regression/{diff,compare}.py — POST /diff reuses it). Exclude
+# everything else, then re-include those, then drop heavy nested build/cache
+# dirs and the regression dir's non-engine parts (golden DXFs, corpus
+# manifests with customer filenames, tests) so only the two .py files ship.
 *
 !services/render
 !deps/cadgamefusion
+!tools/render_regression
+tools/render_regression/golden/
+tools/render_regression/tests/
+tools/render_regression/*_manifest_*.json
+tools/render_regression/baselines*.json
 **/.git
 **/build/
 **/build_*/

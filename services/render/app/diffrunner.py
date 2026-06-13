@@ -108,9 +108,17 @@ class DiffService:
 
         key = _diff_key(sha_a, sha_b, params, tol, self.svc.cli_sha, self.svc.font_fp)
         cached_report = self.cache.get_report(key)
-        if cached_report is not None and cached_report.get("summary"):
-            # Overlay present → serve it; report-only (not-comparable/blank) → None.
-            return self.cache.get(key, DIFF_FMT), cached_report["summary"], key, True
+        cached_summary = cached_report.get("summary") if cached_report else None
+        if cached_summary:
+            artifact = self.cache.get(key, DIFF_FMT)  # None if missing or zero-byte
+            # A comparable diff MUST have an overlay; a skip verdict
+            # (view-space-mismatch / both-blank) is legitimately report-only.
+            # Only trust the hit when the artifact state matches the verdict —
+            # otherwise the overlay was lost/truncated, so fall through and
+            # re-render rather than serve a comparable result with no image.
+            expects_overlay = bool(cached_summary.get("comparable")) and not cached_summary.get("skip_reason")
+            if not (expects_overlay and artifact is None):
+                return artifact, cached_summary, key, True
 
         # Render BOTH revisions at the SAME params → shared bg + colour-mapping.
         # render_bytes caches each individually and enforces the busy gate.

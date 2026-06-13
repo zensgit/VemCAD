@@ -105,6 +105,29 @@ def test_diff_overlay_and_cache(settings, tmp_path):
         assert r2.content == r.content
 
 
+def test_diff_cache_lost_artifact_rerenders(settings, tmp_path):
+    # Report survives but the overlay PNG is evicted/truncated: a comparable
+    # diff must re-render (miss) and return the image — never a 200-JSON-no-PNG.
+    ref = _png(tmp_path / "ref.png", lines=[(40, 150, 380, 150)])
+    cand = _png(tmp_path / "cand.png", lines=[(40, 150, 380, 150), (40, 90, 380, 90)])
+    with make_client(settings) as c:
+        _stub_renderer(c, {DXF_A: ref, DXF_B: cand})
+        files = {
+            "file_a": ("a.dxf", DXF_A, "application/octet-stream"),
+            "file_b": ("b.dxf", DXF_B, "application/octet-stream"),
+        }
+        r = c.post("/diff?width=420&height=300&bg=white", files=files)
+        assert r.status_code == 200 and r.headers["content-type"].startswith("image/png")
+        key = r.headers["X-Diff-Key"]
+        artifact = Path(settings.cache_dir) / key[:2] / (key + ".png")
+        assert artifact.is_file()
+        artifact.unlink()                       # lose the overlay, keep the report
+        r2 = c.post("/diff?width=420&height=300&bg=white", files=files)
+        assert r2.status_code == 200
+        assert r2.headers["content-type"].startswith("image/png")  # re-rendered, not JSON
+        assert r2.headers["X-Diff-Cache"] == "miss"
+
+
 def test_diff_summary_only_json(settings, tmp_path):
     ref = _png(tmp_path / "ref.png", lines=[(40, 150, 380, 150)])
     cand = _png(tmp_path / "cand.png", lines=[(40, 150, 380, 150), (40, 90, 380, 90)])
