@@ -63,6 +63,12 @@ jobs:
             echo "=== container logs ==="; docker logs "$name"
             docker rm -f "$name"; exit 1
           fi
+          # L1 /diff smoke — exercises the REAL render -> diff -> overlay path
+          # in the image. Also proves the diff engine + numpy/Pillow shipped:
+          # a missing dep surfaces as a 501 here, not silently in production.
+          docker exec "$name" sh -c 'printf "0\nSECTION\n2\nENTITIES\n0\nLINE\n8\n0\n10\n0\n20\n0\n11\n10\n21\n10\n0\nENDSEC\n0\nEOF\n" > /tmp/t.dxf'
+          docker exec "$name" python3 /app/diff_smoke.py http://127.0.0.1:8077 /tmp/t.dxf \
+            || { echo "=== diff smoke failed; container logs ==="; docker logs "$name"; docker rm -f "$name"; exit 1; }
           docker rm -f "$name"
 
       - name: Golden end-to-end — render each golden via the image, check non-blank + determinism

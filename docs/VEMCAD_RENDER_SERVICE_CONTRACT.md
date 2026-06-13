@@ -1,8 +1,8 @@
 # VemCAD Render Service Contract (A7)
 
-Status: v0.1 (2026-06-12) — describes the merged Phase-1 service
-(`services/render/`, VemCAD #63/#64/#66/#67). Style follows
-`VEMCAD_ROUTER_CONTRACT.md`.
+Status: v0.2 (2026-06-13) — adds `POST /diff` (version visual diff, L1). v0.1
+(2026-06-12) described the merged Phase-1 service (`services/render/`, VemCAD
+#63/#64/#66/#67). Style follows `VEMCAD_ROUTER_CONTRACT.md`.
 Related: `VEMCAD_CAD_PACKAGE_CONTRACT.md` (the `cad_package` the validator
 checks), `VEMCAD_RENDER_SERVICE_PHASE1_DEVELOPMENT_20260610.md` (plan A2a/A3/A4/A5).
 
@@ -12,7 +12,7 @@ Defines the HTTP contract of the render service so consumers (PLM thumbnails /
 previews, the regression harness, future Yuantus integration) depend on stable
 semantics, not implementation details.
 
-In scope: `GET /healthz`, `POST /render`, `POST /package`,
+In scope: `GET /healthz`, `POST /render`, `POST /diff`, `POST /package`,
 `GET /package/{id}/report`; the error model; cache semantics; the validator's
 capability ceiling; the render report schema; recorded deviations.
 
@@ -40,17 +40,18 @@ store layout, the A6 image internals.
 | error_code | HTTP | Endpoint(s) | Meaning |
 |---|---|---|---|
 | `BAD_PARAMS` | 422 | /render, /package | invalid params, or any framework request-validation failure (the handler is app-wide — e.g. a missing `manifest` part on /package) |
-| `EMPTY_INPUT` | 422 | /render | empty upload, or neither file nor package_id |
-| `UNSUPPORTED_INPUT` | 415 | /render | `.dwg` upload (v0 accepts DXF only) |
-| `PAYLOAD_TOO_LARGE` | 413 | /render, /package | over the upload/package cap |
-| `RENDER_FAILED` | 422 | /render | render_cli error / timeout / blank output |
-| `BUSY` | 429 | /render | worker pool saturated, retry later |
+| `EMPTY_INPUT` | 422 | /render, /diff | empty upload / neither file nor package_id (/render); `file_a` or `file_b` missing or empty (/diff) |
+| `UNSUPPORTED_INPUT` | 415 | /render, /diff | `.dwg` upload (v0 accepts DXF only) |
+| `PAYLOAD_TOO_LARGE` | 413 | /render, /diff, /package | over the upload/package cap |
+| `RENDER_FAILED` | 422 | /render, /diff | render_cli error / timeout / blank output (either revision on /diff) |
+| `BUSY` | 429 | /render, /diff | worker pool saturated, retry later |
 | `BAD_MANIFEST` | 422 | /package | manifest is not valid JSON |
 | `PACKAGE_REJECTED` | 422 | /package | unparseable / unknown-major / identity-broken manifest (the only outright rejection) |
 | `IDENTITY_CONFLICT` | 409 | /package | package_id already bound to a different identity |
 | `PACKAGE_NOT_FOUND` | 404 | /package/{id}/report, /render | no such package_id |
 | `PAYLOAD_NOT_FOUND` | 404 | /render | package has no renderable payload for the role |
 | `ROLE_NOT_RENDERABLE` | 404 | /render | role ∉ {twin-dxf, twin-dxf-flattened} |
+| `DIFF_UNAVAILABLE` | 501 | /diff | numpy/Pillow or the diff engine absent from the deployment (lazy-imported; /render unaffected) |
 | `INTERNAL` | 500 | any | unhandled error (caught, enveloped) |
 
 ## 3. `GET /healthz`
@@ -126,6 +127,46 @@ service params, `content_sha256`, `render_cli_sha256`, `font_dir`,
 the embedded **`render_cli_report`** (B1's `vemcad.render_report`: view
 scale/pan/clip + `y_axis`/viewport, entity/text counts, two-layer font
 records). On a cache hit the sidecar is not regenerated.
+
+## 4.3 `POST /diff` (version visual diff — L1)
+
+Diffs two revisions of one drawing. multipart fields `file_a` (Rev A) and
+`file_b` (Rev B), **both DXF** (`.dwg` on either → `415`); query params
+`width`/`height`/`bg`/`view` (same constraints as §4) plus `summary_only`
+(bool). Both revisions render at the **same** params, so §5-comparability's
+background + colour-mapping are shared by construction; the overlay is always
+PNG (a vector diff is meaningless).
+
+Pipeline: each revision goes through `/render`'s four-tuple cache → PNG, then
+the shared engine (`tools/render_regression/diff.py`) classifies each ink pixel
+unchanged / added / removed (dilation-tolerant) and writes a 3-colour overlay.
+The overlay is cached too, keyed by `( sha256("ref_sha:cand_sha"),
+{…params, op:"diff", tol}, render_cli_version, font_store_fingerprint )`.
+
+Success → `200`. Response shape:
+- default → the overlay `image/png`;
+- `summary_only=true`, **or** a non-comparable / both-blank pair (no overlay
+  exists) → `application/json` `{status:"ok", …summary}`.
+
+Either way these headers carry the summary: `X-Diff-Comparable` (`true|false`),
+`X-Diff-Changed-Fraction`, `X-Diff-Added-Px`, `X-Diff-Removed-Px`,
+`X-Diff-Unchanged-Px`, `X-Diff-Cache` (`hit|miss`), `X-Diff-Key`, and
+`X-Diff-Skip-Reason` when set.
+
+**§5 view-space guard (normative).** The two renders must share view-space, not
+only background. Each render is fit to its OWN extents, so a revision that
+changes the drawing's outer extents yields mismatched ink bboxes. When the two
+ink-bbox aspects diverge beyond the comparator's `ASPECT_TOL`, the service
+returns `comparable=false`, `skip_reason="view-space-mismatch"` (JSON, no
+overlay) instead of silently stretching one onto the other; `both-blank` is
+reported likewise. The honest upgrade (render both in a common window so
+extents-changing revisions diff cleanly) is deferred to a later version.
+
+`changed_fraction` ∈ [0,1] = (added+removed)/(unchanged+added+removed); fixed
+orientation (A=old, B=new), so it is deliberately not swap-symmetric.
+
+Degradation: if numpy/Pillow or the diff engine are absent from the deployment,
+`/diff` returns `501 DIFF_UNAVAILABLE` (lazy import; `/render` is unaffected).
 
 ## 5. `POST /package` + `GET /package/{id}/report`
 

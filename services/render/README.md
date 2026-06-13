@@ -15,6 +15,19 @@
   字体库指纹）直接回图，响应头 `X-Render-Cache: hit|miss`、`X-Render-Key`。
   饱和返回 429。错误一律结构化信封
   `{"status":"error","error_code":...,"error":...}`（口径同 ROUTER_CONTRACT）。
+- `POST /diff` — **版本可视化对比（L1 旗舰）**：multipart `file_a`(Rev A) +
+  `file_b`(Rev B)（**仅 DXF**）+ 查询参数 `width`/`height`/`bg`/`view`（两版用
+  **同一组**参数渲染，§5 的背景+配色由此天然一致；叠加图恒为 PNG）+
+  `summary_only`。两版各自命中 `/render` 四元组缓存出 PNG，再经共享
+  diff 引擎（`tools/render_regression/diff.py`）逐墨迹分类
+  unchanged/added/removed，出三色叠加图 + 摘要（叠加图亦缓存，键含两版 sha +
+  参数 + tol）。响应：默认回叠加 PNG，摘要随响应头
+  `X-Diff-Changed-Fraction`/`-Added-Px`/`-Removed-Px`/`-Unchanged-Px`/
+  `-Comparable`/`-Cache`/`-Key`；`summary_only=true` **或**不可比时回 JSON 摘要。
+  **§5 视图空间守卫**：两版墨迹 bbox 纵横比差超阈（各自按自身外延 fit）→
+  `comparable=false`、`skip_reason=view-space-mismatch`，不出误导叠加图（改外延
+  的版本留待"共同窗口"后续）。numpy/Pillow 缺失 → 501 `DIFF_UNAVAILABLE`
+  （懒加载，不拖垮 `/render`）。
 
 ## 安全姿态（Phase 1）
 

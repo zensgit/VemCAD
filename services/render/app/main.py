@@ -11,6 +11,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 
 from .config import Settings, load_settings
+from .diffrunner import DIFF_MEDIA_TYPE, DiffService, DiffUnavailable
 from .packagestore import PackageStore
 from .renderer import MEDIA_TYPES, BusyError, ParamError, RenderFailed, RenderParams, RenderService
 from .validator import validate_package
@@ -43,6 +44,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     app = FastAPI(title="vemcad-render", version="0.1.0", lifespan=lifespan)
     app.state.svc = svc
+    diffsvc = DiffService(svc)
+    app.state.diffsvc = diffsvc
     store = PackageStore(cfg.cache_dir / "packages")
     app.state.store = store
 
@@ -252,6 +255,83 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             media_type=MEDIA_TYPES[params.fmt],
             headers={"X-Render-Cache": "hit" if hit else "miss", "X-Render-Key": key},
         )
+
+    async def _read_dxf_upload(part: UploadFile, label: str):
+        """Read one DXF upload for /diff: reject .dwg, enforce the upload cap,
+        reject empty. Returns (content, sha256, None) or (None, None, error)."""
+        name = (part.filename or "").lower()
+        if name.endswith(".dwg"):
+            return None, None, _error(
+                415, "UNSUPPORTED_INPUT", "v0 accepts DXF only (%s: send the twin-dxf)" % label)
+        content, total = await _read_capped(part, cfg.max_upload_bytes)
+        if content is None:
+            return None, None, _error(
+                413, "PAYLOAD_TOO_LARGE",
+                "%s exceeds %d bytes (/diff upload cap)" % (label, cfg.max_upload_bytes))
+        if total == 0:
+            return None, None, _error(422, "EMPTY_INPUT", "%s is empty" % label)
+        return content, hashlib.sha256(content).hexdigest(), None
+
+    def _diff_headers(summary: dict, key: str, hit: bool) -> dict:
+        h = {
+            "X-Diff-Cache": "hit" if hit else "miss",
+            "X-Diff-Key": key,
+            "X-Diff-Comparable": "true" if summary.get("comparable") else "false",
+            "X-Diff-Changed-Fraction": str(summary.get("changed_fraction", 0.0)),
+            "X-Diff-Added-Px": str(summary.get("added_px", 0)),
+            "X-Diff-Removed-Px": str(summary.get("removed_px", 0)),
+            "X-Diff-Unchanged-Px": str(summary.get("unchanged_px", 0)),
+        }
+        if summary.get("skip_reason"):
+            h["X-Diff-Skip-Reason"] = str(summary["skip_reason"])
+        return h
+
+    @app.post("/diff")
+    async def diff(
+        file_a: Optional[UploadFile] = File(default=None),
+        file_b: Optional[UploadFile] = File(default=None),
+        width: int = Query(2400),
+        height: int = Query(1697),
+        bg: str = Query("dark"),
+        view: str = Query("extents"),
+        summary_only: bool = Query(False),
+    ):
+        # Both revisions render at THESE params → §5 bg + colour-mapping shared
+        # by construction. The overlay is always PNG (raster diff).
+        try:
+            params = RenderParams.parse("png", width, height, bg, view)
+        except ParamError as e:
+            return _error(422, e.error_code, str(e))
+
+        if file_a is None or file_b is None:
+            return _error(422, "EMPTY_INPUT",
+                          "provide two DXF uploads: file_a (Rev A) and file_b (Rev B)")
+
+        content_a, sha_a, err = await _read_dxf_upload(file_a, "file_a")
+        if err is not None:
+            return err
+        content_b, sha_b, err = await _read_dxf_upload(file_b, "file_b")
+        if err is not None:
+            return err
+
+        try:
+            overlay_path, summary, key, hit = await diffsvc.diff_bytes(
+                content_a, content_b, params, sha_a=sha_a, sha_b=sha_b)
+        except DiffUnavailable as e:
+            return _error(501, "DIFF_UNAVAILABLE", str(e))
+        except BusyError:
+            return _error(429, "BUSY", "render workers saturated, retry later")
+        except RenderFailed as e:
+            detail = ("%s — %s" % (e, e.detail)).strip(" —")
+            return _error(422, "RENDER_FAILED", detail)
+
+        headers = _diff_headers(summary, key, hit)
+        # JSON when the caller wants only metrics, OR when there is no overlay
+        # (not comparable / both-blank) — the summary carries the honest reason.
+        if summary_only or overlay_path is None:
+            return JSONResponse(status_code=200, content={"status": "ok", **summary},
+                                headers=headers)
+        return FileResponse(overlay_path, media_type=DIFF_MEDIA_TYPE, headers=headers)
 
     return app
 
