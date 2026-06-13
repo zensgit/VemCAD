@@ -65,6 +65,11 @@ COPY services/render/requirements.txt /app/requirements.txt
 RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 COPY services/render/app /app/app
 COPY services/render/README.md /app/README.md
+# POST /diff reuses the shared version-diff engine (tools/render_regression);
+# diffrunner._find_regression_dir() walks up to /app/tools/render_regression.
+# Without this the engine is absent and /diff degrades to 501 in the image.
+COPY tools/render_regression/diff.py tools/render_regression/compare.py /app/tools/render_regression/
+COPY services/render/tools/diff_smoke.py /app/diff_smoke.py
 # Linux canonical isolation is asserted at `docker run --network none`;
 # RENDER_ASSUME_NO_NETWORK makes the render report record it honestly.
 ENV QT_QPA_PLATFORM=offscreen \

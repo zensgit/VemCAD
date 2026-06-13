@@ -82,6 +82,15 @@ class RenderCache:
             if os.path.exists(tmp):
                 os.unlink(tmp)
 
+    def put_report_only(self, key: str, report: dict) -> None:
+        """Persist just the report, no artifact — used by /diff when a pair is
+        not comparable (view-space mismatch / both-blank), so a repeat request
+        serves the cached verdict instead of re-rendering."""
+        d = self._dir(key)
+        d.mkdir(parents=True, exist_ok=True)
+        payload = json.dumps(report, ensure_ascii=False, indent=1).encode("utf-8")
+        self._atomic_write(self.report_path(key), lambda out: out.write(payload))
+
     def put(self, key: str, fmt: str, src: Path, report: dict) -> Path:
         d = self._dir(key)
         d.mkdir(parents=True, exist_ok=True)

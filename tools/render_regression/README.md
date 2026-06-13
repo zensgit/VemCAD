@@ -67,15 +67,18 @@ v0 的门控指标 `ink_iou` 是文字+几何合并值（**故不命名 geometry
   分类带**膨胀容差**（默认 2px，同 compare），故 ≤tol 的 AA/hinting 抖动不算改动；
   小平移先被对齐吸收。产出 3 色 overlay PNG + `DiffResult`（`changed_fraction`
   = (added+removed)/墨迹并集 ∈[0,1]，及 `unchanged/added/removed` 像素数、`dx/dy`）。
-- **可比性同 §5 铁律**：两版渲染必须共享 `background+color_mapping+视图空间`，
-  否则 `comparable=False` → skip-and-flag（不出假对比）。两版皆空 → `both-blank`。
+- **可比性同 §5 铁律（引擎自判，不只信调用方）**：两版须共享
+  `background+color_mapping+视图空间`。引擎按各自外延 fit，故当两版墨迹 bbox
+  纵横比差超 `ASPECT_TOL` → `comparable=False`、`skip_reason=view-space-mismatch`
+  （不出误导叠加图；改外延的版本留待"共同窗口"后续）。两版皆空 → `both-blank`。
 - **纯图入/图出**——不在此渲染（两张输入由渲染服务产出）。合成 PIL 对验证
   （确定性、无需 render_cli）。
 - CLI：`python3 tools/render_regression/diff.py REV_A.png REV_B.png --out overlay.png`
   → stdout 打 JSON 摘要、写 overlay。
-- **产品化形态**：渲染服务 `POST /diff`（收两版 DXF / 两份渲染）→ overlay+摘要；
-  Yuantus `/cad/diff?v1=&v2=` 走版本库取两版 → 调服务 → 前端展示。属 L1 收费功能
-  （见 `docs/VEMCAD_RENDER_PRODUCTIZATION_NOTE_20260613.md`）。
+- **产品化形态**：渲染服务 `POST /diff` **已落地**（`services/render`：收两版
+  DXF → 各走 /render 四元组缓存出 PNG → 本引擎出 overlay+摘要；契约见 A7 §4.3）；
+  下一步 Yuantus `/cad/diff?v1=&v2=` 走版本库取两版 → 调服务 → 前端展示。属 L1
+  收费功能（见 `docs/VEMCAD_RENDER_PRODUCTIZATION_NOTE_20260613.md`）。
 
-测试：`python3 -m pytest tools/render_regression/tests -q`（32 = D2 回归台 23 +
-版本对比 9，合成图，无需 render_cli）。
+测试：`python3 -m pytest tools/render_regression/tests -q`（34 = D2 回归台 23 +
+版本对比 11，合成图，无需 render_cli）。

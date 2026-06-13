@@ -2,3 +2,6 @@ fastapi>=0.110
 uvicorn>=0.27
 python-multipart>=0.0.9
 anyio>=3.7
+# POST /diff (version visual diff) reuses tools/render_regression's engine.
+numpy>=1.24
+Pillow>=10.0
