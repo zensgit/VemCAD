@@ -123,3 +123,32 @@ def test_blank_reference_is_all_added(tmp_path):
     assert r.aligned and r.comparable
     assert r.added_px > 0 and r.removed_px == 0
     assert r.changed_fraction == 1.0           # everything new
+
+
+def _box(path, *, x0, y0, x1, y1, size=(420, 300)):
+    im = Image.new("RGB", size, (255, 255, 255))
+    ImageDraw.Draw(im).rectangle([x0, y0, x1, y1], outline=(0, 0, 0), width=3)
+    im.save(path)
+    return path
+
+
+def test_view_space_mismatch_is_flagged(tmp_path):
+    # A's ink bbox is wide (300x100, aspect 3.0), B's is square (200x200,
+    # aspect 1.0): the drawing's extents changed between revisions, so the two
+    # renders are NOT in a shared view-space — flag, don't silently mis-diff.
+    a = _box(tmp_path / "a.png", x0=40, y0=100, x1=340, y1=200)
+    b = _box(tmp_path / "b.png", x0=110, y0=50, x1=310, y1=250)
+    out = tmp_path / "ov.png"
+    r = diff_overlay(a, b, out_path=out)
+    assert not r.comparable
+    assert r.skip_reason == "view-space-mismatch"
+    assert r.changed_fraction == 0.0
+    assert r.overlay_path is None and not out.exists()  # no misleading overlay
+
+
+def test_minor_extent_change_still_diffs(tmp_path):
+    # bbox aspect within ASPECT_TOL (~1.7% wider) → guard must NOT fire.
+    a = _box(tmp_path / "a.png", x0=40, y0=100, x1=340, y1=200)   # 300x100
+    b = _box(tmp_path / "b.png", x0=40, y0=100, x1=345, y1=200)   # 305x100
+    r = diff_overlay(a, b)
+    assert r.comparable and r.aligned

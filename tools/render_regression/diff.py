@@ -20,6 +20,14 @@ i.e. ref ink plus genuinely-new cand ink — not a true pixel union. One toleran
 consequence to keep in mind when reading overlays: a within-tol line *thickening*
 reads as no-change, while *thinning* reads as a small removal. That matches the
 tolerant philosophy (we suppress sub-tol jitter), and is fine for revision review.
+
+§5 view-space: the two renders must share view-space, not just bg/colour. We
+do NOT assume it — when the two ink bboxes disagree in aspect beyond ASPECT_TOL
+(a revision that changed the drawing's outer extents) we return
+comparable=False, skip_reason="view-space-mismatch" instead of stretching one
+onto the other. The honest follow-up (render both in a common window so even
+extents-changing revisions diff cleanly) is deferred; until then those pairs
+are flagged, never silently mis-diffed.
 """
 
 from __future__ import annotations
@@ -32,6 +40,7 @@ import numpy as np
 from PIL import Image
 
 from compare import (  # reuse the D2 alignment + ink extraction
+    ASPECT_TOL,
     CANVAS,
     DILATE_TOL,
     _best_shift,
@@ -111,10 +120,20 @@ def diff_overlay(
 
     ma = _ink_mask(_load_rgb(Path(ref_path)).mean(axis=2))
     mb = _ink_mask(_load_rgb(Path(cand_path)).mean(axis=2))
-    ca, _ = _crop_resize(ma, canvas)
-    cb, _ = _crop_resize(mb, canvas)
+    ca, aspa = _crop_resize(ma, canvas)
+    cb, aspb = _crop_resize(mb, canvas)
     if ca is None and cb is None:
         return DiffResult(False, 0, 0, 0, 0, 0, 0.0, canvas, None, True, "both-blank")
+    # §5 view-space guard. Both renders are produced at identical params, which
+    # secures bg + colour-mapping — but each is fit to its OWN extents, so a
+    # revision that grows/shrinks the drawing's outer extents yields mismatched
+    # ink bboxes. Stretching one onto the other would paint unchanged geometry
+    # as spurious add/remove, so flag it (skip-and-flag) rather than lie. A
+    # fully-blank side is a real all-added / all-removed revision, NOT a
+    # mismatch (aspa/aspb is None there), so it is excluded from this check.
+    if aspa and aspb and abs(1.0 - (aspb / aspa)) > ASPECT_TOL:
+        return DiffResult(False, 0, 0, 0, 0, 0, 0.0, canvas, None,
+                          False, "view-space-mismatch")
     if ca is None:
         ca = np.zeros((canvas[1], canvas[0]), dtype=bool)
     if cb is None:
