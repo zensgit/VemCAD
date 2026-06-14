@@ -1,0 +1,41 @@
+# Deploy runner for the render service — PULLS the published GHCR image (no
+# local build, no submodule checkout), unlike docker-compose.yml (dev, which
+# builds from source). For a dev/staging deploy of the Phase-1 service so
+# Yuantus can be pointed at it. See
+# docs/VEMCAD_RENDER_SERVICE_DEPLOY_RUNBOOK_20260614.md.
+#
+#   # one-time: authenticate to GHCR if the package is private
+#   echo "$GHCR_PAT" | docker login ghcr.io -u <user> --password-stdin
+#   docker compose -f services/render/docker-compose.deploy.yml up -d
+#   bash services/render/tools/deploy_smoke.sh http://127.0.0.1:8077
+#
+# Pin a specific build for rollbacks:  RENDER_IMAGE=ghcr.io/zensgit/vemcad-render:<sha>
+#
+# SECURITY (Phase 1): the service has NO auth (contract §2). Keep it on a
+# trusted internal network only — never publish it to a public interface.
+services:
+  render:
+    image: ${RENDER_IMAGE:-ghcr.io/zensgit/vemcad-render:main}
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      # Yuantus's worker must reach this. Default binds host-local; for a shared
+      # docker network, drop the published port and use the service name instead
+      # (RENDER_SERVICE_BASE_URL=http://render:8077). To reach from another host,
+      # set RENDER_BIND=0.0.0.0 — only on a trusted internal network.
+      - "${RENDER_BIND:-127.0.0.1}:8077:8077"
+    environment:
+      RENDER_WORKERS: "${RENDER_WORKERS:-2}"
+      RENDER_TIMEOUT_S: "${RENDER_TIMEOUT_S:-120}"
+      # Per-tenant font store (A5): mount a host dir and uncomment to feed
+      # render_cli --font-dir (its fingerprint is already in the cache key).
+      # RENDER_FONT_DIR: /fonts
+    # volumes:
+    #   - ${RENDER_FONT_DIR_HOST:-./fonts}:/fonts:ro
+    healthcheck:
+      # 200 only when render_cli + fonts + the startup smoke are all healthy.
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8077/healthz').status==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s

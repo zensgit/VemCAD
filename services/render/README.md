@@ -46,6 +46,12 @@ python3 -m uvicorn app.main:app --factory --host 127.0.0.1 --port 8077
 测试：`RENDER_CLI_PATH=... python3 -m pytest services/render/tests -q`
 （无二进制时渲染类用例自动跳过，参数/缓存单测照跑）。
 
+**部署**（让 Yuantus 可调用）：`docker-compose.deploy.yml` 拉 GHCR 镜像
+（`ghcr.io/zensgit/vemcad-render:main`，main 推送自动发布）一键起；
+`tools/deploy_smoke.sh <BASE_URL>` 为部署后验证闸（healthz + /render + /diff）。
+步骤、网络可达性、Yuantus 接线、回滚见
+`docs/VEMCAD_RENDER_SERVICE_DEPLOY_RUNBOOK_20260614.md`。
+
 ## 环境变量
 
 | 变量 | 默认 | 说明 |

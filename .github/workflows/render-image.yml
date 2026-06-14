@@ -91,6 +91,10 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          IMG=ghcr.io/${{ github.repository_owner }}/vemcad-render:$(git rev-parse --short HEAD)
-          docker tag vemcad-render:ci "$IMG"
-          docker push "$IMG"
+          REPO=ghcr.io/${{ github.repository_owner }}/vemcad-render
+          SHA_TAG="$REPO:$(git rev-parse --short HEAD)"   # immutable, for pinned rollbacks
+          MAIN_TAG="$REPO:main"                           # moving "latest main" tag the deploy compose tracks
+          docker tag vemcad-render:ci "$SHA_TAG"
+          docker tag vemcad-render:ci "$MAIN_TAG"
+          docker push "$SHA_TAG"
+          docker push "$MAIN_TAG"
