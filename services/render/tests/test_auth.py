@@ -5,7 +5,36 @@ normal request validation."""
 from fastapi.testclient import TestClient
 
 from app.config import load_settings
-from app.main import create_app
+from app.main import _auth_failed, create_app
+
+
+# --- module-level _auth_failed (covers cases httpx blocks end-to-end) ---
+
+def test_auth_helper_disabled_returns_none():
+    assert _auth_failed(None, None) is None
+    assert _auth_failed("anything", "") is None      # empty token = disabled
+
+
+def test_auth_helper_correct_wrong_missing():
+    assert _auth_failed("Bearer s3cret", "s3cret") is None
+    assert _auth_failed("Bearer nope", "s3cret").status_code == 401
+    assert _auth_failed(None, "s3cret").status_code == 401
+    assert _auth_failed("", "s3cret").status_code == 401
+    assert _auth_failed("s3cret", "s3cret").status_code == 401          # no "Bearer "
+    assert _auth_failed("Bearer s3cret ", "s3cret").status_code == 401  # trailing space
+
+
+def test_auth_helper_non_ascii_header_fails_closed():
+    # P1 regression: a non-ASCII Authorization byte must yield a clean 401,
+    # NOT raise (hmac.compare_digest rejects non-ASCII str → would be a 500).
+    resp = _auth_failed("Bearer \xe9", "s3cret")
+    assert resp is not None and resp.status_code == 401
+
+
+def test_auth_helper_non_ascii_token_fails_closed():
+    # P3a regression: a non-ASCII configured token must not 500 — clean 401.
+    resp = _auth_failed("Bearer x", "令牌")
+    assert resp is not None and resp.status_code == 401
 
 
 def _client(tmp_path, *, token=None):

@@ -1,6 +1,7 @@
 """FastAPI app for the render service (plan A2a/A3). Factory: create_app()."""
 
 import hashlib
+import hmac
 import json
 from contextlib import asynccontextmanager
 from typing import List, Optional
@@ -32,6 +33,32 @@ def _error(status_code: int, error_code: str, message: str) -> JSONResponse:
     )
 
 
+def _auth_failed(authorization: Optional[str], auth_token: Optional[str]):
+    """Optional bearer-token gate for the data endpoints. `auth_token` falsy →
+    no auth (Phase-1 trusted-internal status quo). Returns an error response on
+    failure, else None.
+
+    Compares as BYTES (constant-time) so a non-ASCII Authorization header fails
+    closed with a clean 401 instead of raising in hmac.compare_digest (which
+    rejects non-ASCII str) and becoming a 500. latin-1 round-trips Starlette's
+    header decode losslessly; a non-ASCII configured token can't encode, so the
+    `ignore`+guard make it fail closed rather than brick the service."""
+    if not auth_token:
+        return None
+    ok = False
+    if authorization:
+        try:
+            ok = hmac.compare_digest(
+                authorization.encode("latin-1", "ignore"),
+                ("Bearer %s" % auth_token).encode("latin-1", "ignore"),
+            )
+        except Exception:
+            ok = False
+    if not ok:
+        return _error(401, "UNAUTHORIZED", "missing or invalid bearer token")
+    return None
+
+
 def create_app(settings: Optional[Settings] = None) -> FastAPI:
     cfg = settings or load_settings()
     svc = RenderService(cfg)
@@ -48,19 +75,6 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.state.diffsvc = diffsvc
     store = PackageStore(cfg.cache_dir / "packages")
     app.state.store = store
-
-    def _auth_failed(authorization: Optional[str]):
-        """When RENDER_AUTH_TOKEN is set, require `Authorization: Bearer <token>`
-        on the data endpoints; returns an error response on failure else None.
-        Unset token = no auth (Phase-1 trusted-internal status quo). /healthz is
-        always open (probes/LBs). Constant-time-ish compare via hmac."""
-        if not cfg.auth_token:
-            return None
-        expected = "Bearer %s" % cfg.auth_token
-        import hmac
-        if not authorization or not hmac.compare_digest(authorization, expected):
-            return _error(401, "UNAUTHORIZED", "missing or invalid bearer token")
-        return None
 
     # Every error leaves through the same structured envelope — including
     # FastAPI's own request validation (e.g. width=abc), which would
@@ -117,7 +131,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         payload: List[UploadFile] = File(default=[]),
         authorization: Optional[str] = Header(default=None),
     ):
-        auth_err = _auth_failed(authorization)
+        auth_err = _auth_failed(authorization, cfg.auth_token)
         if auth_err is not None:
             return auth_err
         manifest_bytes, _ = await _read_capped(manifest, _MANIFEST_CAP)
@@ -160,7 +174,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
 
     @app.get("/package/{package_id}/report")
     async def package_report(package_id: str, authorization: Optional[str] = Header(default=None)):
-        auth_err = _auth_failed(authorization)
+        auth_err = _auth_failed(authorization, cfg.auth_token)
         if auth_err is not None:
             return auth_err
         report = store.get_report(package_id)
@@ -181,7 +195,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         view: str = Query("extents"),
         authorization: Optional[str] = Header(default=None),
     ):
-        auth_err = _auth_failed(authorization)
+        auth_err = _auth_failed(authorization, cfg.auth_token)
         if auth_err is not None:
             return auth_err
         try:
@@ -321,7 +335,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         summary_only: bool = Query(False),
         authorization: Optional[str] = Header(default=None),
     ):
-        auth_err = _auth_failed(authorization)
+        auth_err = _auth_failed(authorization, cfg.auth_token)
         if auth_err is not None:
             return auth_err
         # Both revisions render at THESE params → §5 bg + colour-mapping shared
