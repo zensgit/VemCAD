@@ -1,12 +1,13 @@
 """FastAPI app for the render service (plan A2a/A3). Factory: create_app()."""
 
 import hashlib
+import hmac
 import json
 from contextlib import asynccontextmanager
 from typing import List, Optional
 
 import anyio
-from fastapi import FastAPI, File, Query, Request, UploadFile
+from fastapi import FastAPI, File, Header, Query, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 
@@ -30,6 +31,32 @@ def _error(status_code: int, error_code: str, message: str) -> JSONResponse:
         status_code=status_code,
         content={"status": "error", "error_code": error_code, "error": message},
     )
+
+
+def _auth_failed(authorization: Optional[str], auth_token: Optional[str]):
+    """Optional bearer-token gate for the data endpoints. `auth_token` falsy →
+    no auth (Phase-1 trusted-internal status quo). Returns an error response on
+    failure, else None.
+
+    Compares as BYTES (constant-time) so a non-ASCII Authorization header fails
+    closed with a clean 401 instead of raising in hmac.compare_digest (which
+    rejects non-ASCII str) and becoming a 500. latin-1 round-trips Starlette's
+    header decode losslessly; a non-ASCII configured token can't encode, so the
+    `ignore`+guard make it fail closed rather than brick the service."""
+    if not auth_token:
+        return None
+    ok = False
+    if authorization:
+        try:
+            ok = hmac.compare_digest(
+                authorization.encode("latin-1", "ignore"),
+                ("Bearer %s" % auth_token).encode("latin-1", "ignore"),
+            )
+        except Exception:
+            ok = False
+    if not ok:
+        return _error(401, "UNAUTHORIZED", "missing or invalid bearer token")
+    return None
 
 
 def create_app(settings: Optional[Settings] = None) -> FastAPI:
@@ -102,7 +129,11 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     async def receive_package(
         manifest: UploadFile = File(...),
         payload: List[UploadFile] = File(default=[]),
+        authorization: Optional[str] = Header(default=None),
     ):
+        auth_err = _auth_failed(authorization, cfg.auth_token)
+        if auth_err is not None:
+            return auth_err
         manifest_bytes, _ = await _read_capped(manifest, _MANIFEST_CAP)
         if manifest_bytes is None:
             return _error(413, "PAYLOAD_TOO_LARGE", "manifest exceeds %d bytes" % _MANIFEST_CAP)
@@ -142,7 +173,10 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         return JSONResponse(status_code=200, content=body)
 
     @app.get("/package/{package_id}/report")
-    async def package_report(package_id: str):
+    async def package_report(package_id: str, authorization: Optional[str] = Header(default=None)):
+        auth_err = _auth_failed(authorization, cfg.auth_token)
+        if auth_err is not None:
+            return auth_err
         report = store.get_report(package_id)
         if report is None:
             return _error(404, "PACKAGE_NOT_FOUND", "no package %s" % package_id)
@@ -159,7 +193,11 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         height: int = Query(1697),
         bg: str = Query("dark"),
         view: str = Query("extents"),
+        authorization: Optional[str] = Header(default=None),
     ):
+        auth_err = _auth_failed(authorization, cfg.auth_token)
+        if auth_err is not None:
+            return auth_err
         try:
             params = RenderParams.parse(format, width, height, bg, view)
         except ParamError as e:
@@ -295,7 +333,11 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         bg: str = Query("dark"),
         view: str = Query("extents"),
         summary_only: bool = Query(False),
+        authorization: Optional[str] = Header(default=None),
     ):
+        auth_err = _auth_failed(authorization, cfg.auth_token)
+        if auth_err is not None:
+            return auth_err
         # Both revisions render at THESE params → §5 bg + colour-mapping shared
         # by construction. The overlay is always PNG (raster diff).
         try:

@@ -31,9 +31,12 @@
 
 ## 安全姿态（Phase 1）
 
-仅内网绑定、无认证、429 背压；渲染在沙箱子进程中执行（超时、内存上限、
-独立临时目录、最小环境变量；macOS 开发机经 `sandbox-exec` 尽力禁网并记录，
-Linux 正本由容器层 `--network none` 强制）。详见方案 A3/A7。
+内网绑定、429 背压、**可选 Bearer token**（设 `RENDER_AUTH_TOKEN` 即要求数据
+端点带 `Authorization: Bearer <token>`，否则 401；`/healthz` 始终开放;不设=
+现状无认证、向后兼容）。Yuantus 客户端用 `RENDER_SERVICE_SERVICE_TOKEN` 发该
+头，两边设同一 token 即开启。渲染在沙箱子进程中执行（超时、内存上限、独立临时
+目录、最小环境变量；macOS 开发机经 `sandbox-exec` 尽力禁网并记录，Linux 正本由
+容器层 `--network none` 强制）。详见方案 A3/A7。
 
 ## 运行
 
@@ -64,6 +67,7 @@ python3 -m uvicorn app.main:app --factory --host 127.0.0.1 --port 8077
 | `RENDER_TIMEOUT_S` | 120 | 单次渲染超时 |
 | `RENDER_MEM_LIMIT_MB` | 2048 | 子进程地址空间上限（Linux 强制，macOS 尽力） |
 | `RENDER_SANDBOX_EXEC` | 1 | macOS 是否用 sandbox-exec 禁网包裹（0 关闭） |
+| `RENDER_AUTH_TOKEN` | 未设 | 设则数据端点要求 `Authorization: Bearer <token>`（401 否则）；`/healthz` 豁免；不设=无认证（现状） |
 | `RENDER_ASSUME_NO_NETWORK` | 未设 | Linux 容器以 `--network none` 运行时设为 `1`，使渲染报告如实记录 `network_isolated`（A6 镜像负责设置） |
 
 ## 备注
