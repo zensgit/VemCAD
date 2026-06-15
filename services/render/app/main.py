@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from typing import List, Optional
 
 import anyio
-from fastapi import FastAPI, File, Query, Request, UploadFile
+from fastapi import FastAPI, File, Header, Query, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 
@@ -48,6 +48,19 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     app.state.diffsvc = diffsvc
     store = PackageStore(cfg.cache_dir / "packages")
     app.state.store = store
+
+    def _auth_failed(authorization: Optional[str]):
+        """When RENDER_AUTH_TOKEN is set, require `Authorization: Bearer <token>`
+        on the data endpoints; returns an error response on failure else None.
+        Unset token = no auth (Phase-1 trusted-internal status quo). /healthz is
+        always open (probes/LBs). Constant-time-ish compare via hmac."""
+        if not cfg.auth_token:
+            return None
+        expected = "Bearer %s" % cfg.auth_token
+        import hmac
+        if not authorization or not hmac.compare_digest(authorization, expected):
+            return _error(401, "UNAUTHORIZED", "missing or invalid bearer token")
+        return None
 
     # Every error leaves through the same structured envelope — including
     # FastAPI's own request validation (e.g. width=abc), which would
@@ -102,7 +115,11 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     async def receive_package(
         manifest: UploadFile = File(...),
         payload: List[UploadFile] = File(default=[]),
+        authorization: Optional[str] = Header(default=None),
     ):
+        auth_err = _auth_failed(authorization)
+        if auth_err is not None:
+            return auth_err
         manifest_bytes, _ = await _read_capped(manifest, _MANIFEST_CAP)
         if manifest_bytes is None:
             return _error(413, "PAYLOAD_TOO_LARGE", "manifest exceeds %d bytes" % _MANIFEST_CAP)
@@ -142,7 +159,10 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         return JSONResponse(status_code=200, content=body)
 
     @app.get("/package/{package_id}/report")
-    async def package_report(package_id: str):
+    async def package_report(package_id: str, authorization: Optional[str] = Header(default=None)):
+        auth_err = _auth_failed(authorization)
+        if auth_err is not None:
+            return auth_err
         report = store.get_report(package_id)
         if report is None:
             return _error(404, "PACKAGE_NOT_FOUND", "no package %s" % package_id)
@@ -159,7 +179,11 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         height: int = Query(1697),
         bg: str = Query("dark"),
         view: str = Query("extents"),
+        authorization: Optional[str] = Header(default=None),
     ):
+        auth_err = _auth_failed(authorization)
+        if auth_err is not None:
+            return auth_err
         try:
             params = RenderParams.parse(format, width, height, bg, view)
         except ParamError as e:
@@ -295,7 +319,11 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         bg: str = Query("dark"),
         view: str = Query("extents"),
         summary_only: bool = Query(False),
+        authorization: Optional[str] = Header(default=None),
     ):
+        auth_err = _auth_failed(authorization)
+        if auth_err is not None:
+            return auth_err
         # Both revisions render at THESE params → §5 bg + colour-mapping shared
         # by construction. The overlay is always PNG (raster diff).
         try:

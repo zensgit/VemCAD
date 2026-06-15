@@ -23,10 +23,15 @@ store layout, the A6 image internals.
 
 - JSON responses are `application/json; charset=utf-8`. `POST /render` and
   `POST /package` use `multipart/form-data`.
-- **Security posture (Phase 1)**: internal-network bind only, **no auth**,
-  back-pressure via `429`. Authentication is deferred to the Yuantus
-  integration phase. The image is non-production (CI artifact + dev compose);
-  nothing points production traffic at it.
+- **Security posture**: internal-network bind, back-pressure via `429`, and an
+  **optional bearer token**. If `RENDER_AUTH_TOKEN` is set, the data endpoints
+  (`/render`, `/diff`, `/package`, `/package/{id}/report`) require
+  `Authorization: Bearer <token>` (constant-time compared) → else `401
+  UNAUTHORIZED`; `GET /healthz` stays open for probes/LBs. **Unset = no auth**
+  (the trusted-internal status quo), so it is backward-compatible. The Yuantus
+  client sends this header from `RENDER_SERVICE_SERVICE_TOKEN`, so enabling auth
+  is "set the same token on both sides". Set a token before exposing the service
+  beyond a fully-trusted internal segment.
 - All payloads (DXF, fonts, PNG, JSON) are untrusted and are parsed only inside
   the render sandbox (timeout, RLIMIT, private tempdir, minimal env; Linux:
   `--network none`; macOS dev: `sandbox-exec` deny-network, recorded).
@@ -52,6 +57,7 @@ store layout, the A6 image internals.
 | `PAYLOAD_NOT_FOUND` | 404 | /render | package has no renderable payload for the role |
 | `ROLE_NOT_RENDERABLE` | 404 | /render | role ∉ {twin-dxf, twin-dxf-flattened} |
 | `DIFF_UNAVAILABLE` | 501 | /diff | numpy/Pillow or the diff engine absent from the deployment (lazy-imported; /render unaffected) |
+| `UNAUTHORIZED` | 401 | /render, /diff, /package, /package/{id}/report | `RENDER_AUTH_TOKEN` set and the `Authorization: Bearer <token>` header is missing or wrong (/healthz is exempt) |
 | `INTERNAL` | 500 | any | unhandled error (caught, enveloped) |
 
 ## 3. `GET /healthz`
