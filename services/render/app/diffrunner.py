@@ -21,6 +21,7 @@ from typing import Optional, Tuple
 import anyio
 
 from .cache import cache_key, sha256_bytes
+from .dxfextents import extents_differ, parse_dxf_extents, union_window
 from .renderer import RenderParams, RenderService
 
 # Overlay output is always PNG raster (a vector overlay is meaningless — the
@@ -106,7 +107,24 @@ class DiffService:
         if sha_b is None:
             sha_b = sha256_bytes(content_b)
 
-        key = _diff_key(sha_a, sha_b, params, tol, self.svc.cli_sha, self.svc.font_fp)
+        # §5 common-window upgrade: each render is normally fit to its OWN
+        # extents, so a revision that changed the drawing's outline yields two
+        # rasters in mismatched view-space and the engine honestly skips them
+        # (skip_reason="view-space-mismatch"). When BOTH DXFs declare HEADER
+        # extents and those extents differ, render both in their union window so
+        # the pair shares view-space and diffs cleanly. Falls back to per-extents
+        # rendering when either header lacks usable extents (window left None).
+        # NOTE (follow-up): the union window is a HARD render rect. If a DXF's
+        # HEADER extents are stale-small (present but smaller than real geometry)
+        # this can clip — see dxfextents.py KNOWN LIMITATION. Robust source is
+        # render_cli's report extents; header extents chosen for testability.
+        render_params = params
+        ext_a = parse_dxf_extents(content_a)
+        ext_b = parse_dxf_extents(content_b)
+        if ext_a is not None and ext_b is not None and extents_differ(ext_a, ext_b):
+            render_params = params.windowed(union_window(ext_a, ext_b))
+
+        key = _diff_key(sha_a, sha_b, render_params, tol, self.svc.cli_sha, self.svc.font_fp)
         cached_report = self.cache.get_report(key)
         cached_summary = cached_report.get("summary") if cached_report else None
         if cached_summary:
@@ -120,24 +138,30 @@ class DiffService:
             if not (expects_overlay and artifact is None):
                 return artifact, cached_summary, key, True
 
-        # Render BOTH revisions at the SAME params → shared bg + colour-mapping.
-        # render_bytes caches each individually and enforces the busy gate.
-        path_a, _, _ = await self.svc.render_bytes(content_a, params, content_sha=sha_a)
-        path_b, _, _ = await self.svc.render_bytes(content_b, params, content_sha=sha_b)
+        # Render BOTH revisions at the SAME params (incl. any common window) →
+        # shared bg + colour-mapping + view-space. render_bytes caches each
+        # individually and enforces the busy gate.
+        path_a, _, _ = await self.svc.render_bytes(content_a, render_params, content_sha=sha_a)
+        path_b, _, _ = await self.svc.render_bytes(content_b, render_params, content_sha=sha_b)
 
         overlay_path, summary = await anyio.to_thread.run_sync(
-            self._overlay_sync, engine, path_a, path_b, params, sha_a, sha_b, tol, key
+            self._overlay_sync, engine, path_a, path_b, render_params, sha_a, sha_b, tol, key
         )
         return overlay_path, summary, key, False
 
     def _overlay_sync(self, engine, path_a, path_b, params, sha_a, sha_b, tol, key):
         # The engine decides comparability (its §5 view-space guard) — we never
-        # force comparable=True. Write the overlay to a temp file first, then
+        # force comparable=True. When we rendered both revisions in a common
+        # window (params.window set), tell the engine they share view-space so it
+        # diffs them in the common pixel grid instead of cropping each to its own
+        # bbox (which would defeat the shared window / re-centre a moved revision
+        # into a false match). Write the overlay to a temp file first, then
         # publish through the cache (report-before-artifact atomicity).
         with tempfile.TemporaryDirectory(prefix="vemcad_diff_") as td:
             tmp_overlay = Path(td) / "overlay.png"
             res = engine.diff_overlay(
-                Path(path_a), Path(path_b), tol=tol, out_path=tmp_overlay
+                Path(path_a), Path(path_b), tol=tol, out_path=tmp_overlay,
+                shared_view=(params.window is not None),
             )
             summary = res.to_dict()
             # overlay_path is an internal temp path — the HTTP layer streams the
@@ -148,6 +172,10 @@ class DiffService:
                 "params": params.as_dict(),
                 "tol": tol,
             })
+            # Honest provenance: record the shared window when the common-window
+            # upgrade fired (extents-changing revisions rendered in a union rect).
+            if params.window is not None:
+                summary["common_window"] = list(params.window)
             report = {
                 "schema": "vemcad.render_diff_report",
                 "schema_version": "0.1",

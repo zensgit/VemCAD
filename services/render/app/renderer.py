@@ -5,7 +5,7 @@ import asyncio
 import json
 import re
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -43,6 +43,11 @@ class RenderParams:
     height: int
     bg: str
     view: str = "extents"
+    # Optional explicit world window (xmin, ymin, xmax, ymax). When set, view is
+    # "window" and render_cli is driven with --window instead of auto-extents.
+    # Internal to the /diff common-window upgrade; the HTTP surface still only
+    # parses view="extents" (a window is derived, never client-supplied in v0).
+    window: Optional[Tuple[float, float, float, float]] = None
 
     @staticmethod
     def parse(fmt: str, width, height, bg: str, view: str) -> "RenderParams":
@@ -62,14 +67,35 @@ class RenderParams:
             raise ParamError("view supports only 'extents' in v0")
         return RenderParams(fmt=fmt, width=w, height=h, bg=bg, view=view)
 
+    def windowed(self, window: Tuple[float, float, float, float]) -> "RenderParams":
+        """Derive a copy that renders in an explicit world window. Validates the
+        rect (finite, non-degenerate); raises ParamError otherwise."""
+        if window is None or len(window) != 4:
+            raise ParamError("window must be (xmin, ymin, xmax, ymax)")
+        try:
+            x1, y1, x2, y2 = (float(v) for v in window)
+        except (TypeError, ValueError):
+            raise ParamError("window coordinates must be numbers")
+        for v in (x1, y1, x2, y2):
+            if v != v or v in (float("inf"), float("-inf")):  # NaN / inf
+                raise ParamError("window coordinates must be finite")
+        if x2 <= x1 or y2 <= y1:
+            raise ParamError("window must have xmax>xmin and ymax>ymin")
+        return replace(self, view="window", window=(x1, y1, x2, y2))
+
     def as_dict(self) -> dict:
-        return {
+        d = {
             "format": self.fmt,
             "width": self.width,
             "height": self.height,
             "bg": self.bg,
             "view": self.view,
         }
+        # Include the window only when set, so non-windowed renders keep their
+        # existing four-tuple cache keys unchanged.
+        if self.window is not None:
+            d["window"] = list(self.window)
+        return d
 
 
 SMOKE_TIMEOUT_S = 30.0
@@ -129,6 +155,33 @@ class RenderService:
             self.active -= 1
         return path, key, False
 
+    @staticmethod
+    def _build_argv(render_cli, src, out, params: RenderParams, report_path, font_dir):
+        """Construct the render_cli argv. Pure (no I/O) so it is unit-testable.
+        Appends --window only when an explicit world window is set (the /diff
+        common-window upgrade); otherwise render_cli auto-fits to extents."""
+        argv = [
+            str(render_cli),
+            "--input", str(src),
+            "--out", str(out),
+            "--width", str(params.width),
+            "--height", str(params.height),
+            "--bg", params.bg,
+            "--report", str(report_path),
+        ]
+        # B5: explicit world rectangle so both /diff revisions share view-space.
+        # Use repr (shortest round-trippable form) rather than %g — %g caps at 6
+        # significant figures, which on a HARD world rect would round the window
+        # inward and clip real edge geometry for large CAD coordinates.
+        if params.window is not None:
+            argv += ["--window", ",".join(repr(float(v)) for v in params.window)]
+        # A5: feed the per-tenant font directory to render_cli (B1 --font-dir),
+        # so drawing fonts the host OS lacks resolve from our store. The dir's
+        # fingerprint is already in the cache key, so changing fonts re-renders.
+        if font_dir:
+            argv += ["--font-dir", str(font_dir)]
+        return argv
+
     def _render_sync(
         self,
         content: bytes,
@@ -147,20 +200,10 @@ class RenderService:
             src.write_bytes(content)
             out = workdir / ("out." + params.fmt)
             cli_report_path = workdir / "render_report.json"
-            argv = [
-                str(self.settings.render_cli),
-                "--input", str(src),
-                "--out", str(out),
-                "--width", str(params.width),
-                "--height", str(params.height),
-                "--bg", params.bg,
-                "--report", str(cli_report_path),
-            ]
-            # A5: feed the per-tenant font directory to render_cli (B1 --font-dir),
-            # so drawing fonts the host OS lacks resolve from our store. The dir's
-            # fingerprint is already in the cache key, so changing fonts re-renders.
-            if self.settings.font_dir:
-                argv += ["--font-dir", str(self.settings.font_dir)]
+            argv = self._build_argv(
+                self.settings.render_cli, src, out, params, cli_report_path,
+                self.settings.font_dir,
+            )
             res = self.sandbox.run(argv, workdir, timeout_s=timeout_s)
             if res.timed_out:
                 raise RenderFailed("render timed out", "timeout after %.0fs" % self.settings.timeout_s)

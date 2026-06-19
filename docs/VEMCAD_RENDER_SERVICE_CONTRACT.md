@@ -156,17 +156,35 @@ Success → `200`. Response shape:
 
 Either way these headers carry the summary: `X-Diff-Comparable` (`true|false`),
 `X-Diff-Changed-Fraction`, `X-Diff-Added-Px`, `X-Diff-Removed-Px`,
-`X-Diff-Unchanged-Px`, `X-Diff-Cache` (`hit|miss`), `X-Diff-Key`, and
-`X-Diff-Skip-Reason` when set.
+`X-Diff-Unchanged-Px`, `X-Diff-Cache` (`hit|miss`), `X-Diff-Key`,
+`X-Diff-Skip-Reason` when set, and `X-Diff-Common-Window`
+(`xmin,ymin,xmax,ymax`) when the common-window path engaged (below). The JSON
+body mirrors these, plus `common_window` when present.
 
-**§5 view-space guard (normative).** The two renders must share view-space, not
-only background. Each render is fit to its OWN extents, so a revision that
-changes the drawing's outer extents yields mismatched ink bboxes. When the two
-ink-bbox aspects diverge beyond the comparator's `ASPECT_TOL`, the service
-returns `comparable=false`, `skip_reason="view-space-mismatch"` (JSON, no
-overlay) instead of silently stretching one onto the other; `both-blank` is
-reported likewise. The honest upgrade (render both in a common window so
-extents-changing revisions diff cleanly) is deferred to a later version.
+**§5 view-space guard + common window (normative).** The two renders must share
+view-space, not only background. By default each render is fit to its OWN
+extents, so a revision that changes the drawing's outer extents would yield
+mismatched ink bboxes; stretching one onto the other is never done.
+
+Common-window upgrade (implemented): when **both** revisions declare usable and
+**differing** HEADER extents (`$EXTMIN`/`$EXTMAX`), the service renders both in
+their **union world window** (`render_cli --window`, B5) so they share
+view-space, and diffs them in the common pixel grid (no per-extents bbox
+normalisation, no aspect guard). The window is folded into the render + diff
+cache keys (`params.window`) and surfaced as `X-Diff-Common-Window` /
+`common_window`.
+
+Fallback / guard still applies when the window is NOT engaged (either revision
+lacks usable extents, or extents are equal): the comparator's `ASPECT_TOL`
+guard returns `comparable=false`, `skip_reason="view-space-mismatch"` (JSON, no
+overlay) rather than mis-diffing; `both-blank` is reported likewise.
+
+Known limitation (follow-up): HEADER extents are author-app-maintained and may
+be **stale-small** (present but smaller than the real geometry). Used as a HARD
+`--window`, a stale-small rect can clip out-of-extent geometry. Only *missing*
+extents are guarded (fallback); *stale-present* are not detected. The robust
+source is render_cli's own report extents (consistent with what it renders) —
+tracked as the common-window v2 follow-up.
 
 `changed_fraction` ∈ [0,1] = (added+removed)/(unchanged+added+removed); fixed
 orientation (A=old, B=new), so it is deliberately not swap-symmetric.
