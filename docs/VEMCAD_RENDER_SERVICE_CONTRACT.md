@@ -166,32 +166,32 @@ view-space, not only background. By default each render is fit to its OWN
 extents, so a revision that changes the drawing's outer extents would yield
 mismatched ink bboxes; stretching one onto the other is never done.
 
-Common-window upgrade (implemented): when **both** revisions declare usable and
-**differing** HEADER extents (`$EXTMIN`/`$EXTMAX`), the service renders both in
-their **union world window** (`render_cli --window`, B5) so they share
-view-space, and diffs them in the common pixel grid (no per-extents bbox
-normalisation, no aspect guard). The window is folded into the render + diff
-cache keys (`params.window`) and surfaced as `X-Diff-Common-Window` /
-`common_window`.
+Common-window upgrade (implemented, **v2**): when the two revisions' **real
+geometry extents differ**, the service renders both in their **union world
+window** (`render_cli --window`, B5) so they share view-space, and diffs them in
+the common pixel grid (no per-extents bbox normalisation, no aspect guard). The
+window source, in priority order:
+1. **`content_bbox`** (primary) — render_cli's real-geometry extent
+   (`view.content_bbox`, CADGameFusion #392 `core::contentBounds`), read from each
+   render's report. Real geometry, so it never clips.
+2. **HEADER `$EXTMIN`/`$EXTMAX`** (fallback) — used only when `content_bbox` is
+   absent (a render_cli predating #392). Can be stale-small (see below).
 
-Fallback / guard still applies when the window is NOT engaged (either revision
-lacks usable extents, or extents are equal): the comparator's `ASPECT_TOL`
-guard returns `comparable=false`, `skip_reason="view-space-mismatch"` (JSON, no
-overlay) rather than mis-diffing; `both-blank` is reported likewise.
+The window is folded into the render + diff cache keys (`params.window`) and
+surfaced as `X-Diff-Common-Window` + `common_window`; `window_source`
+(`content_bbox`|`header`) records which source drove it.
 
-Known limitation (follow-up): HEADER extents are author-app-maintained and may
-be **stale-small** (present but smaller than the real geometry). Used as a HARD
-`--window`, a stale-small rect can clip out-of-extent geometry. Only *missing*
-extents are guarded (fallback); *stale-present* are not detected. Note that
-render_cli's report `clip` is **not** a robust alternative — it derives from
-`adapter->getExtents()`, which returns the same header `$EXTMIN/$EXTMAX`. The
-robust **v2** requires render_cli to expose a **real rendered-content bbox** via
-a **shared scene_render content-bounds helper** (extend `fitToContent`'s bbox to
-cover real ink — ellipse/hatch/text extent/expanded blocks — rather than adding
-a second bbox in the import callbacks), emitted as a report field distinct from
-the header-derived `clip` (e.g. `content_bbox`), which VemCAD `/diff` then unions
-for the window (header extents fallback only) — an A→C cross-repo change
-(CADGameFusion first). Tracked as the common-window v2 follow-up.
+Fallback / guard still applies when no window is engaged (extents unavailable or
+equal): the comparator's `ASPECT_TOL` guard returns `comparable=false`,
+`skip_reason="view-space-mismatch"` (JSON, no overlay) rather than mis-diffing;
+`both-blank` likewise.
+
+Residual limitation (FALLBACK path only): HEADER `$EXTMIN`/`$EXTMAX` can be
+**stale-small** and, used as a HARD `--window`, clip out-of-extent geometry. This
+affects ONLY the header fallback; the primary `content_bbox` path is real
+geometry and does not clip. The `stale_small_header` golden (e2e) proves
+render_cli's `content_bbox` exceeds a stale header (max_x/max_y past the header
+rect), i.e. the header-window would clip where the content_bbox-window does not.
 
 `changed_fraction` ∈ [0,1] = (added+removed)/(unchanged+added+removed); fixed
 orientation (A=old, B=new), so it is deliberately not swap-symmetric.
