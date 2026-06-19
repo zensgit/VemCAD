@@ -114,6 +114,10 @@ class DiffService:
         # extents and those extents differ, render both in their union window so
         # the pair shares view-space and diffs cleanly. Falls back to per-extents
         # rendering when either header lacks usable extents (window left None).
+        # NOTE (follow-up): the union window is a HARD render rect. If a DXF's
+        # HEADER extents are stale-small (present but smaller than real geometry)
+        # this can clip — see dxfextents.py KNOWN LIMITATION. Robust source is
+        # render_cli's report extents; header extents chosen for testability.
         render_params = params
         ext_a = parse_dxf_extents(content_a)
         ext_b = parse_dxf_extents(content_b)

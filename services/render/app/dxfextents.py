@@ -14,6 +14,16 @@ dependency on the render report schema.
 
 Returns None when the header lacks usable extents, so the caller falls back to
 the existing per-extents behavior rather than guessing a window.
+
+KNOWN LIMITATION (follow-up): $EXTMIN/$EXTMAX are author-app-maintained and can
+be STALE — present but smaller than the actual geometry. Used as a HARD render
+window that would clip the out-of-extent geometry, which could miss/spurious a
+change. We only handle *missing* extents (fall back); we do NOT detect
+*stale-present* ones. The architecturally correct source is render_cli's OWN
+report extents (guaranteed consistent with what it renders) — header extents
+were chosen here for local testability. Robust v2: render both at extents once,
+read each report's actual extents, union, re-render windowed. Tracked as the
+common-window follow-up; until then a stale-small header is the known risk.
 """
 
 from typing import Optional, Tuple
