@@ -26,7 +26,12 @@
     {"name": "wide_coords", "category": "off-origin",
      "render": {"width": 800, "height": 400, "bg": "white"},
      "expect": "non-blank", "gate": true,
-     "notes": "Frame far off origin (5e6); extents fit must still frame it."}
+     "notes": "Frame far off origin (5e6); extents fit must still frame it."},
+    {"name": "stale_small_header", "category": "stale-small-header",
+     "render": {"width": 1200, "height": 600, "bg": "white"},
+     "expect": "non-blank", "gate": false,
+     "expect_content_bbox": {"min_max_x": 150.0, "min_max_y": 90.0},
+     "notes": "common-window v2: $EXTMIN/$EXTMAX (header) is stale-small (0,0)-(50,50) but the geometry runs to (200,100). render_cli content_bbox must report the REAL extent (max_x>=150, max_y>=90) — proving why v1's header-window clips and v2's content_bbox-window does not. gate=false: this is a content_bbox-assertion fixture, not an ink-IoU baseline."}
   ],
   "deferred": [
     {"category": "FIELD", "reason": "needs an ACAD_FIELD dict — plugin-produced; render-side renders the cached text fine, metadata assertion needs the plugin."},

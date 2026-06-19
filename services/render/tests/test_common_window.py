@@ -81,17 +81,25 @@ class _FakeSvc:
     pre-baked PNG (per-content so A and B can differ), so DiffService runs the
     real diff engine with no binary."""
 
-    def __init__(self, default_png: Path, by_content=None):
+    def __init__(self, default_png: Path, by_content=None, content_bbox=None):
         self.cache = _FakeCache()
         self.cli_sha = "clisha"
         self.font_fp = "fontfp"
         self.default_png = default_png
         self.by_content = by_content or {}
+        # content bytes -> (xmin,ymin,xmax,ymax): when set, the render's report
+        # carries view.content_bbox (simulates render_cli #392).
+        self.content_bbox = content_bbox or {}
         self.received = []
 
     async def render_bytes(self, content, params, content_sha=None):
         self.received.append(params)
-        return self.by_content.get(content, self.default_png), "renderkey", False
+        key = "rk-%s-%s" % (content_sha or id(content), params.view)
+        cb = self.content_bbox.get(content)
+        if cb is not None:
+            self.cache.reports[key] = {"render_cli_report": {"view": {"content_bbox": {
+                "min_x": cb[0], "min_y": cb[1], "max_x": cb[2], "max_y": cb[3]}}}}
+        return self.by_content.get(content, self.default_png), key, False
 
 
 def _run(coro):
@@ -198,32 +206,58 @@ def test_build_argv_no_window_by_default():
 # DiffService orchestration (stubbed renderer, real diff engine)
 # --------------------------------------------------------------------------
 
-def test_diff_uses_common_window_when_extents_differ(tmp_path):
-    a = _dxf((0.0, 0.0), (100.0, 100.0))
-    b = _dxf((0.0, 0.0), (200.0, 100.0))  # B grew in X -> extents differ
-    # Pre-baked renders AS IF produced in the shared window: same canvas size,
-    # B's geometry occupies more width. Different images per revision so the
-    # diff is real (not an image-vs-itself no-op).
-    png_a = _box_png(tmp_path / "a.png", 40, 110, 160, 190)   # narrow box
-    png_b = _box_png(tmp_path / "b.png", 40, 110, 380, 190)   # wide box (grew)
-    svc = _FakeSvc(png_a, by_content={a: png_a, b: png_b})
+def test_diff_window_from_content_bbox(tmp_path):
+    # v2 primary path: the window comes from REAL geometry (render_cli
+    # content_bbox), NOT the header. Headers here are deliberately stale-small
+    # (50/60) while content_bbox is the real 100/200 — the window must use the
+    # latter, proving v2 ignores the stale header.
+    a = _dxf((0.0, 0.0), (50.0, 50.0))
+    b = _dxf((0.0, 0.0), (60.0, 50.0))
+    png_a = _box_png(tmp_path / "a.png", 40, 110, 160, 190)
+    png_b = _box_png(tmp_path / "b.png", 40, 110, 380, 190)
+    svc = _FakeSvc(png_a, by_content={a: png_a, b: png_b},
+                   content_bbox={a: (0.0, 0.0, 100.0, 100.0),
+                                 b: (0.0, 0.0, 200.0, 100.0)})
     diffsvc = DiffService(svc)
 
     params = RenderParams.parse("png", 800, 600, "dark", "extents")
     overlay, summary, key, hit = _run(diffsvc.diff_bytes(a, b, params))
 
-    assert len(svc.received) == 2
-    # BOTH revisions rendered in the SAME union window (0,0,200,100).
-    assert svc.received[0].window == (0.0, 0.0, 200.0, 100.0)
-    assert svc.received[1].window == (0.0, 0.0, 200.0, 100.0)
+    # 2 extents renders (read content_bbox) + 2 windowed re-renders.
+    assert len(svc.received) == 4
+    assert svc.received[0].window is None and svc.received[1].window is None  # extents pass
+    # Union of the CONTENT_BBOXes (0,0,200,100) — not the headers (50/60).
+    assert svc.received[2].window == (0.0, 0.0, 200.0, 100.0)
+    assert svc.received[3].window == (0.0, 0.0, 200.0, 100.0)
     assert summary.get("common_window") == [0.0, 0.0, 200.0, 100.0]
-    # The pair is comparable (shared view-space) AND the grown geometry is
-    # scored as a real change — NOT a false 'identical' and NOT skipped.
+    assert summary.get("window_source") == "content_bbox"
     assert summary["comparable"] is True
     assert summary.get("skip_reason", "") == ""
     assert overlay is not None
     assert summary["added_px"] > 0
     assert summary["changed_fraction"] > 0.0
+
+
+def test_diff_window_from_header_fallback(tmp_path):
+    # Fallback path: no content_bbox in the reports (render_cli predating #392)
+    # -> fall back to DXF header extents; window_source = "header".
+    a = _dxf((0.0, 0.0), (100.0, 100.0))
+    b = _dxf((0.0, 0.0), (200.0, 100.0))
+    png_a = _box_png(tmp_path / "a.png", 40, 110, 160, 190)
+    png_b = _box_png(tmp_path / "b.png", 40, 110, 380, 190)
+    svc = _FakeSvc(png_a, by_content={a: png_a, b: png_b})  # no content_bbox
+
+    diffsvc = DiffService(svc)
+    params = RenderParams.parse("png", 800, 600, "dark", "extents")
+    overlay, summary, key, hit = _run(diffsvc.diff_bytes(a, b, params))
+
+    assert len(svc.received) == 4
+    assert svc.received[2].window == (0.0, 0.0, 200.0, 100.0)  # union of headers
+    assert summary.get("window_source") == "header"
+    assert summary.get("common_window") == [0.0, 0.0, 200.0, 100.0]
+    assert summary["comparable"] is True
+    assert overlay is not None
+    assert summary["added_px"] > 0
 
 
 def test_diff_no_window_when_extents_equal(tmp_path):

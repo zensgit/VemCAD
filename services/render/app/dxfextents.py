@@ -1,37 +1,26 @@
-"""Pure DXF HEADER extents parsing for the /diff common-window upgrade.
+"""DXF HEADER extents parsing — the FALLBACK source for the /diff common-window.
 
-The version-diff §5 guard skips revisions whose *outer extents* differ: each
-render is fit to its own extents, so a revision that changed the drawing's
-outline yields two rasters in different world->pixel mappings, and the engine
-honestly refuses to diff them (skip_reason="view-space-mismatch").
+The version-diff §5 guard skips revisions whose *outer extents* differ: rendered
+to their own extents they land in different world->pixel mappings, so the engine
+refuses to diff them (skip_reason="view-space-mismatch"). The common-window
+upgrade renders BOTH in a shared world window (their union) so even
+extents-changing revisions diff cleanly.
 
-The deferred upgrade (per VEMCAD_RENDER_SERVICE_CONTRACT §5 and the diff
-engine docstring) is to render BOTH revisions in a shared world window = the
-union of their extents, so even extents-changing revisions diff cleanly. The
-world extents come straight from the DXF HEADER variables $EXTMIN/$EXTMAX
-(group codes 10=x, 20=y), parsed here in pure Python -- no render_cli, no
-dependency on the render report schema.
+PRIMARY source = render_cli's real-geometry `content_bbox` (CADGameFusion #392,
+core::contentBounds), consumed in diffrunner. This module is the FALLBACK only,
+used when content_bbox is unavailable (a render_cli predating #392). It parses
+$EXTMIN/$EXTMAX (group codes 10=x, 20=y) in pure Python — no render_cli needed.
 
-Returns None when the header lacks usable extents, so the caller falls back to
-the existing per-extents behavior rather than guessing a window.
+Returns None when the header lacks usable extents (caller then renders per-
+extents, no window).
 
-KNOWN LIMITATION (follow-up): $EXTMIN/$EXTMAX are author-app-maintained and can
-be STALE — present but smaller than the actual geometry. Used as a HARD render
-window that would clip the out-of-extent geometry, which could miss/spurious a
-change. We only handle *missing* extents (fall back); we do NOT detect
-*stale-present* ones. NOTE: render_cli's existing report `clip` is NOT a robust
-alternative — it comes from `adapter->getExtents()`, which itself returns the
-header `$EXTMIN/$EXTMAX` (see dxf_libdxfrw_adapter `getExtents`), so reading the
-report would source the same stale value. The robust v2 requires render_cli to
-expose a REAL rendered-content bbox — best built as a SHARED scene_render
-content-bounds helper (extend the one `fitToContent` uses, scene_renderer.cpp,
-to cover real ink: ellipse/hatch/actual text extent/expanded blocks, not just
-polyline points + text positions), emitted as a report field DISTINCT from the
-header-derived `clip` (e.g. `content_bbox`). Avoid a second bbox in the import
-callbacks — consolidate one geometry truth at the scene_render layer. VemCAD
-then unions that real bbox; header extents stay only as fallback. A→C cross-repo
-(CADGameFusion first). Tracked as the common-window v2 follow-up; until then a
-stale-small header is the known risk.
+KNOWN LIMITATION (fallback path only): $EXTMIN/$EXTMAX are author-app-maintained
+and can be STALE — present but smaller than the actual geometry. Used as a HARD
+window they would clip out-of-extent geometry. We only detect *missing* extents
+(fall back to per-extents); we do NOT detect *stale-present* ones. This risk
+applies ONLY to this fallback — the primary content_bbox path is real geometry
+and does not clip (it is unioned from render_cli's content_bbox, which exceeds a
+stale header; proven by the stale_small_header golden e2e).
 """
 
 from typing import Optional, Tuple
