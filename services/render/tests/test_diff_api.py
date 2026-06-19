@@ -147,6 +147,65 @@ def test_diff_summary_only_json(settings, tmp_path):
         assert "overlay_path" not in body   # no internal/ephemeral server path leaks
 
 
+# ---- common-window provenance must reach the client (HTTP layer) ----
+
+def _dxf_bytes(extmin, extmax):
+    """Minimal DXF HEADER carrying $EXTMIN/$EXTMAX so DiffService's extents
+    parse engages the common-window path on a real upload."""
+    lines = ["0", "SECTION", "2", "HEADER",
+             "9", "$EXTMIN", "10", str(extmin[0]), "20", str(extmin[1]),
+             "9", "$EXTMAX", "10", str(extmax[0]), "20", str(extmax[1]),
+             "0", "ENDSEC", "0", "EOF", ""]
+    return "\n".join(lines).encode("ascii")
+
+
+def test_diff_common_window_passthrough(settings, tmp_path):
+    # Differing HEADER extents → union window engages; the new provenance must
+    # reach the client on BOTH the image response (header) and JSON summary, so
+    # a future header-trim can't silently drop X-Diff-Common-Window/common_window.
+    a = _dxf_bytes((0.0, 0.0), (100.0, 100.0))
+    b = _dxf_bytes((0.0, 0.0), (200.0, 100.0))                 # grew in X
+    ref = _box_png(tmp_path / "ref.png", x0=40, y0=110, x1=160, y1=190)
+    cand = _box_png(tmp_path / "cand.png", x0=40, y0=110, x1=380, y1=190)
+    with make_client(settings) as c:
+        _stub_renderer(c, {a: ref, b: cand})
+        r = c.post("/diff?width=420&height=300&bg=white", files={
+            "file_a": ("a.dxf", a, "application/octet-stream"),
+            "file_b": ("b.dxf", b, "application/octet-stream"),
+        })
+        assert r.status_code == 200, r.text
+        assert r.headers["content-type"].startswith("image/png")
+        assert r.headers["X-Diff-Comparable"] == "true"
+        assert r.headers["X-Diff-Common-Window"] == "0.0,0.0,200.0,100.0"
+        assert int(r.headers["X-Diff-Added-Px"]) > 0
+
+        rj = c.post("/diff?summary_only=true&width=420&height=300&bg=white", files={
+            "file_a": ("a.dxf", a, "application/octet-stream"),
+            "file_b": ("b.dxf", b, "application/octet-stream"),
+        })
+        assert rj.status_code == 200
+        body = rj.json()
+        assert body["common_window"] == [0.0, 0.0, 200.0, 100.0]
+        assert body["comparable"] is True
+
+
+def test_diff_no_common_window_header_when_extents_equal(settings, tmp_path):
+    # Equal extents → no window → header/field absent (legacy path untouched).
+    a = _dxf_bytes((0.0, 0.0), (100.0, 100.0))
+    b = _dxf_bytes((0.0, 0.0), (100.0, 100.0)) + b"999\ncomment\n"  # same extents, diff bytes
+    ref = _box_png(tmp_path / "ref.png", x0=60, y0=110, x1=360, y1=190)
+    cand = _box_png(tmp_path / "cand.png", x0=60, y0=110, x1=360, y1=190)
+    with make_client(settings) as c:
+        _stub_renderer(c, {a: ref, b: cand})
+        r = c.post("/diff?summary_only=true&width=420&height=300&bg=white", files={
+            "file_a": ("a.dxf", a, "application/octet-stream"),
+            "file_b": ("b.dxf", b, "application/octet-stream"),
+        })
+        assert r.status_code == 200
+        assert "X-Diff-Common-Window" not in r.headers
+        assert "common_window" not in r.json()
+
+
 def test_diff_view_space_mismatch_is_flagged(settings, tmp_path):
     # Different ink-bbox aspects → not a shared view-space → flagged, no overlay.
     ref = _box_png(tmp_path / "ref.png", x0=40, y0=100, x1=340, y1=200)   # wide
