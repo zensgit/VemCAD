@@ -60,6 +60,7 @@ class _FakeCache:
     def __init__(self):
         self.reports = {}
         self.artifacts = {}
+        self.content_bboxes = {}  # (content_sha, cli_sha) -> tuple
 
     def get_report(self, key):
         return self.reports.get(key)
@@ -74,6 +75,12 @@ class _FakeCache:
 
     def put_report_only(self, key, report):
         self.reports[key] = report
+
+    def get_content_bbox(self, content_sha, cli_sha):
+        return self.content_bboxes.get((content_sha, cli_sha))
+
+    def put_content_bbox(self, content_sha, cli_sha, bbox):
+        self.content_bboxes[(content_sha, cli_sha)] = tuple(bbox)
 
 
 class _FakeSvc:
@@ -287,6 +294,34 @@ def test_diff_window_engaged_when_content_bbox_equal_but_headers_differ(tmp_path
     # Identical geometry in the shared window -> comparable, ~no change.
     assert summary["comparable"] is True
     assert summary["changed_fraction"] < 0.02
+
+
+def test_content_bbox_cached_skips_probe_render(tmp_path):
+    # Perf follow-up A: content_bbox is cached by content_sha, so a file already
+    # seen in an earlier diff is NOT re-rendered just to read its content_bbox.
+    a = _dxf((0.0, 0.0), (100.0, 100.0))
+    b = _dxf((0.0, 0.0), (200.0, 100.0))
+    c = _dxf((0.0, 0.0), (150.0, 100.0))
+    png = _box_png(tmp_path / "x.png", 40, 110, 380, 190)
+    svc = _FakeSvc(png, by_content={a: png, b: png, c: png},
+                   content_bbox={a: (0.0, 0.0, 100.0, 100.0),
+                                 b: (0.0, 0.0, 200.0, 100.0),
+                                 c: (0.0, 0.0, 150.0, 100.0)})
+    diffsvc = DiffService(svc)
+    params = RenderParams.parse("png", 800, 600, "dark", "extents")
+
+    # First diff A↔B caches content_bbox for A and B.
+    _run(diffsvc.diff_bytes(a, b, params))
+    svc.received.clear()
+
+    # Diff A↔C: A's content_bbox is cached (no extents probe); only C is probed.
+    overlay, summary, key, hit = _run(diffsvc.diff_bytes(a, c, params))
+    probes = [p for p in svc.received if p.window is None]      # extents probe renders
+    windowed = [p for p in svc.received if p.window is not None]
+    assert len(probes) == 1                 # only C probed — A reused from cache
+    assert len(windowed) == 2               # A and C rendered in the union window
+    assert summary.get("window_source") == "content_bbox"
+    assert summary["comparable"] is True
 
 
 def test_diff_no_window_when_extents_equal(tmp_path):

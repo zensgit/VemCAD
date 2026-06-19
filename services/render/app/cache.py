@@ -109,3 +109,37 @@ class RenderCache:
 
         self._atomic_write(dst, copy)
         return dst
+
+    # --- content_bbox cache (perf follow-up A) -----------------------------
+    # content_bbox is the drawing's REAL geometry extent (render_cli #392). It is
+    # a property of the content + renderer only — independent of frame / params /
+    # bg / fonts — so it is keyed by (content_sha, cli_sha), NOT the four-tuple
+    # render key. Caching it lets /diff skip the per-file "probe" render whose only
+    # job was to read content_bbox from the report.
+
+    def _content_bbox_key(self, content_sha: str, cli_sha: str) -> str:
+        return sha256_bytes(("cbbox:%s:%s" % (content_sha, cli_sha or "")).encode("utf-8"))
+
+    def content_bbox_path(self, content_sha: str, cli_sha: str) -> Path:
+        k = self._content_bbox_key(content_sha, cli_sha)
+        return self._dir(k) / (k + ".cbbox.json")
+
+    def get_content_bbox(self, content_sha: str, cli_sha: str):
+        """Return cached (xmin, ymin, xmax, ymax) or None (not cached)."""
+        p = self.content_bbox_path(content_sha, cli_sha)
+        if not p.is_file():
+            return None
+        try:
+            cb = json.loads(p.read_text("utf-8")).get("content_bbox")
+            if isinstance(cb, list) and len(cb) == 4:
+                return tuple(float(v) for v in cb)
+        except (OSError, ValueError, TypeError):
+            return None
+        return None
+
+    def put_content_bbox(self, content_sha: str, cli_sha: str, bbox) -> None:
+        p = self.content_bbox_path(content_sha, cli_sha)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        payload = json.dumps({"content_bbox": [float(v) for v in bbox]},
+                             ensure_ascii=False).encode("utf-8")
+        self._atomic_write(p, lambda out: out.write(payload))
