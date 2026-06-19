@@ -322,6 +322,10 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         }
         if summary.get("skip_reason"):
             h["X-Diff-Skip-Reason"] = str(summary["skip_reason"])
+        # Present when the common-window upgrade fired (both revisions rendered
+        # in their union world rect so extents-changing revisions diff cleanly).
+        if summary.get("common_window"):
+            h["X-Diff-Common-Window"] = ",".join("%g" % v for v in summary["common_window"])
         return h
 
     @app.post("/diff")
