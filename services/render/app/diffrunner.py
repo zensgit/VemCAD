@@ -108,31 +108,24 @@ class DiffService:
             sha_b = sha256_bytes(content_b)
 
         # §5 common-window v2: frame both revisions to REAL geometry so the pair
-        # shares view-space and nothing clips. Render both at extents first to
-        # read each render_cli report's content_bbox (real geometry, independent
-        # of the frame).
-        base_path_a, key_a, _ = await self.svc.render_bytes(content_a, params, content_sha=sha_a)
-        base_path_b, key_b, _ = await self.svc.render_bytes(content_b, params, content_sha=sha_b)
-
-        cb_a = self._report_content_bbox(key_a)
-        cb_b = self._report_content_bbox(key_b)
+        # shares view-space and nothing clips. The shared window is the union of
+        # the two content_bboxes (real geometry from render_cli). content_bbox is
+        # frame-independent, so it is cached by content_sha (perf follow-up A): a
+        # repeat diff of a file skips the extents "probe" render and goes straight
+        # to the windowed diff render.
+        cb_a = await self._content_bbox(content_a, sha_a, params)
+        cb_b = await self._content_bbox(content_b, sha_b, params)
         render_params = params
         if cb_a is not None and cb_b is not None:
             # When real geometry is known for both, ALWAYS render in the
             # content_bbox union window — do NOT gate on the two bboxes differing.
-            # The base extents renders frame to each side's HEADER ($EXTMIN/
-            # $EXTMAX) clip, which may be stale-small (clipping real geometry) or
-            # differ between revisions. Reusing them is safe ONLY when each header
-            # exactly equals its content_bbox AND both agree, which we do not
-            # assume. In particular, EQUAL content_bboxes do NOT imply safety: two
-            # revisions can share an outer bbox yet (a) sit behind the same
-            # stale-small header that clips internal geometry which differs beyond
-            # it, or (b) carry different headers → mismatched per-extents
-            # view-space. Both are mis-handled by the old per-extents path; the
-            # union window fixes both. (Perf follow-ups: reuse the base renders
-            # when both reports show clip == content_bbox and the clips agree;
-            # cache content_bbox by content_sha to skip the probe render on repeat
-            # diffs.)
+            # EQUAL content_bboxes do NOT imply the per-extents renders are safe to
+            # reuse: two revisions can share an outer bbox yet sit behind a
+            # stale-small header that clips internal geometry differing beyond it,
+            # or carry mismatched per-extents view-space. The union window fixes
+            # both. (Perf follow-up B: reuse the per-extents renders when both
+            # reports show clip == content_bbox and the clips agree, to skip the
+            # windowed re-render.)
             window_source = "content_bbox"
             render_params = params.windowed(union_window(cb_a, cb_b))
         else:
@@ -159,20 +152,35 @@ class DiffService:
             if not (expects_overlay and artifact is None):
                 return artifact, cached_summary, key, True
 
-        # Reuse the extents renders when no common window was needed; otherwise
-        # re-render both in the common window (shared view-space). render_bytes
-        # caches each individually and enforces the busy gate.
-        if render_params is params:
-            path_a, path_b = base_path_a, base_path_b
-        else:
-            path_a, _, _ = await self.svc.render_bytes(content_a, render_params, content_sha=sha_a)
-            path_b, _, _ = await self.svc.render_bytes(content_b, render_params, content_sha=sha_b)
+        # Render BOTH revisions at render_params for the diff. render_bytes caches
+        # by (content_sha, params): with no window this hits the extents probe
+        # render; with a window it renders/​hits the common-window render.
+        path_a, _, _ = await self.svc.render_bytes(content_a, render_params, content_sha=sha_a)
+        path_b, _, _ = await self.svc.render_bytes(content_b, render_params, content_sha=sha_b)
 
         overlay_path, summary = await anyio.to_thread.run_sync(
             self._overlay_sync, engine, path_a, path_b, render_params, sha_a, sha_b, tol, key,
             window_source,
         )
         return overlay_path, summary, key, False
+
+    async def _content_bbox(self, content: bytes, content_sha: str, params):
+        """Real geometry extent (render_cli content_bbox) for a drawing, cached by
+        content_sha (perf follow-up A). Returns (xmin, ymin, xmax, ymax), or None
+        when the render_cli predates content_bbox (caller then uses the header
+        fallback). On a cache miss, renders once at `params` (the extents probe)
+        to read it from the report, then caches it. content_bbox is
+        frame-independent, so the cache key is (content_sha, cli_sha) only — a
+        later diff at any params/window/bg reuses it."""
+        cli_sha = self.svc.cli_sha
+        cached = self.cache.get_content_bbox(content_sha, cli_sha)
+        if cached is not None:
+            return cached
+        _, key, _ = await self.svc.render_bytes(content, params, content_sha=content_sha)
+        cb = self._report_content_bbox(key)
+        if cb is not None:
+            self.cache.put_content_bbox(content_sha, cli_sha, cb)
+        return cb
 
     def _report_content_bbox(self, render_key: str):
         """Real geometry extent of a render, from its render_cli report
