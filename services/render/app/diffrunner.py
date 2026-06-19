@@ -77,6 +77,41 @@ def _diff_key(sha_a: str, sha_b: str, params: RenderParams, tol: int,
     return cache_key(pair_sha, diff_params, cli_sha, font_fp)
 
 
+def _view_rect(report, field: str):
+    """Read a render report's view rect (`content_bbox` or `clip`) as a
+    (xmin, ymin, xmax, ymax) tuple, or None when absent/malformed."""
+    if not report:
+        return None
+    view = (report.get("render_cli_report") or {}).get("view") or {}
+    r = view.get(field)
+    if not isinstance(r, dict):
+        return None
+    try:
+        return (float(r["min_x"]), float(r["min_y"]),
+                float(r["max_x"]), float(r["max_y"]))
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def _rect_close(a, b, rtol: float = 1e-5, atol: float = 1e-6) -> bool:
+    """True if two (xmin,ymin,xmax,ymax) rects agree on every edge within tol."""
+    return all(abs(a[i] - b[i]) <= atol + rtol * max(abs(a[i]), abs(b[i]))
+               for i in range(4))
+
+
+def _frames_tightly(clip, cb, rtol: float = 1e-5, atol: float = 1e-6) -> bool:
+    """True if a render's per-extents `clip` frame already frames its real
+    geometry `cb` tightly — i.e. it CONTAINS cb (no clipping) AND is ~equal to it
+    (so the reused frame matches the content_bbox window). The containment test is
+    one-sided so a clip even slightly SMALLER than cb (which would clip real
+    geometry) is never treated as tight. Used by follow-up B to decide reuse."""
+    if clip is None or cb is None:
+        return False
+    contains = (clip[0] <= cb[0] + atol and clip[1] <= cb[1] + atol
+                and clip[2] >= cb[2] - atol and clip[3] >= cb[3] - atol)
+    return contains and _rect_close(clip, cb, rtol, atol)
+
+
 class DiffService:
     """Thin orchestrator over a RenderService — renders both revisions and
     diffs them. Shares the render service's cache + saturation gate."""
@@ -113,21 +148,37 @@ class DiffService:
         # frame-independent, so it is cached by content_sha (perf follow-up A): a
         # repeat diff of a file skips the extents "probe" render and goes straight
         # to the windowed diff render.
-        cb_a = await self._content_bbox(content_a, sha_a, params)
-        cb_b = await self._content_bbox(content_b, sha_b, params)
+        cb_a, clip_a = await self._content_geom(content_a, sha_a, params)
+        cb_b, clip_b = await self._content_geom(content_b, sha_b, params)
+        # render_params = the images actually fed to the diff; key_params = the
+        # LOGICAL frame the diff is keyed + reported under. They differ only in the
+        # follow-up-B reuse case, where we feed per-extents renders that are
+        # equivalent to the union-window renders — keeping key_params canonical so
+        # the diff cache key is STABLE regardless of how the pixels were produced
+        # (a later diff of the same pair still hits the cache).
         render_params = params
+        key_params = params
+        shared_view = False
         if cb_a is not None and cb_b is not None:
-            # When real geometry is known for both, ALWAYS render in the
-            # content_bbox union window — do NOT gate on the two bboxes differing.
-            # EQUAL content_bboxes do NOT imply the per-extents renders are safe to
-            # reuse: two revisions can share an outer bbox yet sit behind a
-            # stale-small header that clips internal geometry differing beyond it,
-            # or carry mismatched per-extents view-space. The union window fixes
-            # both. (Perf follow-up B: reuse the per-extents renders when both
-            # reports show clip == content_bbox and the clips agree, to skip the
-            # windowed re-render.)
+            # Real geometry known for both → the diff is LOGICALLY framed to the
+            # content_bbox union window: shared view-space, nothing clips. Do NOT
+            # gate on the two bboxes differing — equal content_bboxes do not make
+            # per-extents renders safe to reuse (a stale-small header clips internal
+            # geometry beyond it; differing headers → mismatched view-space).
             window_source = "content_bbox"
-            render_params = params.windowed(union_window(cb_a, cb_b))
+            shared_view = True
+            key_params = params.windowed(union_window(cb_a, cb_b))
+            if (_frames_tightly(clip_a, cb_a) and _frames_tightly(clip_b, cb_b)
+                    and _rect_close(clip_a, clip_b)):
+                # Follow-up B: both per-extents renders already frame their real
+                # geometry tightly and in the SAME frame, so they are equivalent to
+                # the union-window renders — REUSE them (render at extents) and skip
+                # the windowed re-render. Pure render-time optimization; the cache
+                # key stays canonical (key_params). clip is known only on a
+                # content_bbox cache miss — exactly when the probe render exists.
+                render_params = params
+            else:
+                render_params = key_params  # render in the union window
         else:
             # Fallback: real geometry unknown (render_cli predating content_bbox).
             # The DXF HEADER is the only view-space signal, so window only when the
@@ -137,8 +188,10 @@ class DiffService:
             h_b = parse_dxf_extents(content_b)
             if h_a is not None and h_b is not None and extents_differ(h_a, h_b):
                 render_params = params.windowed(union_window(h_a, h_b))
+            key_params = render_params
+            shared_view = render_params.window is not None
 
-        key = _diff_key(sha_a, sha_b, render_params, tol, self.svc.cli_sha, self.svc.font_fp)
+        key = _diff_key(sha_a, sha_b, key_params, tol, self.svc.cli_sha, self.svc.font_fp)
         cached_report = self.cache.get_report(key)
         cached_summary = cached_report.get("summary") if cached_report else None
         if cached_summary:
@@ -158,61 +211,56 @@ class DiffService:
         path_a, _, _ = await self.svc.render_bytes(content_a, render_params, content_sha=sha_a)
         path_b, _, _ = await self.svc.render_bytes(content_b, render_params, content_sha=sha_b)
 
+        # Report under key_params (the canonical logical frame), not render_params:
+        # in the reuse case the pixels came from the per-extents renders but the
+        # diff is logically the union-window diff, so common_window reflects that.
         overlay_path, summary = await anyio.to_thread.run_sync(
-            self._overlay_sync, engine, path_a, path_b, render_params, sha_a, sha_b, tol, key,
-            window_source,
+            self._overlay_sync, engine, path_a, path_b, key_params, sha_a, sha_b, tol, key,
+            window_source, shared_view,
         )
         return overlay_path, summary, key, False
 
-    async def _content_bbox(self, content: bytes, content_sha: str, params):
-        """Real geometry extent (render_cli content_bbox) for a drawing, cached by
-        content_sha (perf follow-up A). Returns (xmin, ymin, xmax, ymax), or None
-        when the render_cli predates content_bbox (caller then uses the header
-        fallback). On a cache miss, renders once at `params` (the extents probe)
-        to read it from the report, then caches it. content_bbox is
-        frame-independent, so the cache key is (content_sha, cli_sha) only — a
-        later diff at any params/window/bg reuses it."""
+    async def _content_geom(self, content: bytes, content_sha: str, params):
+        """Returns (content_bbox, clip) for a drawing.
+
+        content_bbox = real geometry extent (render_cli #392), cached by
+        content_sha (follow-up A). clip = the per-extents frame render_cli used
+        (`view.clip` = the DXF header rect), read from the PROBE report — so it is
+        available only on a content_bbox cache MISS (when we render the probe),
+        and None on a cache hit. Follow-up B uses clip to detect when the
+        per-extents render already frames real geometry (clip == content_bbox) and
+        can be reused instead of re-rendering windowed.
+
+        content_bbox is None when the render_cli predates the field (caller then
+        uses the header fallback)."""
         cli_sha = self.svc.cli_sha
         cached = self.cache.get_content_bbox(content_sha, cli_sha)
         if cached is not None:
-            return cached
+            return cached, None  # cache hit: no probe report, so no clip
         _, key, _ = await self.svc.render_bytes(content, params, content_sha=content_sha)
-        cb = self._report_content_bbox(key)
+        report = self.cache.get_report(key)
+        cb = _view_rect(report, "content_bbox")
+        clip = _view_rect(report, "clip")
         if cb is not None:
             self.cache.put_content_bbox(content_sha, cli_sha, cb)
-        return cb
-
-    def _report_content_bbox(self, render_key: str):
-        """Real geometry extent of a render, from its render_cli report
-        `view.content_bbox` (added in CADGameFusion #392) — returns
-        (xmin, ymin, xmax, ymax) or None when absent (older render_cli)."""
-        report = self.cache.get_report(render_key)
-        if not report:
-            return None
-        view = (report.get("render_cli_report") or {}).get("view") or {}
-        cb = view.get("content_bbox")
-        if not isinstance(cb, dict):
-            return None
-        try:
-            return (float(cb["min_x"]), float(cb["min_y"]),
-                    float(cb["max_x"]), float(cb["max_y"]))
-        except (KeyError, TypeError, ValueError):
-            return None
+        return cb, clip
 
     def _overlay_sync(self, engine, path_a, path_b, params, sha_a, sha_b, tol, key,
-                      window_source="content_bbox"):
+                      window_source="content_bbox", shared_view=False):
         # The engine decides comparability (its §5 view-space guard) — we never
-        # force comparable=True. When we rendered both revisions in a common
-        # window (params.window set), tell the engine they share view-space so it
-        # diffs them in the common pixel grid instead of cropping each to its own
-        # bbox (which would defeat the shared window / re-centre a moved revision
-        # into a false match). Write the overlay to a temp file first, then
-        # publish through the cache (report-before-artifact atomicity).
+        # force comparable=True. `shared_view` (decided by the caller) tells the
+        # engine the two renders share view-space so it diffs them in the common
+        # pixel grid instead of cropping each to its own bbox (which would defeat
+        # the shared window / re-centre a moved revision into a false match). It is
+        # True whenever real geometry framed the pair — both the union-window path
+        # AND follow-up B's reuse path (per-extents renders with agreeing tight
+        # clips share view-space without an explicit window). Write the overlay to
+        # a temp file first, then publish through the cache (report-before-artifact).
         with tempfile.TemporaryDirectory(prefix="vemcad_diff_") as td:
             tmp_overlay = Path(td) / "overlay.png"
             res = engine.diff_overlay(
                 Path(path_a), Path(path_b), tol=tol, out_path=tmp_overlay,
-                shared_view=(params.window is not None),
+                shared_view=shared_view,
             )
             summary = res.to_dict()
             # overlay_path is an internal temp path — the HTTP layer streams the
@@ -223,13 +271,15 @@ class DiffService:
                 "params": params.as_dict(),
                 "tol": tol,
             })
-            # Honest provenance: record the shared window when the common-window
-            # upgrade fired (extents-changing revisions rendered in a union rect),
-            # plus whether it came from real geometry (content_bbox) or the
-            # stale-prone header fallback.
+            # Honest provenance: when the pair shared view-space, record its source
+            # (real geometry content_bbox, or the stale-prone header fallback); and
+            # when an explicit union window was rendered, record it. Follow-up B's
+            # reuse path shares view-space WITHOUT an explicit window, so it records
+            # window_source but no common_window.
+            if shared_view:
+                summary["window_source"] = window_source
             if params.window is not None:
                 summary["common_window"] = list(params.window)
-                summary["window_source"] = window_source
             report = {
                 "schema": "vemcad.render_diff_report",
                 "schema_version": "0.1",
