@@ -107,28 +107,43 @@ class DiffService:
         if sha_b is None:
             sha_b = sha256_bytes(content_b)
 
-        # §5 common-window v2: source the shared window from each render's REAL
-        # geometry extent (render_cli report `content_bbox`), not the stale-prone
-        # DXF header. Render both at extents first, read content_bbox, and if the
-        # two extents differ re-render both in their union window so they share
-        # view-space and diff cleanly (the engine's shared_view path). The DXF
-        # HEADER $EXTMIN/$EXTMAX is a FALLBACK only — used when content_bbox is
-        # unavailable (a render_cli predating the field). Header extents can be
-        # stale-small and clip; content_bbox (real geometry) cannot.
+        # §5 common-window v2: frame both revisions to REAL geometry so the pair
+        # shares view-space and nothing clips. Render both at extents first to
+        # read each render_cli report's content_bbox (real geometry, independent
+        # of the frame).
         base_path_a, key_a, _ = await self.svc.render_bytes(content_a, params, content_sha=sha_a)
         base_path_b, key_b, _ = await self.svc.render_bytes(content_b, params, content_sha=sha_b)
 
         cb_a = self._report_content_bbox(key_a)
         cb_b = self._report_content_bbox(key_b)
-        window_source = "content_bbox"
-        if cb_a is None or cb_b is None:
-            cb_a = parse_dxf_extents(content_a)
-            cb_b = parse_dxf_extents(content_b)
-            window_source = "header"
-
         render_params = params
-        if cb_a is not None and cb_b is not None and extents_differ(cb_a, cb_b):
+        if cb_a is not None and cb_b is not None:
+            # When real geometry is known for both, ALWAYS render in the
+            # content_bbox union window — do NOT gate on the two bboxes differing.
+            # The base extents renders frame to each side's HEADER ($EXTMIN/
+            # $EXTMAX) clip, which may be stale-small (clipping real geometry) or
+            # differ between revisions. Reusing them is safe ONLY when each header
+            # exactly equals its content_bbox AND both agree, which we do not
+            # assume. In particular, EQUAL content_bboxes do NOT imply safety: two
+            # revisions can share an outer bbox yet (a) sit behind the same
+            # stale-small header that clips internal geometry which differs beyond
+            # it, or (b) carry different headers → mismatched per-extents
+            # view-space. Both are mis-handled by the old per-extents path; the
+            # union window fixes both. (Perf follow-ups: reuse the base renders
+            # when both reports show clip == content_bbox and the clips agree;
+            # cache content_bbox by content_sha to skip the probe render on repeat
+            # diffs.)
+            window_source = "content_bbox"
             render_params = params.windowed(union_window(cb_a, cb_b))
+        else:
+            # Fallback: real geometry unknown (render_cli predating content_bbox).
+            # The DXF HEADER is the only view-space signal, so window only when the
+            # two headers differ — header can be stale-small and clip.
+            window_source = "header"
+            h_a = parse_dxf_extents(content_a)
+            h_b = parse_dxf_extents(content_b)
+            if h_a is not None and h_b is not None and extents_differ(h_a, h_b):
+                render_params = params.windowed(union_window(h_a, h_b))
 
         key = _diff_key(sha_a, sha_b, render_params, tol, self.svc.cli_sha, self.svc.font_fp)
         cached_report = self.cache.get_report(key)

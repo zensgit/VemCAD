@@ -166,25 +166,35 @@ view-space, not only background. By default each render is fit to its OWN
 extents, so a revision that changes the drawing's outer extents would yield
 mismatched ink bboxes; stretching one onto the other is never done.
 
-Common-window upgrade (implemented, **v2**): when the two revisions' **real
-geometry extents differ**, the service renders both in their **union world
-window** (`render_cli --window`, B5) so they share view-space, and diffs them in
-the common pixel grid (no per-extents bbox normalisation, no aspect guard). The
-window source, in priority order:
+Common-window upgrade (implemented, **v2**): the trigger is "the pair needs a
+shared view-space", which the service secures by framing both revisions to real
+geometry. The window source, in priority order:
 1. **`content_bbox`** (primary) — render_cli's real-geometry extent
    (`view.content_bbox`, CADGameFusion #392 `core::contentBounds`), read from each
-   render's report. Real geometry, so it never clips.
+   render's report. When it is available for **both** revisions the service
+   **always** renders both in their `content_bbox` **union world window**
+   (`render_cli --window`, B5) and diffs in the common pixel grid (no per-extents
+   bbox normalisation, no aspect guard). It does **not** gate on the two bboxes
+   differing: equal content_bboxes do **not** make the per-extents base renders
+   safe to reuse — the two sides can still sit behind different or stale-small
+   HEADER clips (mismatched view-space, or internal geometry clipped beyond a
+   stale extent). Reusing the base renders is correct only when each header
+   exactly equals its content_bbox and both agree, which the service does not
+   assume (a perf follow-up may detect that case to skip the re-render). Real
+   geometry, so the window never clips.
 2. **HEADER `$EXTMIN`/`$EXTMAX`** (fallback) — used only when `content_bbox` is
-   absent (a render_cli predating #392). Can be stale-small (see below).
+   absent (a render_cli predating #392). Real geometry is then unknown, so the
+   header is the only view-space signal and the window engages only when the two
+   headers differ. Header can be stale-small (see below).
 
 The window is folded into the render + diff cache keys (`params.window`) and
 surfaced as `X-Diff-Common-Window` + `common_window`; `window_source`
 (`content_bbox`|`header`) records which source drove it.
 
-Fallback / guard still applies when no window is engaged (extents unavailable or
-equal): the comparator's `ASPECT_TOL` guard returns `comparable=false`,
-`skip_reason="view-space-mismatch"` (JSON, no overlay) rather than mis-diffing;
-`both-blank` likewise.
+Guard still applies when no window is engaged (the header-fallback path with
+equal/absent headers): the comparator's `ASPECT_TOL` guard returns
+`comparable=false`, `skip_reason="view-space-mismatch"` (JSON, no overlay) rather
+than mis-diffing; `both-blank` likewise.
 
 Residual limitation (FALLBACK path only): HEADER `$EXTMIN`/`$EXTMAX` can be
 **stale-small** and, used as a HARD `--window`, clip out-of-extent geometry. This
