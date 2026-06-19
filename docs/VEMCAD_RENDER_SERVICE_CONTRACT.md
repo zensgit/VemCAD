@@ -182,9 +182,16 @@ overlay) rather than mis-diffing; `both-blank` is reported likewise.
 Known limitation (follow-up): HEADER extents are author-app-maintained and may
 be **stale-small** (present but smaller than the real geometry). Used as a HARD
 `--window`, a stale-small rect can clip out-of-extent geometry. Only *missing*
-extents are guarded (fallback); *stale-present* are not detected. The robust
-source is render_cli's own report extents (consistent with what it renders) —
-tracked as the common-window v2 follow-up.
+extents are guarded (fallback); *stale-present* are not detected. Note that
+render_cli's report `clip` is **not** a robust alternative — it derives from
+`adapter->getExtents()`, which returns the same header `$EXTMIN/$EXTMAX`. The
+robust **v2** requires render_cli to expose a **real rendered-content bbox** via
+a **shared scene_render content-bounds helper** (extend `fitToContent`'s bbox to
+cover real ink — ellipse/hatch/text extent/expanded blocks — rather than adding
+a second bbox in the import callbacks), emitted as a report field distinct from
+the header-derived `clip` (e.g. `content_bbox`), which VemCAD `/diff` then unions
+for the window (header extents fallback only) — an A→C cross-repo change
+(CADGameFusion first). Tracked as the common-window v2 follow-up.
 
 `changed_fraction` ∈ [0,1] = (added+removed)/(unchanged+added+removed); fixed
 orientation (A=old, B=new), so it is deliberately not swap-symmetric.

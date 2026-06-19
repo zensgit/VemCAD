@@ -116,8 +116,9 @@ class DiffService:
         # rendering when either header lacks usable extents (window left None).
         # NOTE (follow-up): the union window is a HARD render rect. If a DXF's
         # HEADER extents are stale-small (present but smaller than real geometry)
-        # this can clip — see dxfextents.py KNOWN LIMITATION. Robust source is
-        # render_cli's report extents; header extents chosen for testability.
+        # this can clip — see dxfextents.py KNOWN LIMITATION. The robust v2 needs
+        # render_cli to expose a REAL geometry bbox (its report `clip` is itself
+        # header-derived via getExtents, so it is not an alternative).
         render_params = params
         ext_a = parse_dxf_extents(content_a)
         ext_b = parse_dxf_extents(content_b)
