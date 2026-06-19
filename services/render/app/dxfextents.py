@@ -19,11 +19,19 @@ KNOWN LIMITATION (follow-up): $EXTMIN/$EXTMAX are author-app-maintained and can
 be STALE — present but smaller than the actual geometry. Used as a HARD render
 window that would clip the out-of-extent geometry, which could miss/spurious a
 change. We only handle *missing* extents (fall back); we do NOT detect
-*stale-present* ones. The architecturally correct source is render_cli's OWN
-report extents (guaranteed consistent with what it renders) — header extents
-were chosen here for local testability. Robust v2: render both at extents once,
-read each report's actual extents, union, re-render windowed. Tracked as the
-common-window follow-up; until then a stale-small header is the known risk.
+*stale-present* ones. NOTE: render_cli's existing report `clip` is NOT a robust
+alternative — it comes from `adapter->getExtents()`, which itself returns the
+header `$EXTMIN/$EXTMAX` (see dxf_libdxfrw_adapter `getExtents`), so reading the
+report would source the same stale value. The robust v2 requires render_cli to
+expose a REAL rendered-content bbox — best built as a SHARED scene_render
+content-bounds helper (extend the one `fitToContent` uses, scene_renderer.cpp,
+to cover real ink: ellipse/hatch/actual text extent/expanded blocks, not just
+polyline points + text positions), emitted as a report field DISTINCT from the
+header-derived `clip` (e.g. `content_bbox`). Avoid a second bbox in the import
+callbacks — consolidate one geometry truth at the scene_render layer. VemCAD
+then unions that real bbox; header extents stay only as fallback. A→C cross-repo
+(CADGameFusion first). Tracked as the common-window v2 follow-up; until then a
+stale-small header is the known risk.
 """
 
 from typing import Optional, Tuple
