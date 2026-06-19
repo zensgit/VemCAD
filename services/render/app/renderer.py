@@ -170,8 +170,11 @@ class RenderService:
             "--report", str(report_path),
         ]
         # B5: explicit world rectangle so both /diff revisions share view-space.
+        # Use repr (shortest round-trippable form) rather than %g — %g caps at 6
+        # significant figures, which on a HARD world rect would round the window
+        # inward and clip real edge geometry for large CAD coordinates.
         if params.window is not None:
-            argv += ["--window", "%g,%g,%g,%g" % tuple(params.window)]
+            argv += ["--window", ",".join(repr(float(v)) for v in params.window)]
         # A5: feed the per-tenant font directory to render_cli (B1 --font-dir),
         # so drawing fonts the host OS lacks resolve from our store. The dir's
         # fingerprint is already in the cache key, so changing fonts re-renders.

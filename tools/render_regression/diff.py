@@ -46,6 +46,7 @@ from compare import (  # reuse the D2 alignment + ink extraction
     _best_shift,
     _crop_resize,
     _dilate,
+    _ink_bbox,
     _ink_mask,
     _load_rgb,
     _shift,
@@ -101,6 +102,55 @@ def _render_overlay(unchanged, removed, added, canvas: Tuple[int, int]) -> Image
     return Image.fromarray(img, mode="RGB")
 
 
+def _union_bbox(*masks):
+    """Smallest (r0, r1, c0, c1) covering the ink bbox of every given mask, or
+    None if all masks are blank."""
+    boxes = [bb for bb in (_ink_bbox(m) for m in masks) if bb is not None]
+    if not boxes:
+        return None
+    return (min(b[0] for b in boxes), max(b[1] for b in boxes),
+            min(b[2] for b in boxes), max(b[3] for b in boxes))
+
+
+def _diff_shared_view(ma, mb, tol: int, out_path: Optional[Path]) -> DiffResult:
+    """Diff two renders KNOWN to share view-space (same world window + pixel
+    size — the /diff common-window path). Crucially, unlike the per-extents
+    path, this does NOT crop each render to its OWN ink bbox (which discards
+    absolute frame position and would defeat the shared window) and does NOT
+    apply the aspect guard. Both masks are cropped to the SAME union bbox, so a
+    revision that *moved* or *grew* geometry within the shared window is scored
+    as a real change instead of being re-centred into a false 'no change'."""
+    if ma.shape != mb.shape:
+        # A shared window at identical width/height must yield identical pixel
+        # dims. If not, the caller's shared-view claim is broken — flag, don't guess.
+        canvas = (mb.shape[1], mb.shape[0])
+        return DiffResult(False, 0, 0, 0, 0, 0, 0.0, canvas, None,
+                          False, "shared-view-shape-mismatch")
+    ub = _union_bbox(ma, mb)
+    if ub is None:
+        canvas = (ma.shape[1], ma.shape[0])
+        return DiffResult(False, 0, 0, 0, 0, 0, 0.0, canvas, None, True, "both-blank")
+    r0, r1, c0, c1 = ub
+    ca = ma[r0:r1, c0:c1]
+    cb = mb[r0:r1, c0:c1]
+    canvas = (c1 - c0, r1 - r0)  # (w, h)
+
+    dx, dy = _best_shift(ca, cb)   # absorb ≤tol AA/hinting jitter only
+    cb = _shift(cb, dy, dx)
+
+    unchanged, removed, added = _classify(ca, cb, tol)
+    u, r, a = int(unchanged.sum()), int(removed.sum()), int(added.sum())
+    union = u + r + a
+    changed_fraction = (r + a) / union if union else 0.0
+
+    written: Optional[str] = None
+    if out_path is not None:
+        _render_overlay(unchanged, removed, added, canvas).save(str(out_path))
+        written = str(out_path)
+    return DiffResult(True, dx, dy, u, a, r, round(changed_fraction, 4),
+                      canvas, written, True, "")
+
+
 def diff_overlay(
     ref_path: Path,
     cand_path: Path,
@@ -110,16 +160,26 @@ def diff_overlay(
     out_path: Optional[Path] = None,
     comparable: bool = True,
     skip_reason: str = "",
+    shared_view: bool = False,
 ) -> DiffResult:
     """Produce a version-diff overlay + summary. `comparable` is set False by
-    the caller when bg / color_mapping / view-space differ (the two renders
-    must share them — same §5 rule as compare())."""
+    the caller when bg / color_mapping differ (the two renders must share them
+    — same §5 rule as compare()).
+
+    `shared_view=True` means the caller guaranteed both renders share view-space
+    (the /diff common-window upgrade: both rendered in the union world window).
+    Then the per-extents independent bbox crop + aspect guard are bypassed and
+    both renders are diffed in their common pixel grid, so extents-changing /
+    geometry-moving revisions diff cleanly instead of being skipped or
+    re-centred into a false match."""
     if not comparable:
         return DiffResult(False, 0, 0, 0, 0, 0, 0.0, canvas, None,
                           False, skip_reason or "not-comparable")
 
     ma = _ink_mask(_load_rgb(Path(ref_path)).mean(axis=2))
     mb = _ink_mask(_load_rgb(Path(cand_path)).mean(axis=2))
+    if shared_view:
+        return _diff_shared_view(ma, mb, tol, out_path)
     ca, aspa = _crop_resize(ma, canvas)
     cb, aspb = _crop_resize(mb, canvas)
     if ca is None and cb is None:

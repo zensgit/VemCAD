@@ -325,7 +325,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         # Present when the common-window upgrade fired (both revisions rendered
         # in their union world rect so extents-changing revisions diff cleanly).
         if summary.get("common_window"):
-            h["X-Diff-Common-Window"] = ",".join("%g" % v for v in summary["common_window"])
+            h["X-Diff-Common-Window"] = ",".join(repr(float(v)) for v in summary["common_window"])
         return h
 
     @app.post("/diff")

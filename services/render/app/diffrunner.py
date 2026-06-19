@@ -147,12 +147,17 @@ class DiffService:
 
     def _overlay_sync(self, engine, path_a, path_b, params, sha_a, sha_b, tol, key):
         # The engine decides comparability (its §5 view-space guard) — we never
-        # force comparable=True. Write the overlay to a temp file first, then
+        # force comparable=True. When we rendered both revisions in a common
+        # window (params.window set), tell the engine they share view-space so it
+        # diffs them in the common pixel grid instead of cropping each to its own
+        # bbox (which would defeat the shared window / re-centre a moved revision
+        # into a false match). Write the overlay to a temp file first, then
         # publish through the cache (report-before-artifact atomicity).
         with tempfile.TemporaryDirectory(prefix="vemcad_diff_") as td:
             tmp_overlay = Path(td) / "overlay.png"
             res = engine.diff_overlay(
-                Path(path_a), Path(path_b), tol=tol, out_path=tmp_overlay
+                Path(path_a), Path(path_b), tol=tol, out_path=tmp_overlay,
+                shared_view=(params.window is not None),
             )
             summary = res.to_dict()
             # overlay_path is an internal temp path — the HTTP layer streams the

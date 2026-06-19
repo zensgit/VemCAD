@@ -47,6 +47,15 @@ def _inked_png(path: Path) -> Path:
     return path
 
 
+def _box_png(path: Path, x0, y0, x1, y1) -> Path:
+    """A box at an explicit position on a fixed-size canvas (simulates a render
+    in a shared window — the canvas size is constant, the geometry moves)."""
+    im = Image.new("RGB", (420, 300), (255, 255, 255))
+    ImageDraw.Draw(im).rectangle([x0, y0, x1, y1], outline=(0, 0, 0), width=3)
+    im.save(path)
+    return path
+
+
 class _FakeCache:
     def __init__(self):
         self.reports = {}
@@ -69,18 +78,20 @@ class _FakeCache:
 
 class _FakeSvc:
     """Stub RenderService: records the params of every render and returns a
-    pre-baked PNG, so DiffService runs the real diff engine with no binary."""
+    pre-baked PNG (per-content so A and B can differ), so DiffService runs the
+    real diff engine with no binary."""
 
-    def __init__(self, png: Path):
+    def __init__(self, default_png: Path, by_content=None):
         self.cache = _FakeCache()
         self.cli_sha = "clisha"
         self.font_fp = "fontfp"
-        self.png = png
+        self.default_png = default_png
+        self.by_content = by_content or {}
         self.received = []
 
     async def render_bytes(self, content, params, content_sha=None):
         self.received.append(params)
-        return self.png, "renderkey", False
+        return self.by_content.get(content, self.default_png), "renderkey", False
 
 
 def _run(coro):
@@ -171,7 +182,8 @@ def test_build_argv_includes_window_when_set():
     p = RenderParams.parse("png", 800, 600, "white", "extents").windowed((0.0, 0.0, 200.0, 100.0))
     argv = RenderService._build_argv("render_cli", "in.dxf", "out.png", p, "rep.json", None)
     assert "--window" in argv
-    assert argv[argv.index("--window") + 1] == "0,0,200,100"
+    # repr-based (round-trippable, no %g 6-sig-fig truncation/clipping).
+    assert argv[argv.index("--window") + 1] == "0.0,0.0,200.0,100.0"
 
 
 def test_build_argv_no_window_by_default():
@@ -187,11 +199,15 @@ def test_build_argv_no_window_by_default():
 # --------------------------------------------------------------------------
 
 def test_diff_uses_common_window_when_extents_differ(tmp_path):
-    png = _inked_png(tmp_path / "r.png")
-    svc = _FakeSvc(png)
-    diffsvc = DiffService(svc)
     a = _dxf((0.0, 0.0), (100.0, 100.0))
     b = _dxf((0.0, 0.0), (200.0, 100.0))  # B grew in X -> extents differ
+    # Pre-baked renders AS IF produced in the shared window: same canvas size,
+    # B's geometry occupies more width. Different images per revision so the
+    # diff is real (not an image-vs-itself no-op).
+    png_a = _box_png(tmp_path / "a.png", 40, 110, 160, 190)   # narrow box
+    png_b = _box_png(tmp_path / "b.png", 40, 110, 380, 190)   # wide box (grew)
+    svc = _FakeSvc(png_a, by_content={a: png_a, b: png_b})
+    diffsvc = DiffService(svc)
 
     params = RenderParams.parse("png", 800, 600, "dark", "extents")
     overlay, summary, key, hit = _run(diffsvc.diff_bytes(a, b, params))
@@ -201,8 +217,13 @@ def test_diff_uses_common_window_when_extents_differ(tmp_path):
     assert svc.received[0].window == (0.0, 0.0, 200.0, 100.0)
     assert svc.received[1].window == (0.0, 0.0, 200.0, 100.0)
     assert summary.get("common_window") == [0.0, 0.0, 200.0, 100.0]
-    assert overlay is not None          # comparable -> overlay emitted
+    # The pair is comparable (shared view-space) AND the grown geometry is
+    # scored as a real change — NOT a false 'identical' and NOT skipped.
     assert summary["comparable"] is True
+    assert summary.get("skip_reason", "") == ""
+    assert overlay is not None
+    assert summary["added_px"] > 0
+    assert summary["changed_fraction"] > 0.0
 
 
 def test_diff_no_window_when_extents_equal(tmp_path):
