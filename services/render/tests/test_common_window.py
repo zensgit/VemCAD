@@ -260,6 +260,35 @@ def test_diff_window_from_header_fallback(tmp_path):
     assert summary["added_px"] > 0
 
 
+def test_diff_window_engaged_when_content_bbox_equal_but_headers_differ(tmp_path):
+    # P1 regression: EQUAL content_bbox must STILL engage the common window when
+    # the headers differ / one is stale-small. Here both real bboxes are
+    # (0,0,200,100) but A's HEADER is stale-small (0,0,50,50) while B's is correct
+    # (0,0,200,100) — A's per-extents base render would clip to the corner. The
+    # window must still engage from content_bbox (not be skipped because the two
+    # bboxes are equal), so both render in the same real-geometry window and the
+    # identical geometry diffs as ~no change instead of being mis-diffed/skipped.
+    a = _dxf((0.0, 0.0), (50.0, 50.0))     # stale-small header
+    b = _dxf((0.0, 0.0), (200.0, 100.0))   # correct header
+    png = _box_png(tmp_path / "same.png", 40, 110, 380, 190)  # identical render both sides
+    svc = _FakeSvc(png, by_content={a: png, b: png},
+                   content_bbox={a: (0.0, 0.0, 200.0, 100.0),
+                                 b: (0.0, 0.0, 200.0, 100.0)})  # EQUAL real bbox
+    diffsvc = DiffService(svc)
+    params = RenderParams.parse("png", 800, 600, "dark", "extents")
+    overlay, summary, key, hit = _run(diffsvc.diff_bytes(a, b, params))
+
+    # Window engaged from content_bbox despite equal bboxes (2 extents + 2 windowed).
+    assert len(svc.received) == 4
+    assert svc.received[2].window == (0.0, 0.0, 200.0, 100.0)
+    assert svc.received[3].window == (0.0, 0.0, 200.0, 100.0)
+    assert summary.get("window_source") == "content_bbox"
+    assert summary.get("common_window") == [0.0, 0.0, 200.0, 100.0]
+    # Identical geometry in the shared window -> comparable, ~no change.
+    assert summary["comparable"] is True
+    assert summary["changed_fraction"] < 0.02
+
+
 def test_diff_no_window_when_extents_equal(tmp_path):
     png = _inked_png(tmp_path / "r.png")
     svc = _FakeSvc(png)
