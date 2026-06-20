@@ -271,11 +271,14 @@ class DiffService:
                 "params": params.as_dict(),
                 "tol": tol,
             })
-            # Honest provenance: when the pair shared view-space, record its source
-            # (real geometry content_bbox, or the stale-prone header fallback); and
-            # when an explicit union window was rendered, record it. Follow-up B's
-            # reuse path shares view-space WITHOUT an explicit window, so it records
-            # window_source but no common_window.
+            # Honest provenance, reported under the canonical frame (`params` here
+            # is the caller's key_params): when the pair shared view-space record
+            # its source (real geometry content_bbox, or the stale-prone header
+            # fallback), and when that canonical frame is an explicit window record
+            # it. Both the union-window AND follow-up B's reuse path pass the
+            # canonical key_params, so reuse records window_source AND common_window
+            # even though its pixels came from the per-extents renders. Only the
+            # header-fallback no-window case records neither.
             if shared_view:
                 summary["window_source"] = window_source
             if params.window is not None:
