@@ -179,8 +179,9 @@ geometry. The window source, in priority order:
    safe to reuse — the two sides can still sit behind different or stale-small
    HEADER clips (mismatched view-space, or internal geometry clipped beyond a
    stale extent). Reusing the base renders is correct only when each header
-   exactly equals its content_bbox and both agree, which the service does not
-   assume (a perf follow-up may detect that case to skip the re-render). Real
+   exactly equals its content_bbox and both agree — the service **detects** this
+   case and reuses the per-extents renders (skipping the windowed re-render),
+   keyed under the same canonical window so the diff cache stays stable. Real
    geometry, so the window never clips.
 2. **HEADER `$EXTMIN`/`$EXTMAX`** (fallback) — used only when `content_bbox` is
    absent (a render_cli predating #392). Real geometry is then unknown, so the
