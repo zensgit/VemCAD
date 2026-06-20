@@ -88,7 +88,7 @@ class _FakeSvc:
     pre-baked PNG (per-content so A and B can differ), so DiffService runs the
     real diff engine with no binary."""
 
-    def __init__(self, default_png: Path, by_content=None, content_bbox=None):
+    def __init__(self, default_png: Path, by_content=None, content_bbox=None, clip=None):
         self.cache = _FakeCache()
         self.cli_sha = "clisha"
         self.font_fp = "fontfp"
@@ -97,15 +97,25 @@ class _FakeSvc:
         # content bytes -> (xmin,ymin,xmax,ymax): when set, the render's report
         # carries view.content_bbox (simulates render_cli #392).
         self.content_bbox = content_bbox or {}
+        # content bytes -> (xmin,ymin,xmax,ymax): the per-extents `view.clip`
+        # (header rect) in the report; used by follow-up B's reuse decision.
+        self.clip = clip or {}
         self.received = []
 
     async def render_bytes(self, content, params, content_sha=None):
         self.received.append(params)
         key = "rk-%s-%s" % (content_sha or id(content), params.view)
+        view = {}
         cb = self.content_bbox.get(content)
         if cb is not None:
-            self.cache.reports[key] = {"render_cli_report": {"view": {"content_bbox": {
-                "min_x": cb[0], "min_y": cb[1], "max_x": cb[2], "max_y": cb[3]}}}}
+            view["content_bbox"] = {"min_x": cb[0], "min_y": cb[1],
+                                    "max_x": cb[2], "max_y": cb[3]}
+        cl = self.clip.get(content)
+        if cl is not None:
+            view["clip"] = {"min_x": cl[0], "min_y": cl[1],
+                            "max_x": cl[2], "max_y": cl[3]}
+        if view:
+            self.cache.reports[key] = {"render_cli_report": {"view": view}}
         return self.by_content.get(content, self.default_png), key, False
 
 
@@ -322,6 +332,87 @@ def test_content_bbox_cached_skips_probe_render(tmp_path):
     assert len(windowed) == 2               # A and C rendered in the union window
     assert summary.get("window_source") == "content_bbox"
     assert summary["comparable"] is True
+
+
+def test_diff_reuses_per_extents_renders_when_clip_frames_geometry(tmp_path):
+    # Perf follow-up B: both per-extents renders already frame their real geometry
+    # tightly (clip == content_bbox) and in the SAME frame → reuse them and SKIP
+    # the windowed re-render. A real change (moved box) is STILL detected because
+    # shared_view is forced (the reuse path shares view-space).
+    # Distinct bytes (same declared extents) so BOTH are content_bbox cache misses
+    # → both probed → both clips available for the reuse check.
+    a = _dxf((0.0, 0.0), (200.0, 100.0))
+    b = _dxf((0.0, 0.0), (200.0, 100.0)) + b"999\nrevB\n"
+    png_a = _box_png(tmp_path / "a.png", 40, 110, 160, 190)    # box left
+    png_b = _box_png(tmp_path / "b.png", 240, 110, 380, 190)   # box right (moved)
+    tight = (0.0, 0.0, 200.0, 100.0)
+    svc = _FakeSvc(png_a, by_content={a: png_a, b: png_b},
+                   content_bbox={a: tight, b: tight},
+                   clip={a: tight, b: tight})  # clip == content_bbox (tight, equal)
+    diffsvc = DiffService(svc)
+    params = RenderParams.parse("png", 800, 600, "dark", "extents")
+    overlay, summary, key, hit = _run(diffsvc.diff_bytes(a, b, params))
+
+    # Reuse → NO windowed render: every render is at extents (window is None)...
+    assert all(p.window is None for p in svc.received)
+    # ...but the diff is still LOGICALLY the union-window diff: provenance is
+    # canonical (window_source + common_window), so the cache key stays stable.
+    assert summary.get("window_source") == "content_bbox"
+    assert summary.get("common_window") == [0.0, 0.0, 200.0, 100.0]
+    # shared_view forced → the moved box is a real change, not aspect-guard-skipped.
+    assert summary["comparable"] is True
+    assert summary.get("skip_reason", "") == ""
+    assert summary["changed_fraction"] > 0.3
+    assert summary["added_px"] > 0 and summary["removed_px"] > 0
+    assert overlay is not None
+
+
+def test_reused_diff_is_cache_stable_across_repeat(tmp_path):
+    # Regression guard: the reuse render-optimization must NOT change the diff
+    # cache key. A repeat of the same diff (now content_bbox-cached, so clip is
+    # unavailable and reuse would not re-fire) must still HIT the cached result
+    # under the SAME canonical key — not recompute under a different key.
+    a = _dxf((0.0, 0.0), (200.0, 100.0))
+    b = _dxf((0.0, 0.0), (200.0, 100.0)) + b"999\nrevB\n"
+    png_a = _box_png(tmp_path / "a.png", 40, 110, 160, 190)
+    png_b = _box_png(tmp_path / "b.png", 240, 110, 380, 190)
+    tight = (0.0, 0.0, 200.0, 100.0)
+    svc = _FakeSvc(png_a, by_content={a: png_a, b: png_b},
+                   content_bbox={a: tight, b: tight}, clip={a: tight, b: tight})
+    diffsvc = DiffService(svc)
+    params = RenderParams.parse("png", 800, 600, "dark", "extents")
+
+    _, _, key1, hit1 = _run(diffsvc.diff_bytes(a, b, params))   # reuse path
+    assert hit1 is False
+    svc.received.clear()
+
+    _, _, key2, hit2 = _run(diffsvc.diff_bytes(a, b, params))   # repeat
+    assert key2 == key1            # canonical key stable across reuse→cached flip
+    assert hit2 is True            # second diff hits the cached result
+    assert svc.received == []      # ... and renders nothing
+
+
+def test_diff_windows_when_clip_is_stale_small(tmp_path):
+    # Safety: when a clip is stale-small (< content_bbox) it must NOT be treated as
+    # tight (reusing it would clip real geometry) — window to content_bbox instead.
+    a = _dxf((0.0, 0.0), (50.0, 50.0))
+    b = _dxf((0.0, 0.0), (200.0, 100.0))
+    png_a = _box_png(tmp_path / "a.png", 40, 110, 160, 190)
+    png_b = _box_png(tmp_path / "b.png", 40, 110, 380, 190)
+    bbox = (0.0, 0.0, 200.0, 100.0)
+    svc = _FakeSvc(png_a, by_content={a: png_a, b: png_b},
+                   content_bbox={a: bbox, b: bbox},
+                   clip={a: (0.0, 0.0, 50.0, 50.0),   # STALE: smaller than content_bbox
+                         b: bbox})
+    diffsvc = DiffService(svc)
+    params = RenderParams.parse("png", 800, 600, "dark", "extents")
+    overlay, summary, key, hit = _run(diffsvc.diff_bytes(a, b, params))
+
+    windowed = [p for p in svc.received if p.window is not None]
+    assert len(windowed) == 2                          # stale clip → windowed, not reused
+    assert all(p.window == (0.0, 0.0, 200.0, 100.0) for p in windowed)
+    assert summary.get("window_source") == "content_bbox"
+    assert summary.get("common_window") == [0.0, 0.0, 200.0, 100.0]
 
 
 def test_diff_no_window_when_extents_equal(tmp_path):
