@@ -326,6 +326,14 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         # in their union world rect so extents-changing revisions diff cleanly).
         if summary.get("common_window"):
             h["X-Diff-Common-Window"] = ",".join(repr(float(v)) for v in summary["common_window"])
+        # Provenance for fast triage (full detail in summary.diagnostics): how the diff
+        # was framed (real content_bbox vs header fallback) and whether the per-extents
+        # base renders were reused. X-Diff-Cache above already shows the diff-overlay hit.
+        diag = summary.get("diagnostics") or {}
+        if diag.get("window_source"):
+            h["X-Diff-Window-Source"] = str(diag["window_source"])
+            h["X-Diff-Header-Fallback"] = "true" if diag.get("header_fallback") else "false"
+            h["X-Diff-Base-Reuse"] = "true" if diag.get("base_render_reuse") else "false"
         return h
 
     @app.post("/diff")
