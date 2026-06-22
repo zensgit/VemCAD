@@ -159,6 +159,8 @@ class DiffService:
         render_params = params
         key_params = params
         shared_view = False
+        base_render_reuse = False
+        reuse_reason = ""
         if cb_a is not None and cb_b is not None:
             # Real geometry known for both → the diff is LOGICALLY framed to the
             # content_bbox union window: shared view-space, nothing clips. Do NOT
@@ -177,8 +179,11 @@ class DiffService:
                 # key stays canonical (key_params). clip is known only on a
                 # content_bbox cache miss — exactly when the probe render exists.
                 render_params = params
+                base_render_reuse = True
+                reuse_reason = "per-extents renders frame real geometry tightly in the same frame"
             else:
                 render_params = key_params  # render in the union window
+                reuse_reason = "re-rendered in the content_bbox union window (per-extents clips not tight or disagree, or unknown on a cache hit)"
         else:
             # Fallback: real geometry unknown (render_cli predating content_bbox).
             # The DXF HEADER is the only view-space signal, so window only when the
@@ -190,6 +195,29 @@ class DiffService:
                 render_params = params.windowed(union_window(h_a, h_b))
             key_params = render_params
             shared_view = render_params.window is not None
+            reuse_reason = "header fallback (no content_bbox from render_cli)"
+
+        # Provenance for `/diff` debugging: which window the diff was framed in, whether
+        # geometry was real (content_bbox) or a header fallback, the actual bboxes/union
+        # window, whether the per-extents base renders were reused (and why), and whether
+        # each content_bbox came from cache. Surfaced in the summary so a later AutoCAD
+        # mismatch can be triaged (window vs cache vs render vs drawing) without re-running.
+        diagnostics = {
+            "window_source": window_source,
+            "header_fallback": window_source == "header",
+            "content_bbox": {
+                "ref": list(cb_a) if cb_a is not None else None,
+                "cand": list(cb_b) if cb_b is not None else None,
+                "union_window": list(key_params.window) if key_params.window is not None else None,
+            },
+            "base_render_reuse": base_render_reuse,
+            "base_render_reuse_reason": reuse_reason,
+            "content_bbox_cache": {
+                # content_bbox is cached by content_sha; a cache hit returns no probe clip.
+                "ref_hit": cb_a is not None and clip_a is None,
+                "cand_hit": cb_b is not None and clip_b is None,
+            },
+        }
 
         key = _diff_key(sha_a, sha_b, key_params, tol, self.svc.cli_sha, self.svc.font_fp)
         cached_report = self.cache.get_report(key)
@@ -216,7 +244,7 @@ class DiffService:
         # diff is logically the union-window diff, so common_window reflects that.
         overlay_path, summary = await anyio.to_thread.run_sync(
             self._overlay_sync, engine, path_a, path_b, key_params, sha_a, sha_b, tol, key,
-            window_source, shared_view,
+            window_source, shared_view, diagnostics,
         )
         return overlay_path, summary, key, False
 
@@ -246,7 +274,7 @@ class DiffService:
         return cb, clip
 
     def _overlay_sync(self, engine, path_a, path_b, params, sha_a, sha_b, tol, key,
-                      window_source="content_bbox", shared_view=False):
+                      window_source="content_bbox", shared_view=False, diagnostics=None):
         # The engine decides comparability (its §5 view-space guard) — we never
         # force comparable=True. `shared_view` (decided by the caller) tells the
         # engine the two renders share view-space so it diffs them in the common
@@ -283,6 +311,8 @@ class DiffService:
                 summary["window_source"] = window_source
             if params.window is not None:
                 summary["common_window"] = list(params.window)
+            if diagnostics is not None:
+                summary["diagnostics"] = diagnostics
             report = {
                 "schema": "vemcad.render_diff_report",
                 "schema_version": "0.1",

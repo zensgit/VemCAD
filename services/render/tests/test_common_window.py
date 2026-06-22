@@ -277,6 +277,50 @@ def test_diff_window_from_header_fallback(tmp_path):
     assert summary["added_px"] > 0
 
 
+def test_diff_diagnostics_content_bbox(tmp_path):
+    # /diff provenance object on the content_bbox (real-geometry) path: records the
+    # window source, the actual bboxes + union window, and the base-render reuse decision.
+    a = _dxf((0.0, 0.0), (50.0, 50.0))
+    b = _dxf((0.0, 0.0), (60.0, 50.0))
+    png_a = _box_png(tmp_path / "a.png", 40, 110, 160, 190)
+    png_b = _box_png(tmp_path / "b.png", 40, 110, 380, 190)
+    svc = _FakeSvc(png_a, by_content={a: png_a, b: png_b},
+                   content_bbox={a: (0.0, 0.0, 100.0, 100.0),
+                                 b: (0.0, 0.0, 200.0, 100.0)})
+    diffsvc = DiffService(svc)
+    params = RenderParams.parse("png", 800, 600, "dark", "extents")
+    overlay, summary, key, hit = _run(diffsvc.diff_bytes(a, b, params))
+
+    diag = summary["diagnostics"]
+    assert diag["window_source"] == "content_bbox"
+    assert diag["header_fallback"] is False
+    assert diag["content_bbox"]["ref"] == [0.0, 0.0, 100.0, 100.0]
+    assert diag["content_bbox"]["cand"] == [0.0, 0.0, 200.0, 100.0]
+    assert diag["content_bbox"]["union_window"] == [0.0, 0.0, 200.0, 100.0]
+    # per-extents clips disagree with the union -> re-rendered windowed, not reused.
+    assert diag["base_render_reuse"] is False
+    assert "content_bbox_cache" in diag
+
+
+def test_diff_diagnostics_header_fallback(tmp_path):
+    # On the header-fallback path the provenance flags it and carries no content_bbox.
+    a = _dxf((0.0, 0.0), (100.0, 100.0))
+    b = _dxf((0.0, 0.0), (200.0, 100.0))
+    png_a = _box_png(tmp_path / "a.png", 40, 110, 160, 190)
+    png_b = _box_png(tmp_path / "b.png", 40, 110, 380, 190)
+    svc = _FakeSvc(png_a, by_content={a: png_a, b: png_b})  # no content_bbox
+    diffsvc = DiffService(svc)
+    params = RenderParams.parse("png", 800, 600, "dark", "extents")
+    overlay, summary, key, hit = _run(diffsvc.diff_bytes(a, b, params))
+
+    diag = summary["diagnostics"]
+    assert diag["window_source"] == "header"
+    assert diag["header_fallback"] is True
+    assert diag["content_bbox"]["ref"] is None
+    assert diag["content_bbox"]["cand"] is None
+    assert "header fallback" in diag["base_render_reuse_reason"]
+
+
 def test_diff_window_engaged_when_content_bbox_equal_but_headers_differ(tmp_path):
     # P1 regression: EQUAL content_bbox must STILL engage the common window when
     # the headers differ / one is stale-small. Here both real bboxes are
