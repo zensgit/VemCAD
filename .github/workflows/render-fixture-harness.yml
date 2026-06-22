@@ -1,0 +1,91 @@
+name: Render Fixture Harness (private)
+
+# Manual render / diff of an IN-REPO fixture through the render image — the private-CI render path
+# that bypasses local Docker (which won't start in some dev environments). It builds the same image
+# as render-image.yml and runs render_cli / the /diff engine on a fixture YOU specify.
+#
+# POLICY (goal item #4 — harness preparation):
+#   * Defaults to a NON-PROPRIETARY golden fixture already in the repo.
+#   * Point `fixture` (and `fixture_b` for a real two-revision diff) at a real drawing ONLY after it
+#     has been explicitly allowed into this PRIVATE repo. Do not add customer drawings preemptively.
+#   * This produces VemCAD's OWN render/diff — it does NOT replace AutoCAD ground truth. Use it to
+#     triage where a difference comes from (window/cache/render/drawing) via the X-Diff-* provenance.
+
+on:
+  workflow_dispatch:
+    inputs:
+      fixture:
+        description: "In-repo DXF path to render"
+        default: "tools/render_regression/golden/lines_text_bom.dxf"
+        required: true
+      fixture_b:
+        description: "Optional 2nd in-repo DXF to DIFF against `fixture` (blank = render only)"
+        default: ""
+        required: false
+      width:
+        description: "Render width (px)"
+        default: "1600"
+        required: false
+      height:
+        description: "Render height (px)"
+        default: "1131"
+        required: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with submodules — render_cli lives in the cadgamefusion submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Validate fixtures exist in-repo
+        run: |
+          test -f "${{ inputs.fixture }}" || { echo "::error::fixture not found in repo: ${{ inputs.fixture }}"; exit 1; }
+          if [ -n "${{ inputs.fixture_b }}" ]; then
+            test -f "${{ inputs.fixture_b }}" || { echo "::error::fixture_b not found in repo: ${{ inputs.fixture_b }}"; exit 1; }
+          fi
+          echo "fixture: ${{ inputs.fixture }}${{ inputs.fixture_b && ' | fixture_b: ' }}${{ inputs.fixture_b }}"
+
+      - name: Build render image
+        run: docker build -f services/render/Dockerfile -t vemcad-render:harness .
+
+      - name: Render the fixture (render_cli)
+        run: |
+          mkdir -p out
+          docker run --rm --network none \
+            -v "$PWD:/work:ro" -v "$PWD/out:/out" \
+            --entrypoint render_cli vemcad-render:harness \
+            --input "/work/${{ inputs.fixture }}" --out "/out/render_a.png" \
+            --width "${{ inputs.width }}" --height "${{ inputs.height }}"
+          sz=$(stat -c%s out/render_a.png 2>/dev/null || echo 0)
+          [ "$sz" -gt 1000 ] || { echo "::error::render is blank/tiny ($sz bytes)"; exit 1; }
+          echo "OK: rendered ${{ inputs.fixture }} -> out/render_a.png ($sz bytes)"
+
+      - name: Diff two revisions (only when fixture_b is given)
+        if: ${{ inputs.fixture_b != '' }}
+        run: |
+          name=vemcad_render_harness
+          docker run -d -p 8077:8077 --name "$name" vemcad-render:harness
+          up=
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:8077/healthz >/dev/null 2>&1; then up=1; break; fi
+            sleep 2
+          done
+          if [ -z "$up" ]; then echo "::error::render service did not come up"; docker logs "$name"; docker rm -f "$name"; exit 1; fi
+          echo "=== diff: ${{ inputs.fixture }}  vs  ${{ inputs.fixture_b }} ==="
+          curl -fsS -X POST "http://127.0.0.1:8077/diff?width=${{ inputs.width }}&height=${{ inputs.height }}" \
+            -F "file_a=@${{ inputs.fixture }}" -F "file_b=@${{ inputs.fixture_b }}" \
+            -o out/diff_overlay.png -D out/diff_headers.txt \
+            || { echo "::error::/diff request failed"; docker logs "$name"; docker rm -f "$name"; exit 1; }
+          echo "--- diff provenance (X-Diff-*: window_source / header_fallback / base_reuse / cache / changed_fraction) ---"
+          grep -i "^X-Diff-" out/diff_headers.txt || echo "(no X-Diff-* headers — check the response)"
+          docker rm -f "$name"
+
+      - name: Upload render/diff artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: render-harness-output
+          path: out/**
+          retention-days: 7
