@@ -14,7 +14,11 @@
     {"name": "cjk_text", "category": "cjk-text",
      "render": {"width": 1600, "height": 800, "bg": "white"},
      "expect": "non-blank", "gate": false,
-     "notes": "Font resolution. gate=false until D2 has a text/geometry split — a Noto-vs-华文 substitution changes glyph shapes and would false-fail the combined gate; tracked as a trend metric instead."},
+     "expect_font_resolution": {
+       "forbid_resolved": ["DejaVu Sans"],
+       "require_resolved_contains_any": ["Serif", "Song", "FangSong", "仿宋", "STFangsong", "Zhuque"]
+     },
+     "notes": "Font resolution. gate=false until D2 has a text/geometry split — a Noto-vs-华文 substitution changes glyph shapes and would false-fail the combined metric; report-level gate still forbids the Linux headless regression where empty-style CJK resolves to DejaVu Sans."},
     {"name": "garbage_extents", "category": "garbage-extents",
      "render": {"width": 1200, "height": 600, "bg": "white", "window": "0,0,200,100"},
      "expect": "non-blank", "gate": true,
