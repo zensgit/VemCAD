@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from app.main import create_app
 from conftest import needs_render_cli
@@ -77,6 +78,46 @@ def test_bad_params_envelope(settings):
         )
         assert r.status_code == 422
         assert r.json()["error_code"] == "BAD_PARAMS"
+
+
+def test_bad_style_envelope(settings):
+    with make_client(settings) as c:
+        r = c.post(
+            "/render?style=screen",
+            files={"file": ("x.dxf", b"0", "text/plain")},
+        )
+        assert r.status_code == 422
+        assert r.json()["error_code"] == "BAD_PARAMS"
+
+        r2 = c.post(
+            "/render?format=svg&style=acad-plot",
+            files={"file": ("x.dxf", b"0", "text/plain")},
+        )
+        assert r2.status_code == 422
+        assert r2.json()["error_code"] == "BAD_PARAMS"
+
+
+def test_render_style_reaches_service_and_response_header(settings, tmp_path):
+    with make_client(settings) as c:
+        out = tmp_path / "fake.png"
+        Image.new("RGB", (10, 10), "white").save(out)
+        seen = {}
+
+        async def fake_render_view_bytes(content, params, content_sha=None):
+            seen["params"] = params
+            seen["content_sha"] = content_sha
+            return out, "style-key", False
+
+        c.app.state.svc.render_view_bytes = fake_render_view_bytes
+        r = c.post(
+            "/render?format=png&width=200&height=100&bg=white&view=sheet&style=acad-plot",
+            files={"file": ("x.dxf", b"0\nEOF\n", "text/plain")},
+        )
+        assert r.status_code == 200, r.text
+        assert seen["params"].style == "acad-plot"
+        assert seen["params"].view == "sheet"
+        assert r.headers["X-Render-Style"] == "acad-plot"
+        assert r.headers["X-Render-Key"] == "style-key"
 
 
 def test_dwg_rejected(settings):

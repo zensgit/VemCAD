@@ -193,13 +193,14 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         height: int = Query(1697),
         bg: str = Query("dark"),
         view: str = Query("extents"),
+        style: str = Query("source"),
         authorization: Optional[str] = Header(default=None),
     ):
         auth_err = _auth_failed(authorization, cfg.auth_token)
         if auth_err is not None:
             return auth_err
         try:
-            params = RenderParams.parse(format, width, height, bg, view)
+            params = RenderParams.parse(format, width, height, bg, view, style)
         except ParamError as e:
             return _error(422, e.error_code, str(e))
 
@@ -241,7 +242,11 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             return FileResponse(
                 path,
                 media_type=MEDIA_TYPES[params.fmt],
-                headers={"X-Render-Cache": "hit" if hit else "miss", "X-Render-Key": key},
+                headers={
+                    "X-Render-Cache": "hit" if hit else "miss",
+                    "X-Render-Key": key,
+                    "X-Render-Style": params.style,
+                },
             )
 
         if file is None:
@@ -291,7 +296,11 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         return FileResponse(
             path,
             media_type=MEDIA_TYPES[params.fmt],
-            headers={"X-Render-Cache": "hit" if hit else "miss", "X-Render-Key": key},
+            headers={
+                "X-Render-Cache": "hit" if hit else "miss",
+                "X-Render-Key": key,
+                "X-Render-Style": params.style,
+            },
         )
 
     async def _read_dxf_upload(part: UploadFile, label: str):
@@ -344,6 +353,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         height: int = Query(1697),
         bg: str = Query("dark"),
         view: str = Query("extents"),
+        style: str = Query("source"),
         summary_only: bool = Query(False),
         authorization: Optional[str] = Header(default=None),
     ):
@@ -353,7 +363,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         # Both revisions render at THESE params → §5 bg + colour-mapping shared
         # by construction. The overlay is always PNG (raster diff).
         try:
-            params = RenderParams.parse("png", width, height, bg, view)
+            params = RenderParams.parse("png", width, height, bg, view, style)
         except ParamError as e:
             return _error(422, e.error_code, str(e))
 
