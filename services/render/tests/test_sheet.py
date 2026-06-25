@@ -93,13 +93,18 @@ from app.renderer import RenderParams, RenderService  # noqa: E402
 
 
 class _StubSvc(RenderService):
-    def __init__(self, probe_png, view_dict):
+    def __init__(self, probe_png, view_dict, *, nested_report=False):
         self._probe = probe_png
         self.windowed = []
+        report = (
+            {"render_cli_report": {"view": view_dict}}
+            if nested_report
+            else {"view": view_dict}
+        )
 
         class _Cache:
             def get_report(_self, key):
-                return {"view": view_dict}
+                return report
 
         self.cache = _Cache()
 
@@ -121,6 +126,16 @@ def test_render_sheet_detects_and_rewindows(tmp_path):
     asyncio.run(svc.render_sheet_bytes(b"x", _sheet_params(), content_sha="s"))
     assert svc.windowed, "expected a windowed re-render"
     assert svc.windowed[0][2] < 800 / 2.0  # framed to the 图框 right edge, not the stray
+
+
+def test_render_sheet_reads_nested_render_cli_report_view(tmp_path):
+    # Real cache reports wrap render_cli's view under render_cli_report.view. A
+    # regression here makes every sheet render silently fall back to extents.
+    p = _img(tmp_path, "probe_nested.png", 1000, 700, frames=[(100, 80, 720, 620)],
+             strays=[(820, 300, 880, 360)])
+    svc = _StubSvc(p, {"scale": 2.0, "pan_x": 0.0, "pan_y": 700.0}, nested_report=True)
+    asyncio.run(svc.render_sheet_bytes(b"x", _sheet_params(), content_sha="s"))
+    assert svc.windowed, "expected nested render_cli_report.view to drive sheet detection"
 
 
 def test_render_sheet_failsafe_keeps_extents(tmp_path):
