@@ -12,6 +12,7 @@ from typing import Optional, Tuple
 from .cache import RenderCache, cache_key, font_fingerprint, sha256_bytes, sha256_file
 from .config import MAX_PIXELS, MAX_SIDE_PX, Settings
 from .sandbox import SandboxRunner
+from .sheet import detect_sheet_window
 from .smoke import SMOKE_DXF
 
 _BG_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
@@ -63,8 +64,8 @@ class RenderParams:
             raise ParamError("width*height must be <= %d pixels" % MAX_PIXELS)
         if bg not in _ALLOWED_BG_NAMES and not _BG_RE.match(bg or ""):
             raise ParamError("bg must be dark, white or #RRGGBB")
-        if view != "extents":
-            raise ParamError("view supports only 'extents' in v0")
+        if view not in ("extents", "sheet"):
+            raise ParamError("view must be 'extents' or 'sheet'")
         return RenderParams(fmt=fmt, width=w, height=h, bg=bg, view=view)
 
     def windowed(self, window: Tuple[float, float, float, float]) -> "RenderParams":
@@ -154,6 +155,38 @@ class RenderService:
         finally:
             self.active -= 1
         return path, key, False
+
+    async def render_sheet_bytes(
+        self, content: bytes, params: RenderParams, content_sha: Optional[str] = None
+    ) -> Tuple[Path, str, bool]:
+        """view=sheet (plot preview): render at extents, detect the 图框 window from
+        that image, then re-render framed to it so strays OUTSIDE the border are
+        clipped (corpus #020 class). Fail-safe: no confident frame -> the extents
+        render (today's behaviour). Both passes ride the normal render cache, so a
+        repeat sheet request is two cache hits."""
+        if content_sha is None:
+            content_sha = sha256_bytes(content)
+        probe = replace(params, view="extents", window=None)
+        ppath, pkey, phit = await self.render_bytes(content, probe, content_sha)
+        report = self.cache.get_report(pkey)
+        view = report.get("view") if isinstance(report, dict) else None
+        rect = detect_sheet_window(str(ppath), view) if isinstance(view, dict) else None
+        if rect is None:
+            return ppath, pkey, phit  # no confident 图框 -> keep extents framing
+        try:
+            windowed = probe.windowed(rect)
+        except ParamError:
+            return ppath, pkey, phit  # degenerate detected rect -> extents
+        return await self.render_bytes(content, windowed, content_sha)
+
+    async def render_view_bytes(
+        self, content: bytes, params: RenderParams, content_sha: Optional[str] = None
+    ) -> Tuple[Path, str, bool]:
+        """Single entry the HTTP layer calls: dispatch by view ('sheet' -> the
+        two-pass sheet-window producer; else the plain extents/window render)."""
+        if params.view == "sheet":
+            return await self.render_sheet_bytes(content, params, content_sha)
+        return await self.render_bytes(content, params, content_sha)
 
     @staticmethod
     def _build_argv(render_cli, src, out, params: RenderParams, report_path, font_dir):

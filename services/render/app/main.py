@@ -232,7 +232,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
                 return _error(404, "PAYLOAD_NOT_FOUND",
                               "package %s has no stored %s payload" % (package_id, role))
             try:
-                path, key, hit = await svc.render_bytes(content, params, content_sha=sha)
+                path, key, hit = await svc.render_view_bytes(content, params, content_sha=sha)
             except BusyError:
                 return _error(429, "BUSY", "render workers saturated, retry later")
             except RenderFailed as e:
@@ -281,7 +281,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         content = b"".join(chunks)
 
         try:
-            path, key, hit = await svc.render_bytes(content, params, content_sha=hasher.hexdigest())
+            path, key, hit = await svc.render_view_bytes(content, params, content_sha=hasher.hexdigest())
         except BusyError:
             return _error(429, "BUSY", "render workers saturated, retry later")
         except RenderFailed as e:
