@@ -35,8 +35,44 @@ def _ink_mask(gray: np.ndarray, thr: int) -> np.ndarray:
     return (gray < bg - thr) if bg > 128 else (gray > bg + thr)
 
 
+def _clusters(indices: np.ndarray) -> list[tuple[int, int]]:
+    if len(indices) == 0:
+        return []
+    clusters: list[tuple[int, int]] = []
+    start = prev = int(indices[0])
+    for item in indices[1:]:
+        cur = int(item)
+        if cur == prev + 1:
+            prev = cur
+            continue
+        clusters.append((start, prev))
+        start = prev = cur
+    clusters.append((start, prev))
+    return clusters
+
+
+def _inner_edge_clusters(
+    clusters: list[tuple[int, int]], span: int, inner_gap_frac: float = 0.08
+) -> Optional[tuple[tuple[int, int], tuple[int, int]]]:
+    if len(clusters) < 2:
+        return None
+
+    # Prefer the printable inner frame when the drawing has both an outer sheet
+    # edge and an inner margin: the paired lines sit close to the image edge.
+    # When there is only one confident frame (or multiple separated frames), keep
+    # the outermost pair to preserve the existing fail-safe union behaviour.
+    gap_limit = max(8.0, inner_gap_frac * span)
+    left = clusters[0]
+    if len(clusters) >= 3 and clusters[1][0] - clusters[0][1] <= gap_limit:
+        left = clusters[1]
+    right = clusters[-1]
+    if len(clusters) >= 3 and clusters[-1][0] - clusters[-2][1] <= gap_limit:
+        right = clusters[-2]
+    return left, right
+
+
 def detect_sheet_rect_px(
-    png_path: str, span_frac: float = 0.4, ink_thr: int = 60, min_frac: float = 0.25
+    png_path: str, span_frac: float = 0.4, ink_thr: int = 30, min_frac: float = 0.25
 ) -> Optional[PixelRect]:
     """Pixel rect (x0,y0,x1,y1) of the 图框 via full-span-ink projection, or None.
 
@@ -50,10 +86,12 @@ def detect_sheet_rect_px(
     ink = _ink_mask(gray, ink_thr)
     vcols = np.where(ink.sum(axis=0) > span_frac * H)[0]
     hrows = np.where(ink.sum(axis=1) > span_frac * W)[0]
-    if len(vcols) < 2 or len(hrows) < 2:
+    v_edges = _inner_edge_clusters(_clusters(vcols), W)
+    h_edges = _inner_edge_clusters(_clusters(hrows), H)
+    if v_edges is None or h_edges is None:
         return None
-    x0, x1 = int(vcols.min()), int(vcols.max())
-    y0, y1 = int(hrows.min()), int(hrows.max())
+    x0, x1 = int(v_edges[0][0]), int(v_edges[1][1])
+    y0, y1 = int(h_edges[0][0]), int(h_edges[1][1])
     if (x1 - x0) < min_frac * W or (y1 - y0) < min_frac * H:
         return None
     return (x0, y0, x1, y1)
@@ -75,7 +113,7 @@ def px_rect_to_world(rect: PixelRect, view: dict) -> WorldRect:
 
 
 def detect_sheet_window(
-    png_path: str, view: dict, span_frac: float = 0.4, ink_thr: int = 60, min_frac: float = 0.25
+    png_path: str, view: dict, span_frac: float = 0.4, ink_thr: int = 30, min_frac: float = 0.25
 ) -> Optional[WorldRect]:
     """World window (xmin,ymin,xmax,ymax) framing the 图框 for a clean preview, or
     None when no confident frame is found (caller keeps the extents framing)."""

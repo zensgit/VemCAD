@@ -30,6 +30,25 @@ def test_detects_frame_excludes_stray(tmp_path):
     assert abs(y0 - 80) < 6 and abs(y1 - 620) < 6
 
 
+def test_detects_light_outer_frame_not_dark_inner_frame(tmp_path):
+    # Some corpus title blocks draw the outer sheet border in light green and the
+    # printable margin in darker ink. The preview should prefer the printable
+    # inner frame, so the outer sheet marker does not remain as "ink outside the
+    # 图框" in the final image.
+    im = Image.new("L", (1000, 700), 255)
+    d = ImageDraw.Draw(im)
+    d.rectangle((100, 80, 900, 640), outline=205, width=3)  # faint outer frame
+    d.rectangle((150, 120, 850, 600), outline=0, width=3)   # dark inner margin
+    p = str(tmp_path / "light_outer_frame.png")
+    im.save(p)
+
+    r = detect_sheet_rect_px(p)
+    assert r is not None
+    x0, y0, x1, y1 = r
+    assert abs(x0 - 150) < 6 and abs(x1 - 850) < 6
+    assert abs(y0 - 120) < 6 and abs(y1 - 600) < 6
+
+
 def test_two_aligned_frames_union(tmp_path):
     # multi_frame: two side-by-side 图框 with aligned top/bottom -> union (correct
     # preview: both frames, no strays to exclude).
