@@ -15,6 +15,9 @@
   plot-raster 风格，用于 AutoCAD PLOT/EXPORTPNG 参照对比和白底图纸预览）。
   命中四元组缓存（内容 sha256 + 规范化参数 + render_cli 二进制 sha256 +
   字体库指纹）直接回图，响应头 `X-Render-Cache: hit|miss`、`X-Render-Key`。
+  `view=sheet` 另带 `X-Render-Sheet-Mode: detected|fallback|unknown` 和
+  `X-Render-Resolved-View`，用于确认图框窗口是否成功检测，或是否按 fail-safe
+  回退到 extents。
   饱和返回 429。错误一律结构化信封
   `{"status":"error","error_code":...,"error":...}`（口径同 ROUTER_CONTRACT）。
 - `POST /diff` — **版本可视化对比（L1 旗舰）**：multipart `file_a`(Rev A) +
@@ -50,6 +53,29 @@ python3 -m uvicorn app.main:app --factory --host 127.0.0.1 --port 8077
 
 测试：`RENDER_CLI_PATH=... python3 -m pytest services/render/tests -q`
 （无二进制时渲染类用例自动跳过，参数/缓存单测照跑）。
+
+## `view=sheet` 默认化前审计
+
+`view=sheet` 是 opt-in 图纸预览窗口：先按 extents 渲染，再检测图框窗口并重渲染；
+检测不可靠时 fail-safe 保持 extents。把它升为 `/render` 默认前，先对实际图纸目录
+跑 corpus audit（图纸只从运行时目录读取，不进仓）：
+
+```bash
+python3 services/render/tools/sheet_readiness_audit.py \
+  --base-url http://127.0.0.1:8077 \
+  --input-dir /path/to/dxf-corpus \
+  --out-dir /tmp/vemcad-sheet-audit \
+  --width 1600 --height 1131 --bg white --style acad-plot
+```
+
+输出：
+
+- `summary.json` — 每张图的 `pass|review|fail`、`sheet_mode`、保留墨迹比例、
+  edge-ink 裁切风险和渲染路径。
+- `contact_sheet_*.png` — extents vs sheet 的人工复核总览。
+
+默认退出码只因 `fail` 非零；若要把人工复核项也设成门禁，传
+`--fail-on-review`。
 
 **部署**（让 Yuantus 可调用）：`docker-compose.deploy.yml` 拉 GHCR 镜像
 （`ghcr.io/zensgit/vemcad-render:main`，main 推送自动发布）一键起；

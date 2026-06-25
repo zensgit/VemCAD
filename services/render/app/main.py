@@ -125,6 +125,25 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             chunks.append(chunk)
         return b"".join(chunks), total
 
+    def _render_headers(params: RenderParams, key: str, hit: bool) -> dict:
+        headers = {
+            "X-Render-Cache": "hit" if hit else "miss",
+            "X-Render-Key": key,
+            "X-Render-Style": params.style,
+        }
+        report = svc.cache.get_report(key) or {}
+        resolved = (report.get("params") or {}).get("view") if isinstance(report, dict) else None
+        if resolved:
+            headers["X-Render-Resolved-View"] = str(resolved)
+        if params.view == "sheet":
+            if resolved == "window":
+                headers["X-Render-Sheet-Mode"] = "detected"
+            elif resolved == "extents":
+                headers["X-Render-Sheet-Mode"] = "fallback"
+            else:
+                headers["X-Render-Sheet-Mode"] = "unknown"
+        return headers
+
     @app.post("/package")
     async def receive_package(
         manifest: UploadFile = File(...),
@@ -242,11 +261,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             return FileResponse(
                 path,
                 media_type=MEDIA_TYPES[params.fmt],
-                headers={
-                    "X-Render-Cache": "hit" if hit else "miss",
-                    "X-Render-Key": key,
-                    "X-Render-Style": params.style,
-                },
+                headers=_render_headers(params, key, hit),
             )
 
         if file is None:
@@ -296,11 +311,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         return FileResponse(
             path,
             media_type=MEDIA_TYPES[params.fmt],
-            headers={
-                "X-Render-Cache": "hit" if hit else "miss",
-                "X-Render-Key": key,
-                "X-Render-Style": params.style,
-            },
+            headers=_render_headers(params, key, hit),
         )
 
     async def _read_dxf_upload(part: UploadFile, label: str):

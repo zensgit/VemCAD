@@ -120,6 +120,46 @@ def test_render_style_reaches_service_and_response_header(settings, tmp_path):
         assert r.headers["X-Render-Key"] == "style-key"
 
 
+def test_render_sheet_mode_header_comes_from_cached_report(settings, tmp_path):
+    with make_client(settings) as c:
+        out = tmp_path / "fake.png"
+        Image.new("RGB", (10, 10), "white").save(out)
+
+        async def fake_render_view_bytes(content, params, content_sha=None):
+            return out, "sheet-key", False
+
+        c.app.state.svc.render_view_bytes = fake_render_view_bytes
+        c.app.state.svc.cache.get_report = lambda key: {"params": {"view": "window"}}
+
+        r = c.post(
+            "/render?format=png&width=200&height=100&bg=white&view=sheet",
+            files={"file": ("x.dxf", b"0\nEOF\n", "text/plain")},
+        )
+        assert r.status_code == 200, r.text
+        assert r.headers["X-Render-Resolved-View"] == "window"
+        assert r.headers["X-Render-Sheet-Mode"] == "detected"
+
+
+def test_render_sheet_mode_header_reports_fallback(settings, tmp_path):
+    with make_client(settings) as c:
+        out = tmp_path / "fake.png"
+        Image.new("RGB", (10, 10), "white").save(out)
+
+        async def fake_render_view_bytes(content, params, content_sha=None):
+            return out, "sheet-key", False
+
+        c.app.state.svc.render_view_bytes = fake_render_view_bytes
+        c.app.state.svc.cache.get_report = lambda key: {"params": {"view": "extents"}}
+
+        r = c.post(
+            "/render?format=png&width=200&height=100&bg=white&view=sheet",
+            files={"file": ("x.dxf", b"0\nEOF\n", "text/plain")},
+        )
+        assert r.status_code == 200, r.text
+        assert r.headers["X-Render-Resolved-View"] == "extents"
+        assert r.headers["X-Render-Sheet-Mode"] == "fallback"
+
+
 def test_dwg_rejected(settings):
     with make_client(settings) as c:
         r = c.post(
