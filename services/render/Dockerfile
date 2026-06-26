@@ -49,10 +49,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # by tools/fetch_fonts.sh (NOT committed; see fonts/README.md). Optional: the
 # build tolerates an empty dir (Noto still covers CJK).
 COPY services/render/fonts/ /usr/share/fonts/vemcad/
-# Temporary CADGF bridge: render_cli can request macOS song/fangsong family
-# names (STFangsong/STSong) on Linux; map those to CJK serif families until the
-# submodule emits portable render-host families directly.
-COPY services/render/fontconfig/ /etc/fonts/conf.d/
 RUN fc-cache -f && fc-list :lang=zh | sort | head -n 40
 
 # ── Stage 3: runtime — the service + render_cli ─────────────────────────────
