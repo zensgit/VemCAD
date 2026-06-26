@@ -21,6 +21,25 @@ _ALLOWED_BG_NAMES = ("dark", "white")
 MEDIA_TYPES = {"png": "image/png", "svg": "image/svg+xml"}
 
 
+def _report_view(report: Optional[dict]) -> Optional[dict]:
+    """Return render_cli's view mapping from a cached service report.
+
+    The service report wraps render_cli's report under `render_cli_report`; older
+    tests/stubs may still provide a top-level `view`. Keep both so tests and
+    cached transitional reports fail open to the existing extents fallback only
+    when neither shape carries view data.
+    """
+    if not isinstance(report, dict):
+        return None
+    view = report.get("view")
+    if isinstance(view, dict):
+        return view
+    cli_report = report.get("render_cli_report")
+    if isinstance(cli_report, dict) and isinstance(cli_report.get("view"), dict):
+        return cli_report["view"]
+    return None
+
+
 class ParamError(ValueError):
     def __init__(self, message: str):
         super().__init__(message)
@@ -168,8 +187,7 @@ class RenderService:
             content_sha = sha256_bytes(content)
         probe = replace(params, view="extents", window=None)
         ppath, pkey, phit = await self.render_bytes(content, probe, content_sha)
-        report = self.cache.get_report(pkey)
-        view = report.get("view") if isinstance(report, dict) else None
+        view = _report_view(self.cache.get_report(pkey))
         rect = detect_sheet_window(str(ppath), view) if isinstance(view, dict) else None
         if rect is None:
             return ppath, pkey, phit  # no confident 图框 -> keep extents framing
