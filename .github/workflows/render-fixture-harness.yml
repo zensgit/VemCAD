@@ -58,10 +58,24 @@ jobs:
             -v "$PWD:/work:ro" -v "$PWD/out:/out" \
             --entrypoint render_cli vemcad-render:harness \
             --input "/work/${{ inputs.fixture }}" --out "/out/render_a.png" \
+            --class-mask-out "/out/render_a_semantic_classes.png" \
+            --report "/out/render_a_report.json" \
             --width "${{ inputs.width }}" --height "${{ inputs.height }}"
           sz=$(stat -c%s out/render_a.png 2>/dev/null || echo 0)
           [ "$sz" -gt 1000 ] || { echo "::error::render is blank/tiny ($sz bytes)"; exit 1; }
+          msz=$(stat -c%s out/render_a_semantic_classes.png 2>/dev/null || echo 0)
+          [ "$msz" -gt 1000 ] || { echo "::error::semantic class mask is blank/tiny ($msz bytes)"; exit 1; }
+          python3 - <<'PY'
+          import json
+          report = json.load(open("out/render_a_report.json", encoding="utf-8"))
+          classes = report.get("semantic_classes") or {}
+          assert classes.get("mask_kind") == "candidate-renderer-semantic-class-buffer"
+          assert classes.get("reference_semantics") == "unknown"
+          assert classes.get("view_space") == "same_as_color_render"
+          assert classes.get("palette")
+          PY
           echo "OK: rendered ${{ inputs.fixture }} -> out/render_a.png ($sz bytes)"
+          echo "OK: semantic class mask -> out/render_a_semantic_classes.png ($msz bytes)"
 
       - name: Diff two revisions (only when fixture_b is given)
         if: ${{ inputs.fixture_b != '' }}
@@ -75,7 +89,9 @@ jobs:
           done
           if [ -z "$up" ]; then echo "::error::render service did not come up"; docker logs "$name"; docker rm -f "$name"; exit 1; fi
           echo "=== diff: ${{ inputs.fixture }}  vs  ${{ inputs.fixture_b }} ==="
-          curl -fsS -X POST "http://127.0.0.1:8077/diff?width=${{ inputs.width }}&height=${{ inputs.height }}" \
+          # X3 / AutoCAD-style comparison uses extents framing. `view=sheet` is
+          # a human-preview mode and must not silently re-frame plot comparisons.
+          curl -fsS -X POST "http://127.0.0.1:8077/diff?width=${{ inputs.width }}&height=${{ inputs.height }}&view=extents" \
             -F "file_a=@${{ inputs.fixture }}" -F "file_b=@${{ inputs.fixture_b }}" \
             -o out/diff_overlay.png -D out/diff_headers.txt \
             || { echo "::error::/diff request failed"; docker logs "$name"; docker rm -f "$name"; exit 1; }

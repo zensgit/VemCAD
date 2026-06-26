@@ -200,3 +200,21 @@ fix:
 This keeps the G11 target honest: the goal is not "make one raster overlap by
 guessing"; it is "identify the mismatching render class and fix that class
 without regressing the 12-drawing batch."
+
+## Semantic Mask Diagnostic Path
+
+The renderer-side shape for that next slice is a single class-buffer pass, not
+N separate per-class renders:
+
+1. `render_cli --class-mask-out <png> --report <json>` emits the normal colour
+   render and a candidate-side semantic class buffer in the exact same view.
+2. The report's `semantic_classes.palette` gives the reserved colours for
+   renderer-owned classes such as ordinary geometry, direct text, dimensions,
+   hatches, and insert/title-block text.
+3. `compare_vs_acad.py --semantic-mask <png> --semantic-render-report <json>`
+   scores each candidate class against AutoCAD's total ink after the same X3
+   alignment.
+
+This is still diagnostic, not a new gate: AutoCAD reference semantics are
+unknown, so the report exposes candidate-class `precision` and AutoCAD
+`reference_coverage` instead of claiming a true per-semantic-class IoU.

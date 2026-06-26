@@ -21,6 +21,12 @@ For triage, add `--class-report report.json --print-classes` to split the
 already-aligned ink comparison by rendered display-colour buckets. This is not a
 semantic text/dimension/hatch split; it is a diagnostic layer for finding which
 visible colour family accounts for a poor X3 score.
+
+When render_cli also produced `--class-mask-out` plus a report, add
+`--semantic-mask mask.png --semantic-render-report report.json` to get
+candidate-renderer semantic class diagnostics. AutoCAD reference semantics are
+still unknown; the rows say which candidate entity class accounts for ink that
+does or does not overlap the AutoCAD plot.
 """
 
 from __future__ import annotations
@@ -57,6 +63,17 @@ def _print_class_rows(report: cmp.ColorClassReport) -> None:
             row.name, row.ink_iou, row.ref_pixels, row.cand_pixels, row.band))
 
 
+def _print_semantic_class_rows(report: cmp.SemanticClassReport) -> None:
+    print("  semantic classes : candidate renderer masks (AutoCAD semantics unknown)")
+    if not report.classes:
+        print("    (none — %s)" % (report.skip_reason or "blank"))
+        return
+    for row in report.classes:
+        print("    %-12s precision=%-6s ref_coverage=%-6s ours_px=%-7d band=%s" % (
+            row.name, row.candidate_precision, row.reference_coverage,
+            row.candidate_pixels, row.band))
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
         prog="compare_vs_acad",
@@ -70,7 +87,19 @@ def main(argv=None) -> int:
                     help="write per-display-color diagnostic JSON")
     ap.add_argument("--print-classes", action="store_true",
                     help="print per-display-color diagnostic scores")
+    ap.add_argument("--semantic-mask", type=Path, default=None,
+                    help="candidate semantic class-buffer PNG from render_cli --class-mask-out")
+    ap.add_argument("--semantic-render-report", type=Path, default=None,
+                    help="render_cli report JSON carrying semantic_classes.palette")
+    ap.add_argument("--semantic-class-report", type=Path, default=None,
+                    help="write candidate semantic class diagnostic JSON")
+    ap.add_argument("--print-semantic-classes", action="store_true",
+                    help="print candidate semantic class diagnostic scores")
     args = ap.parse_args(argv)
+    if (args.semantic_class_report is not None or args.print_semantic_classes
+            or args.semantic_mask is not None or args.semantic_render_report is not None):
+        if args.semantic_mask is None or args.semantic_render_report is None:
+            ap.error("--semantic-mask and --semantic-render-report are required for semantic class diagnostics")
 
     # ref = AutoCAD (ground truth), cand = ours.
     res = cmp.compare(args.acad, args.ours, capture_method=args.capture_method)
@@ -107,6 +136,26 @@ def main(argv=None) -> int:
                 encoding="utf-8")
         if args.print_classes:
             _print_class_rows(class_report)
+    if args.semantic_class_report is not None or args.print_semantic_classes:
+        semantic_report = cmp.compare_semantic_classes(
+            args.acad, args.ours,
+            candidate_mask_path=args.semantic_mask,
+            render_report_path=args.semantic_render_report,
+            capture_method=args.capture_method,
+        )
+        if args.semantic_class_report is not None:
+            payload = semantic_report.to_dict()
+            payload["reference"] = str(args.acad)
+            payload["candidate"] = str(args.ours)
+            payload["candidate_semantic_mask"] = str(args.semantic_mask)
+            payload["candidate_render_report"] = str(args.semantic_render_report)
+            payload["summary"] = res.to_dict()
+            args.semantic_class_report.parent.mkdir(parents=True, exist_ok=True)
+            args.semantic_class_report.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8")
+        if args.print_semantic_classes:
+            _print_semantic_class_rows(semantic_report)
     print("verdict: %s" % _verdict(res.band, res.comparable, res.skip_reason))
     return 0
 

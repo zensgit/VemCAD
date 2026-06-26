@@ -65,3 +65,59 @@ def test_class_report_json_and_stdout(tmp_path, capsys):
     assert rows["red"]["ref_present"] is True
     assert rows["red"]["cand_present"] is False
     assert rows["red"]["ink_iou"] == 0.0
+
+
+def _semantic_inputs(tmp_path):
+    mask = tmp_path / "semantic_mask.png"
+    report = tmp_path / "render_report.json"
+
+    im = Image.new("RGB", (420, 300), (0, 0, 0))
+    d = ImageDraw.Draw(im)
+    d.rectangle([20, 20, 400, 280], outline=(31, 119, 180), width=3)
+    d.line([40, 150, 380, 150], fill=(31, 119, 180), width=3)
+    d.line([70, 60, 150, 92], fill=(255, 127, 14), width=3)
+    im.save(mask)
+
+    report.write_text(json.dumps({
+        "semantic_classes": {
+            "schema": "vemcad.render_semantic_classes",
+            "schema_version": "0.1",
+            "mask_kind": "candidate-renderer-semantic-class-buffer",
+            "reference_semantics": "unknown",
+            "palette": [
+                {"name": "geometry", "rgb": "#1F77B4"},
+                {"name": "text", "rgb": "#FF7F0E"},
+            ],
+        }
+    }), encoding="utf-8")
+    return mask, report
+
+
+def test_semantic_class_report_json_and_stdout(tmp_path, capsys):
+    a = _draw(tmp_path / "acad.png", [(40, 150, 380, 150)],
+              colored_lines=[(70, 60, 150, 92, (0, 0, 0))])
+    o = _draw(tmp_path / "ours.png", [(40, 150, 380, 150)],
+              colored_lines=[(70, 60, 150, 92, (0, 0, 0))])
+    mask, render_report = _semantic_inputs(tmp_path)
+    out_report = tmp_path / "semantic_classes.json"
+
+    rc = cva.main([
+        a, o,
+        "--semantic-mask", str(mask),
+        "--semantic-render-report", str(render_report),
+        "--semantic-class-report", str(out_report),
+        "--print-semantic-classes",
+    ])
+    assert rc == 0
+    txt = capsys.readouterr().out
+    assert "semantic classes" in txt
+    assert "geometry" in txt
+    assert "AutoCAD semantics unknown" in txt
+
+    payload = json.loads(out_report.read_text(encoding="utf-8"))
+    assert payload["diagnostic_kind"] == "candidate-semantic-class-ink"
+    assert payload["semantic"] is True
+    assert payload["reference_semantics"] == "unknown"
+    rows = {row["name"]: row for row in payload["classes"]}
+    assert rows["geometry"]["candidate_precision"] >= 0.97
+    assert rows["text"]["candidate_precision"] >= 0.97
