@@ -50,6 +50,13 @@ BANDS = [
     (0.00, 0.90, "fallback"),
 ]
 
+COLOR_CLASS_ORDER = ("dark", "green", "red", "yellow", "cyan", "magenta", "other")
+COLOR_CLASS_NOTE = (
+    "Display-color ink diagnostics only. These masks are not semantic text/"
+    "dimension/hatch classes; they split CAD ink by rendered RGB after the same "
+    "crop/resize/shift alignment as the gate metric."
+)
+
 
 def band_for(score: float) -> str:
     for lo, hi, action in BANDS:
@@ -104,6 +111,39 @@ class CompareResult:
         d = asdict(self); d["canvas"] = list(self.canvas); return d
 
 
+@dataclass
+class ColorClassResult:
+    name: str
+    ink_iou: float
+    ref_pixels: int
+    cand_pixels: int
+    ref_fraction: float
+    cand_fraction: float
+    ref_present: bool
+    cand_present: bool
+    band: str
+
+
+@dataclass
+class ColorClassReport:
+    diagnostic_kind: str
+    semantic: bool
+    note: str
+    aligned: bool
+    dx: int
+    dy: int
+    canvas: Tuple[int, int]
+    comparable: bool
+    skip_reason: str
+    trust: str
+    classes: Tuple[ColorClassResult, ...]
+
+    def to_dict(self) -> dict:
+        d = asdict(self)
+        d["canvas"] = list(self.canvas)
+        return d
+
+
 def _load_rgb(path: Path) -> np.ndarray:
     return np.asarray(Image.open(path).convert("RGB"), dtype=np.float64)
 
@@ -142,11 +182,17 @@ def _crop_resize(mask: np.ndarray, canvas: Tuple[int, int]):
     r0, r1, c0, c1 = bb
     h, w = r1 - r0, c1 - c0
     aspect = w / h if h else 0.0
+    return _crop_resize_to_bbox(mask, bb, canvas), aspect
+
+
+def _crop_resize_to_bbox(mask: np.ndarray, bbox, canvas: Tuple[int, int]) -> np.ndarray:
+    r0, r1, c0, c1 = bbox
+    h, w = r1 - r0, c1 - c0
     sub = mask[r0:r1, c0:c1]
     if (w, h) == canvas:
-        return sub, aspect
+        return sub
     img = Image.fromarray((sub * 255).astype(np.uint8)).resize(canvas, Image.NEAREST)
-    return (np.asarray(img) > 127), aspect
+    return np.asarray(img) > 127
 
 
 def _best_shift(a: np.ndarray, b: np.ndarray, search: int = 3):
@@ -191,6 +237,91 @@ def _mean_ink_color(rgb: np.ndarray, mask: np.ndarray) -> Optional[np.ndarray]:
     if mask.sum() == 0:
         return None
     return rgb[mask].mean(axis=0)
+
+
+def _display_color_masks(rgb: np.ndarray, ink: np.ndarray) -> dict[str, np.ndarray]:
+    """Best-effort CAD display-color buckets for diagnostics.
+
+    These intentionally stay display-color based. They do not infer CAD entity
+    semantics; their purpose is to say which rendered color family accounts for
+    a bad X3 comparison after the same global alignment as `compare()`.
+    """
+    r = rgb[:, :, 0]
+    g = rgb[:, :, 1]
+    b = rgb[:, :, 2]
+    masks = {
+        "dark": ink & (r < 100) & (g < 100) & (b < 100),
+        "green": ink & (g > 120) & (r < 140) & (b < 170) & ((g - r) > 30) & ((g - b) > 20),
+        "red": ink & (r > 140) & (g < 140) & (b < 160) & ((r - g) > 20),
+        "yellow": ink & (r > 150) & (g > 120) & (b < 150),
+        "cyan": ink & (g > 120) & (b > 120) & (r < 140),
+        "magenta": ink & (r > 140) & (b > 120) & (g < 140),
+    }
+    covered = np.zeros_like(ink, dtype=bool)
+    for mask in masks.values():
+        covered |= mask
+    masks["other"] = ink & ~covered
+    return masks
+
+
+def compare_color_classes(
+    ref_path: Path, cand_path: Path, *,
+    canvas: Tuple[int, int] = CANVAS, tol: int = DILATE_TOL,
+    capture_method: str = "offscreen-render",
+) -> ColorClassReport:
+    """Diagnostic per-display-color scores after the same alignment as compare().
+
+    The returned scores are not a pass/fail gate. They are a triage view for X3
+    AutoCAD comparisons where one combined ink-IoU hides whether the misses are
+    mostly dark geometry, dimensions in a color layer, or one-sided extra ink.
+    """
+    trust = TRUST.get(capture_method, "record")
+    ra, rb = _load_rgb(Path(ref_path)), _load_rgb(Path(cand_path))
+    ga, gb = ra.mean(axis=2), rb.mean(axis=2)
+    ma, mb = _ink_mask(ga), _ink_mask(gb)
+    bbox_a, bbox_b = _ink_bbox(ma), _ink_bbox(mb)
+
+    if bbox_a is None or bbox_b is None:
+        both_blank = bbox_a is None and bbox_b is None
+        return ColorClassReport(
+            "display-color-ink-classes", False, COLOR_CLASS_NOTE,
+            False, 0, 0, canvas, True,
+            "both-blank" if both_blank else "blank-side", trust, tuple(),
+        )
+
+    ca = _crop_resize_to_bbox(ma, bbox_a, canvas)
+    cb = _crop_resize_to_bbox(mb, bbox_b, canvas)
+    dx, dy = _best_shift(ca, cb)
+
+    ref_classes = _display_color_masks(ra, ma)
+    cand_classes = _display_color_masks(rb, mb)
+    canvas_pixels = float(canvas[0] * canvas[1])
+    rows = []
+    for name in COLOR_CLASS_ORDER:
+        ref_mask = _crop_resize_to_bbox(ref_classes[name], bbox_a, canvas)
+        cand_mask = _crop_resize_to_bbox(cand_classes[name], bbox_b, canvas)
+        cand_shift = _shift(cand_mask, dy, dx)
+        ref_pixels = int(ref_mask.sum())
+        cand_pixels = int(cand_mask.sum())
+        score = _ink_iou_tol(ref_mask, cand_shift, tol=tol)
+        ref_present = ref_pixels > 0
+        cand_present = cand_pixels > 0
+        rows.append(ColorClassResult(
+            name=name,
+            ink_iou=round(score, 4),
+            ref_pixels=ref_pixels,
+            cand_pixels=cand_pixels,
+            ref_fraction=round(ref_pixels / canvas_pixels, 6),
+            cand_fraction=round(cand_pixels / canvas_pixels, 6),
+            ref_present=ref_present,
+            cand_present=cand_present,
+            band="absent" if not ref_present and not cand_present else band_for(score),
+        ))
+
+    return ColorClassReport(
+        "display-color-ink-classes", False, COLOR_CLASS_NOTE,
+        True, dx, dy, canvas, True, "", trust, tuple(rows),
+    )
 
 
 def compare(

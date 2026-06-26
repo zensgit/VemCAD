@@ -16,11 +16,17 @@ Then:
 
 Reads: red in the overlay = ink AutoCAD has that we are MISSING; green = ink we
 drew that AutoCAD does NOT have; grey = matches.
+
+For triage, add `--class-report report.json --print-classes` to split the
+already-aligned ink comparison by rendered display-colour buckets. This is not a
+semantic text/dimension/hatch split; it is a diagnostic layer for finding which
+visible colour family accounts for a poor X3 score.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -41,6 +47,16 @@ def _verdict(band: str, comparable: bool, skip_reason: str) -> str:
     }.get(band, "UNKNOWN")
 
 
+def _print_class_rows(report: cmp.ColorClassReport) -> None:
+    print("  class scores : display-color diagnostics (not semantic masks)")
+    if not report.classes:
+        print("    (none — %s)" % (report.skip_reason or "blank"))
+        return
+    for row in report.classes:
+        print("    %-8s IoU=%-6s ref_px=%-7d ours_px=%-7d band=%s" % (
+            row.name, row.ink_iou, row.ref_pixels, row.cand_pixels, row.band))
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
         prog="compare_vs_acad",
@@ -50,6 +66,10 @@ def main(argv=None) -> int:
     ap.add_argument("--out", type=Path, default=None, help="difference overlay PNG to write")
     ap.add_argument("--capture-method", default="offscreen-render",
                     help="trust tier for the comparison (default offscreen-render)")
+    ap.add_argument("--class-report", type=Path, default=None,
+                    help="write per-display-color diagnostic JSON")
+    ap.add_argument("--print-classes", action="store_true",
+                    help="print per-display-color diagnostic scores")
     args = ap.parse_args(argv)
 
     # ref = AutoCAD (ground truth), cand = ours.
@@ -73,6 +93,20 @@ def main(argv=None) -> int:
     print("  band         : %s" % res.band)
     if overlay_note:
         print(overlay_note)
+    if args.class_report is not None or args.print_classes:
+        class_report = cmp.compare_color_classes(
+            args.acad, args.ours, capture_method=args.capture_method)
+        if args.class_report is not None:
+            payload = class_report.to_dict()
+            payload["reference"] = str(args.acad)
+            payload["candidate"] = str(args.ours)
+            payload["summary"] = res.to_dict()
+            args.class_report.parent.mkdir(parents=True, exist_ok=True)
+            args.class_report.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8")
+        if args.print_classes:
+            _print_class_rows(class_report)
     print("verdict: %s" % _verdict(res.band, res.comparable, res.skip_reason))
     return 0
 
