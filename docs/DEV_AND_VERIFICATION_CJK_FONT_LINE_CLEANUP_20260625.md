@@ -70,13 +70,14 @@ compliance violation, not a cosmetic warning.
 - License: repoint to `…/v0.212/LICENSE.txt` so the OFL license travels with the font (required).
 - LXGW WenKai's pin (v1.510) still resolves (200), unchanged.
 
-**What this does and does NOT do (the corrected scope).** This makes Zhuque correctly **available**
-(font + license) in the image. It does **not** change which family `cjk_text` resolves to:
-`defaultTextFamily()`'s Linux prefer order still lists `Noto Serif CJK SC` **before**
-`Zhuque Fangsong`, so `cjk_text` still resolves to **Noto Serif CJK SC** (gate-correct). Making
-Zhuque the *preferred* resolution — the authentic 仿宋 visual — requires a CADGF prefer-order change
-(§6), deliberately **not** done here. (Prior wording claiming this PR "restores the preferred 仿宋
-visual" was wrong and has been corrected.)
+**What this PR (#104) does and does NOT do.** This makes Zhuque correctly **available** (font +
+license) in the image. It does **not** itself change which family `cjk_text` resolves to: at #104,
+`defaultTextFamily()`'s Linux prefer order still listed `Noto Serif CJK SC` **before**
+`Zhuque Fangsong`, so `cjk_text` resolved to **Noto Serif CJK SC**. Making Zhuque the *preferred*
+resolution — the authentic 仿宋 visual — was the separate prefer-order change in §6, which **has since
+been done** (CADGF #414 + VemCAD #105): post-bump, `cjk_text` resolves to **Zhuque Fangsong**, with
+Noto retained as the guaranteed fallback. (Prior wording claiming *this* PR "restores the preferred
+仿宋 visual" was wrong and was corrected; the visual is now restored by #414/#105.)
 
 **Verification.**
 - `bash -n services/render/tools/fetch_fonts.sh` — OK.
@@ -86,8 +87,8 @@ visual" was wrong and has been corrected.)
   `require_license_with_font` guard **fails the build** on a font-present-without-license state. So the
   render-image `build-and-smoke` run doesn't merely *log* `ZhuqueFangsong-OFL.txt` alongside the `.ttf`
   in `services/render/fonts/`, it **cannot pass without it** (the prior run showed the `.ttf` succeed
-  but `…-OFL.txt` fail — that is now a hard failure, not a warning). render-image stays green
-  (`cjk_text → Noto Serif CJK SC`, 0 failures).
+  but `…-OFL.txt` fail — that is now a hard failure, not a warning). render-image stays green (at #104,
+  `cjk_text → Noto Serif CJK SC`, 0 failures; after #414/#105, `cjk_text → Zhuque Fangsong`, still 0).
 
 ## 5. Net state
 
@@ -95,16 +96,17 @@ After A + B + C land:
 - **No image-side fontconfig bridge** (the conf + Dockerfile `COPY` are gone — #103).
 - **All four macOS-only ST\* families** (`STFangsong`/`STSong`/`STKaiti`/`STHeiti`) are remapped to
   typeface-class-correct host families at the CADGF render layer; the importer is untouched.
-- Zhuque 仿宋 is correctly **bundled + OFL-compliant** (Item C). `cjk_text` resolves to
-  `Noto Serif CJK SC` (the guaranteed CJK serif); Zhuque is staged but not yet the preferred face.
+- Zhuque 仿宋 is correctly **bundled + OFL-compliant** (Item C) **and is now the preferred resolved
+  face** (CADGF #414 + VemCAD #105): `cjk_text` resolves to **Zhuque Fangsong** (verified — render log
+  `resolved=Zhuque Fangsong`), with `Noto Serif CJK SC` retained as the guaranteed fallback.
 
 ## 6. Out of scope / deferred follow-ups
 
-- **Authentic 仿宋 preferred visual** (deferred, cosmetic). To make `cjk_text` resolve to
-  `Zhuque Fangsong` (a true 仿宋) instead of `Noto Serif CJK SC` (a Song serif), reorder
-  `defaultTextFamily()`'s Linux prefer list to put `Zhuque Fangsong` (+ `FangSong`/`仿宋`) **before**
-  `Noto Serif CJK SC`, then bump VemCAD. Now safe because Item C makes Zhuque reliably present. Not
-  done here — the owner flagged Zhuque as visual-priority/deferrable.
+- **Authentic 仿宋 preferred visual** — ✅ **DONE** (was deferred from #104). CADGF #414 reordered
+  `defaultTextFamily()`'s Linux prefer list to put `Zhuque Fangsong` before `Noto Serif CJK SC`;
+  VemCAD #105 bumped the submodule to consume it. `cjk_text` now resolves to `Zhuque Fangsong`
+  (verified: render-image log `font_resolution OK (resolved=Zhuque Fangsong)`, golden e2e green). Safe
+  because Item C makes Zhuque reliably present; Noto remains the guaranteed fallback.
 - The importer still bakes macOS ST* names (editor parity); the render layer maps them. A deeper
   importer refactor is not warranted.
 - Explicit kai/hei aren't gated end-to-end (no SimSun/KaiTi/SimHei golden) — proportionate to rare
