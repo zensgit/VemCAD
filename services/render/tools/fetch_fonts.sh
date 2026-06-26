@@ -47,7 +47,10 @@ fetch_zip_ttf() {
 
 fetch_zip_ttf "$ZQFS_ZIP_URL" "ZhuqueFangsong-Regular.ttf"
 fetch "$LXGW_URL" "LXGWWenKai-Regular.ttf"
-# OFL requires the license to travel with the font on redistribution.
-fetch "https://raw.githubusercontent.com/TrionesType/zhuque/master/LICENSE" "ZhuqueFangsong-OFL.txt"
+# OFL requires the license to travel with the font on redistribution. The file
+# lives on the tag as LICENSE.txt (master/main both 404); pin it to the v0.212 tag
+# so it actually lands alongside the .ttf — this is a compliance requirement, not
+# a best-effort warning.
+fetch "https://raw.githubusercontent.com/TrionesType/zhuque/v0.212/LICENSE.txt" "ZhuqueFangsong-OFL.txt"
 fetch "https://raw.githubusercontent.com/lxgw/LxgwWenKai/main/OFL.txt" "LXGWWenKai-OFL.txt"
 echo "done."
