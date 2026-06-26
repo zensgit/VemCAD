@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from compare import compare, band_for, TRUST  # noqa: E402
+from compare import compare, compare_color_classes, band_for, TRUST  # noqa: E402
 from baseline import BaselineStore  # noqa: E402
 
 
@@ -53,6 +53,29 @@ def test_missing_geometry_drops_score(tmp_path):
     r = compare(a, b)
     assert r.ink_iou < 0.97   # divergence detected
     assert r.band in ("review", "fallback")
+
+
+def _class(report, name):
+    return next(row for row in report.classes if row.name == name)
+
+
+def test_color_class_diagnostics_find_missing_red_line(tmp_path):
+    # The overall comparator says "different"; the diagnostic split says *why*:
+    # black geometry still matches, while AutoCAD's red display layer is absent
+    # from the candidate. This is display-colour triage, not CAD semantics.
+    a = draw(tmp_path / "acad.png", bg=(255, 255, 255), ink=(0, 0, 0), extra_line=True)
+    b = draw(tmp_path / "ours.png", bg=(255, 255, 255), ink=(0, 0, 0), extra_line=False)
+    report = compare_color_classes(a, b)
+    dark = _class(report, "dark")
+    red = _class(report, "red")
+    yellow = _class(report, "yellow")
+
+    assert report.aligned and report.comparable
+    assert not report.semantic
+    assert dark.ink_iou >= 0.97
+    assert red.ref_present and not red.cand_present
+    assert red.ink_iou == 0.0
+    assert yellow.band == "absent"
 
 
 def test_blank_candidate_is_fallback(tmp_path):
