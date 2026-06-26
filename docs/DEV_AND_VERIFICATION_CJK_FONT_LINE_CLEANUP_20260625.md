@@ -82,10 +82,12 @@ visual" was wrong and has been corrected.)
 - `bash -n services/render/tools/fetch_fonts.sh` — OK.
 - Functional extraction against the real v0.212 ZIP → `ZhuqueFangsong-Regular.ttf` **8,824,084 bytes OK**.
 - License URL `…/v0.212/LICENSE.txt` → **200** (master/main → 404), content is the OFL.
-- **CI proof (the required one):** render-image `build-and-smoke` `fetch_fonts.sh` log must show
-  **both** `ZhuqueFangsong-Regular.ttf` *and* `ZhuqueFangsong-OFL.txt` fetched into
-  `services/render/fonts/` (the prior run showed the `.ttf` succeed but `…-OFL.txt` fail — this PR's
-  run is what closes that). render-image stays green (`cjk_text → Noto Serif CJK SC`, 0 failures).
+- **CI proof (the required one):** `fetch_fonts.sh` now **enforces** the OFL invariant — a
+  `require_license_with_font` guard **fails the build** on a font-present-without-license state. So the
+  render-image `build-and-smoke` run doesn't merely *log* `ZhuqueFangsong-OFL.txt` alongside the `.ttf`
+  in `services/render/fonts/`, it **cannot pass without it** (the prior run showed the `.ttf` succeed
+  but `…-OFL.txt` fail — that is now a hard failure, not a warning). render-image stays green
+  (`cjk_text → Noto Serif CJK SC`, 0 failures).
 
 ## 5. Net state
 

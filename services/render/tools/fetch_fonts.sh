@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Fetch the OFL 仿宋/楷体 fonts (B2 decision) into services/render/fonts/.
-# Pinned release archives; each font keeps its OFL license file. The image
-# build tolerates absence (Noto covers CJK), so a rotted URL is non-fatal —
-# it just means 仿宋/楷体 fall back until re-fetched.
+# Pinned release archives; each font keeps its OFL license file. The image build
+# tolerates a font's ABSENCE (Noto covers CJK), so a rotted FONT url is non-fatal —
+# 仿宋/楷体 just fall back until re-fetched. But OFL is non-negotiable: if a font IS
+# fetched, its license MUST ship with it, so a font-present-without-license state is a
+# HARD failure (enforced at the end), NOT a warning.
 #
 # Usage: services/render/tools/fetch_fonts.sh
 set -euo pipefail
@@ -53,4 +55,17 @@ fetch "$LXGW_URL" "LXGWWenKai-Regular.ttf"
 # a best-effort warning.
 fetch "https://raw.githubusercontent.com/TrionesType/zhuque/v0.212/LICENSE.txt" "ZhuqueFangsong-OFL.txt"
 fetch "https://raw.githubusercontent.com/lxgw/LxgwWenKai/main/OFL.txt" "LXGWWenKai-OFL.txt"
+
+# OFL ENFORCEMENT: a font that was fetched MUST ship with its license. Fail the build on a
+# font-present-without-license state (e.g. a rotted license URL) — the hard requirement, not a
+# best-effort warning, so the render-image build PROVES the license landed alongside the font.
+require_license_with_font() {
+    local font="$1" license="$2"
+    if [ -f "$FONTS_DIR/$font" ] && [ ! -f "$FONTS_DIR/$license" ]; then
+        echo "  ERROR: $font is present but its OFL license $license is missing — the license must ship with the font (OFL)." >&2
+        exit 1
+    fi
+}
+require_license_with_font "ZhuqueFangsong-Regular.ttf" "ZhuqueFangsong-OFL.txt"
+require_license_with_font "LXGWWenKai-Regular.ttf" "LXGWWenKai-OFL.txt"
 echo "done."
