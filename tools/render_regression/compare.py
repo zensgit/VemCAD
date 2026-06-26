@@ -22,6 +22,7 @@ image pairs so alignment + scoring are verified without a live renderer.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Optional, Tuple
@@ -55,6 +56,12 @@ COLOR_CLASS_NOTE = (
     "Display-color ink diagnostics only. These masks are not semantic text/"
     "dimension/hatch classes; they split CAD ink by rendered RGB after the same "
     "crop/resize/shift alignment as the gate metric."
+)
+SEMANTIC_CLASS_NOTE = (
+    "Candidate-renderer semantic class diagnostics. The class buffer comes from "
+    "render_cli and shares the candidate render view-space; AutoCAD reference "
+    "semantics are unknown, so rows report how each candidate class overlaps the "
+    "AutoCAD ink, not a true reference-vs-candidate semantic IoU."
 )
 
 
@@ -137,6 +144,40 @@ class ColorClassReport:
     skip_reason: str
     trust: str
     classes: Tuple[ColorClassResult, ...]
+
+    def to_dict(self) -> dict:
+        d = asdict(self)
+        d["canvas"] = list(self.canvas)
+        return d
+
+
+@dataclass
+class SemanticClassResult:
+    name: str
+    rgb: str
+    candidate_pixels: int
+    candidate_fraction: float
+    candidate_precision: float
+    reference_coverage: float
+    candidate_present: bool
+    band: str
+
+
+@dataclass
+class SemanticClassReport:
+    diagnostic_kind: str
+    semantic: bool
+    reference_semantics: str
+    candidate_semantics: str
+    note: str
+    aligned: bool
+    dx: int
+    dy: int
+    canvas: Tuple[int, int]
+    comparable: bool
+    skip_reason: str
+    trust: str
+    classes: Tuple[SemanticClassResult, ...]
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -321,6 +362,139 @@ def compare_color_classes(
     return ColorClassReport(
         "display-color-ink-classes", False, COLOR_CLASS_NOTE,
         True, dx, dy, canvas, True, "", trust, tuple(rows),
+    )
+
+
+def _hex_rgb(value: str) -> Tuple[int, int, int]:
+    s = (value or "").strip()
+    if s.startswith("#"):
+        s = s[1:]
+    if len(s) != 6:
+        raise ValueError("semantic palette rgb must be #RRGGBB")
+    return int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16)
+
+
+def _semantic_classes_from_report(report_path: Path):
+    payload = json.loads(Path(report_path).read_text(encoding="utf-8"))
+    classes = payload.get("semantic_classes")
+    if not isinstance(classes, dict):
+        wrapped = payload.get("render_cli_report")
+        if isinstance(wrapped, dict):
+            classes = wrapped.get("semantic_classes")
+    if not isinstance(classes, dict):
+        raise ValueError("render report missing semantic_classes")
+    palette = classes.get("palette")
+    if not isinstance(palette, list) or not palette:
+        raise ValueError("semantic_classes.palette must be a non-empty list")
+    rows = []
+    for row in palette:
+        if not isinstance(row, dict):
+            raise ValueError("semantic palette rows must be objects")
+        name = str(row.get("name") or "")
+        rgb = str(row.get("rgb") or "")
+        if not name:
+            raise ValueError("semantic palette row missing name")
+        rows.append((name, rgb.upper(), _hex_rgb(rgb)))
+    return classes, tuple(rows)
+
+
+def _semantic_palette_masks(rgb: np.ndarray, palette) -> dict[str, np.ndarray]:
+    """Classify a render_cli semantic class-buffer by nearest reserved colour.
+
+    The buffer background is black and the foreground is anti-aliased, so exact
+    RGB equality would drop edge pixels. Nearest palette colour over non-black
+    pixels preserves the class buffer as a raster mask while still ignoring the
+    black background.
+    """
+    non_bg = rgb.max(axis=2) > 8.0
+    if not non_bg.any():
+        return {name: np.zeros(rgb.shape[:2], dtype=bool) for name, _, _ in palette}
+    pal = np.asarray([row[2] for row in palette], dtype=np.float64)
+    flat = rgb.reshape((-1, 3))
+    dist = ((flat[:, None, :] - pal[None, :, :]) ** 2).sum(axis=2)
+    nearest = dist.argmin(axis=1).reshape(rgb.shape[:2])
+    return {
+        name: non_bg & (nearest == idx)
+        for idx, (name, _, _) in enumerate(palette)
+    }
+
+
+def compare_semantic_classes(
+    ref_path: Path, cand_path: Path, *,
+    candidate_mask_path: Path,
+    render_report_path: Path,
+    canvas: Tuple[int, int] = CANVAS, tol: int = DILATE_TOL,
+    capture_method: str = "offscreen-render",
+) -> SemanticClassReport:
+    """Candidate semantic-class diagnostics after the same alignment as X3.
+
+    This consumes render_cli's `--class-mask-out` PNG plus its report palette.
+    The mask is candidate-side only: AutoCAD reference semantics are unknown, so
+    rows report how each candidate class overlaps AutoCAD's total ink.
+    """
+    trust = TRUST.get(capture_method, "record")
+    classes_meta, palette = _semantic_classes_from_report(render_report_path)
+    ra, rb = _load_rgb(Path(ref_path)), _load_rgb(Path(cand_path))
+    sem = _load_rgb(Path(candidate_mask_path))
+    if sem.shape[:2] != rb.shape[:2]:
+        return SemanticClassReport(
+            "candidate-semantic-class-ink", True,
+            str(classes_meta.get("reference_semantics", "unknown")),
+            str(classes_meta.get("mask_kind", "candidate-renderer-semantic-class-buffer")),
+            SEMANTIC_CLASS_NOTE, False, 0, 0, canvas, False,
+            "semantic-mask-size-mismatch", trust, tuple(),
+        )
+
+    ga, gb = ra.mean(axis=2), rb.mean(axis=2)
+    ma, mb = _ink_mask(ga), _ink_mask(gb)
+    bbox_a, bbox_b = _ink_bbox(ma), _ink_bbox(mb)
+    if bbox_a is None or bbox_b is None:
+        both_blank = bbox_a is None and bbox_b is None
+        return SemanticClassReport(
+            "candidate-semantic-class-ink", True,
+            str(classes_meta.get("reference_semantics", "unknown")),
+            str(classes_meta.get("mask_kind", "candidate-renderer-semantic-class-buffer")),
+            SEMANTIC_CLASS_NOTE, False, 0, 0, canvas, True,
+            "both-blank" if both_blank else "blank-side", trust, tuple(),
+        )
+
+    ref_mask = _crop_resize_to_bbox(ma, bbox_a, canvas)
+    cand_mask = _crop_resize_to_bbox(mb, bbox_b, canvas)
+    dx, dy = _best_shift(ref_mask, cand_mask)
+    class_masks = _semantic_palette_masks(sem, palette)
+    ref_d = _dilate(ref_mask, tol)
+    ref_total = float(ref_mask.sum())
+    canvas_pixels = float(canvas[0] * canvas[1])
+
+    rows = []
+    for name, rgb, _ in palette:
+        class_mask = _crop_resize_to_bbox(class_masks[name], bbox_b, canvas)
+        shifted = _shift(class_mask, dy, dx)
+        cand_pixels = int(shifted.sum())
+        if cand_pixels:
+            overlap = int(np.logical_and(shifted, ref_d).sum())
+            precision = overlap / float(cand_pixels)
+            coverage = (np.logical_and(ref_mask, _dilate(shifted, tol)).sum() / ref_total
+                        if ref_total else 0.0)
+        else:
+            precision = 0.0
+            coverage = 0.0
+        rows.append(SemanticClassResult(
+            name=name,
+            rgb=rgb,
+            candidate_pixels=cand_pixels,
+            candidate_fraction=round(cand_pixels / canvas_pixels, 6),
+            candidate_precision=round(float(precision), 4),
+            reference_coverage=round(float(coverage), 4),
+            candidate_present=cand_pixels > 0,
+            band="absent" if not cand_pixels else band_for(float(precision)),
+        ))
+
+    return SemanticClassReport(
+        "candidate-semantic-class-ink", True,
+        str(classes_meta.get("reference_semantics", "unknown")),
+        str(classes_meta.get("mask_kind", "candidate-renderer-semantic-class-buffer")),
+        SEMANTIC_CLASS_NOTE, True, dx, dy, canvas, True, "", trust, tuple(rows),
     )
 
 

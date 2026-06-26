@@ -2,6 +2,7 @@
 live renderer; the render→compare end-to-end is exercised in CI where the
 image builds cleanly)."""
 
+import json
 import sys
 from pathlib import Path
 
@@ -11,7 +12,13 @@ from PIL import Image, ImageDraw
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from compare import compare, compare_color_classes, band_for, TRUST  # noqa: E402
+from compare import (  # noqa: E402
+    compare,
+    compare_color_classes,
+    compare_semantic_classes,
+    band_for,
+    TRUST,
+)
 from baseline import BaselineStore  # noqa: E402
 
 
@@ -76,6 +83,85 @@ def test_color_class_diagnostics_find_missing_red_line(tmp_path):
     assert red.ref_present and not red.cand_present
     assert red.ink_iou == 0.0
     assert yellow.band == "absent"
+
+
+def _semantic_fixture(tmp_path, *, mask_size=(420, 300)):
+    ref = tmp_path / "acad.png"
+    cand = tmp_path / "ours.png"
+    mask = tmp_path / "classes.png"
+    report = tmp_path / "render_report.json"
+
+    for path in (ref, cand):
+        im = Image.new("RGB", (420, 300), (255, 255, 255))
+        d = ImageDraw.Draw(im)
+        d.rectangle([20, 20, 400, 280], outline=(0, 0, 0), width=3)
+        d.line([40, 150, 380, 150], fill=(0, 0, 0), width=3)
+        d.rectangle([70, 60, 150, 92], outline=(0, 0, 0), width=3)
+        im.save(path)
+
+    m = Image.new("RGB", mask_size, (0, 0, 0))
+    d = ImageDraw.Draw(m)
+    d.rectangle([20, 20, 400, 280], outline=(31, 119, 180), width=3)   # geometry
+    d.line([40, 150, 380, 150], fill=(31, 119, 180), width=3)
+    d.rectangle([70, 60, 150, 92], outline=(255, 127, 14), width=3)    # text
+    m.save(mask)
+
+    report.write_text(json.dumps({
+        "semantic_classes": {
+            "schema": "vemcad.render_semantic_classes",
+            "schema_version": "0.1",
+            "mask_kind": "candidate-renderer-semantic-class-buffer",
+            "reference_semantics": "unknown",
+            "palette": [
+                {"name": "geometry", "rgb": "#1F77B4"},
+                {"name": "text", "rgb": "#FF7F0E"},
+                {"name": "dimension", "rgb": "#D62728"},
+            ],
+        }
+    }), encoding="utf-8")
+    return ref, cand, mask, report
+
+
+def _semantic_class(report, name):
+    return next(row for row in report.classes if row.name == name)
+
+
+def test_semantic_class_diagnostics_use_candidate_class_buffer(tmp_path):
+    ref, cand, mask, render_report = _semantic_fixture(tmp_path)
+
+    report = compare_semantic_classes(
+        ref, cand,
+        candidate_mask_path=mask,
+        render_report_path=render_report,
+    )
+    geometry = _semantic_class(report, "geometry")
+    text = _semantic_class(report, "text")
+    dimension = _semantic_class(report, "dimension")
+
+    assert report.semantic
+    assert report.diagnostic_kind == "candidate-semantic-class-ink"
+    assert report.reference_semantics == "unknown"
+    assert report.candidate_semantics == "candidate-renderer-semantic-class-buffer"
+    assert report.aligned and report.comparable
+    assert geometry.candidate_precision >= 0.97
+    assert geometry.reference_coverage > 0.5
+    assert text.candidate_precision >= 0.97
+    assert text.reference_coverage > 0.05
+    assert dimension.band == "absent"
+
+
+def test_semantic_class_diagnostics_reject_mask_size_mismatch(tmp_path):
+    ref, cand, mask, render_report = _semantic_fixture(tmp_path, mask_size=(210, 150))
+
+    report = compare_semantic_classes(
+        ref, cand,
+        candidate_mask_path=mask,
+        render_report_path=render_report,
+    )
+
+    assert report.semantic
+    assert not report.comparable
+    assert report.skip_reason == "semantic-mask-size-mismatch"
 
 
 def test_blank_candidate_is_fallback(tmp_path):
