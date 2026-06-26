@@ -12,6 +12,7 @@ from PIL import Image, ImageDraw
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import compare as compare_module  # noqa: E402
 from compare import (  # noqa: E402
     compare,
     compare_color_classes,
@@ -162,6 +163,24 @@ def test_semantic_class_diagnostics_reject_mask_size_mismatch(tmp_path):
     assert report.semantic
     assert not report.comparable
     assert report.skip_reason == "semantic-mask-size-mismatch"
+
+
+def test_semantic_class_decoder_keeps_antialiased_text_edges_in_text(tmp_path):
+    # render_cli's class buffer is drawn on black. Anti-aliased text edges are
+    # dim orange (alpha * #FF7F0E); a full-RGB nearest-neighbour classifier used
+    # to misbucket those pixels as red/dimension. The decoder must classify by
+    # colour direction so dim text remains text.
+    mask = np.zeros((12, 12, 3), dtype=np.float64)
+    mask[2:10, 2:10] = (255, 127, 14)
+    mask[1, 2:10] = (96, 48, 5)
+    mask[10, 2:10] = (128, 64, 7)
+    masks = compare_module._semantic_palette_masks(mask, (
+        ("text", "#FF7F0E", (255, 127, 14)),
+        ("dimension", "#D62728", (214, 39, 40)),
+    ))
+
+    assert masks["text"].sum() == 80
+    assert masks["dimension"].sum() == 0
 
 
 def test_blank_candidate_is_fallback(tmp_path):

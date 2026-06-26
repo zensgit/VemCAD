@@ -401,18 +401,23 @@ def _semantic_classes_from_report(report_path: Path):
 def _semantic_palette_masks(rgb: np.ndarray, palette) -> dict[str, np.ndarray]:
     """Classify a render_cli semantic class-buffer by nearest reserved colour.
 
-    The buffer background is black and the foreground is anti-aliased, so exact
-    RGB equality would drop edge pixels. Nearest palette colour over non-black
-    pixels preserves the class buffer as a raster mask while still ignoring the
-    black background.
+    The buffer background is black and the foreground is anti-aliased. Edge
+    pixels are therefore approximately `alpha * class_rgb`, not close to the
+    full-strength palette colour. Classify by RGB direction (nearest colour ray)
+    instead of Euclidean distance to full-strength RGB; otherwise dim orange text
+    edges can be misread as the red/dimension class.
     """
-    non_bg = rgb.max(axis=2) > 8.0
+    norm = np.linalg.norm(rgb, axis=2)
+    non_bg = norm > 8.0
     if not non_bg.any():
         return {name: np.zeros(rgb.shape[:2], dtype=bool) for name, _, _ in palette}
     pal = np.asarray([row[2] for row in palette], dtype=np.float64)
+    pal_norm = pal / np.maximum(np.linalg.norm(pal, axis=1, keepdims=True), 1e-9)
     flat = rgb.reshape((-1, 3))
-    dist = ((flat[:, None, :] - pal[None, :, :]) ** 2).sum(axis=2)
-    nearest = dist.argmin(axis=1).reshape(rgb.shape[:2])
+    flat_norm = flat / np.maximum(np.linalg.norm(flat, axis=1, keepdims=True), 1e-9)
+    # Cosine similarity to the reserved colour rays. Background pixels are
+    # filtered by `non_bg` above, so their arbitrary nearest class is ignored.
+    nearest = (flat_norm @ pal_norm.T).argmax(axis=1).reshape(rgb.shape[:2])
     return {
         name: non_bg & (nearest == idx)
         for idx, (name, _, _) in enumerate(palette)
