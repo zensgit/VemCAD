@@ -160,6 +160,72 @@ def test_render_sheet_mode_header_reports_fallback(settings, tmp_path):
         assert r.headers["X-Render-Sheet-Mode"] == "fallback"
 
 
+@needs_render_cli
+def test_acad_plot_style_does_not_affect_sheet_view_resolution(settings, fixture_dxf):
+    """style=acad-plot (grayscale postprocess) and view=sheet (sheet detection) are
+    orthogonal. The grayscale runs on the final PNG, AFTER view resolution, so a real
+    render must produce identical sheet-detection / fallback headers whether or not the
+    plot style is applied — only the pixels differ, never the view."""
+
+    def render(c, style):
+        r = c.post(
+            f"/render?format=png&width=800&height=500&view=sheet&style={style}",
+            files={"file": ("block_ellipse.dxf", fixture_dxf, "application/octet-stream")},
+        )
+        assert r.status_code == 200, r.text
+        return r
+
+    with make_client(settings) as c:
+        plot = render(c, "acad-plot")
+        src = render(c, "source")
+
+    # The plot style is applied only to acad-plot (and reaches the response).
+    assert plot.headers["X-Render-Style"] == "acad-plot"
+    assert src.headers["X-Render-Style"] == "source"
+
+    # Sheet detection / fallback is UNAFFECTED by the grayscale postprocess: the
+    # view-resolution headers are identical across the two styles.
+    for h in ("X-Render-Resolved-View", "X-Render-Sheet-Mode"):
+        assert plot.headers.get(h) == src.headers.get(h), (
+            f"{h} differs by style: acad-plot={plot.headers.get(h)!r} source={src.headers.get(h)!r}"
+        )
+
+
+def test_acad_plot_style_leaves_sheet_mode_headers_unchanged(settings, tmp_path):
+    """Orthogonality, proven in CI (no render_cli): with style=acad-plot the sheet-mode /
+    resolved-view headers are exactly what the source style yields — detected when the
+    report carries a sheet view, fallback otherwise. The grayscale postprocess runs on the
+    final PNG, after view resolution, so it cannot change these headers. Mirrors the
+    source-style sheet-header tests above, with style=acad-plot added."""
+    with make_client(settings) as c:
+        out = tmp_path / "fake.png"
+        Image.new("RGB", (10, 10), "white").save(out)
+
+        async def fake_render_view_bytes(content, params, content_sha=None):
+            return out, "k", False
+
+        c.app.state.svc.render_view_bytes = fake_render_view_bytes
+
+        c.app.state.svc.cache.get_report = lambda key: {"params": {"view": "window"}}
+        r = c.post(
+            "/render?format=png&width=200&height=100&bg=white&view=sheet&style=acad-plot",
+            files={"file": ("x.dxf", b"0\nEOF\n", "text/plain")},
+        )
+        assert r.status_code == 200, r.text
+        assert r.headers["X-Render-Style"] == "acad-plot"
+        assert r.headers["X-Render-Resolved-View"] == "window"
+        assert r.headers["X-Render-Sheet-Mode"] == "detected"
+
+        c.app.state.svc.cache.get_report = lambda key: {"params": {"view": "extents"}}
+        r2 = c.post(
+            "/render?format=png&width=200&height=100&bg=white&view=sheet&style=acad-plot",
+            files={"file": ("x.dxf", b"0\nEOF\n", "text/plain")},
+        )
+        assert r2.status_code == 200, r2.text
+        assert r2.headers["X-Render-Resolved-View"] == "extents"
+        assert r2.headers["X-Render-Sheet-Mode"] == "fallback"
+
+
 def test_dwg_rejected(settings):
     with make_client(settings) as c:
         r = c.post(
