@@ -125,6 +125,25 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             chunks.append(chunk)
         return b"".join(chunks), total
 
+    def _render_headers(params: RenderParams, key: str, hit: bool) -> dict:
+        headers = {
+            "X-Render-Cache": "hit" if hit else "miss",
+            "X-Render-Key": key,
+            "X-Render-Style": params.style,
+        }
+        report = svc.cache.get_report(key) or {}
+        resolved = (report.get("params") or {}).get("view") if isinstance(report, dict) else None
+        if resolved:
+            headers["X-Render-Resolved-View"] = str(resolved)
+        if params.view == "sheet":
+            if resolved == "window":
+                headers["X-Render-Sheet-Mode"] = "detected"
+            elif resolved == "extents":
+                headers["X-Render-Sheet-Mode"] = "fallback"
+            else:
+                headers["X-Render-Sheet-Mode"] = "unknown"
+        return headers
+
     @app.post("/package")
     async def receive_package(
         manifest: UploadFile = File(...),
@@ -193,13 +212,14 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         height: int = Query(1697),
         bg: str = Query("dark"),
         view: str = Query("extents"),
+        style: str = Query("source"),
         authorization: Optional[str] = Header(default=None),
     ):
         auth_err = _auth_failed(authorization, cfg.auth_token)
         if auth_err is not None:
             return auth_err
         try:
-            params = RenderParams.parse(format, width, height, bg, view)
+            params = RenderParams.parse(format, width, height, bg, view, style)
         except ParamError as e:
             return _error(422, e.error_code, str(e))
 
@@ -241,7 +261,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             return FileResponse(
                 path,
                 media_type=MEDIA_TYPES[params.fmt],
-                headers={"X-Render-Cache": "hit" if hit else "miss", "X-Render-Key": key},
+                headers=_render_headers(params, key, hit),
             )
 
         if file is None:
@@ -291,7 +311,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         return FileResponse(
             path,
             media_type=MEDIA_TYPES[params.fmt],
-            headers={"X-Render-Cache": "hit" if hit else "miss", "X-Render-Key": key},
+            headers=_render_headers(params, key, hit),
         )
 
     async def _read_dxf_upload(part: UploadFile, label: str):
@@ -344,6 +364,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         height: int = Query(1697),
         bg: str = Query("dark"),
         view: str = Query("extents"),
+        style: str = Query("source"),
         summary_only: bool = Query(False),
         authorization: Optional[str] = Header(default=None),
     ):
@@ -353,7 +374,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
         # Both revisions render at THESE params → §5 bg + colour-mapping shared
         # by construction. The overlay is always PNG (raster diff).
         try:
-            params = RenderParams.parse("png", width, height, bg, view)
+            params = RenderParams.parse("png", width, height, bg, view, style)
         except ParamError as e:
             return _error(422, e.error_code, str(e))
 

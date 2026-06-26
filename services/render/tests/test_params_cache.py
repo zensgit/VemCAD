@@ -8,6 +8,17 @@ def test_params_ok():
     p = RenderParams.parse("png", "2400", 1697, "dark", "extents")
     assert p.width == 2400 and p.fmt == "png"
     assert p.as_dict()["bg"] == "dark"
+    assert "style" not in p.as_dict()  # source style keeps legacy cache keys stable
+
+
+def test_acad_plot_style_enters_params_and_cache_key():
+    source = RenderParams.parse("png", 100, 50, "white", "sheet")
+    plot = RenderParams.parse("png", 100, 50, "white", "sheet", "acad-plot")
+    assert plot.style == "acad-plot"
+    assert plot.as_dict()["style"] == "acad-plot"
+    assert cache_key("c" * 64, source.as_dict(), "cli", "fp") != cache_key(
+        "c" * 64, plot.as_dict(), "cli", "fp"
+    )
 
 
 @pytest.mark.parametrize(
@@ -20,11 +31,16 @@ def test_params_ok():
         dict(fmt="png", width=100, height=100, bg="grey", view="extents"),
         dict(fmt="png", width=100, height=100, bg="#12345", view="extents"),
         dict(fmt="png", width=100, height=100, bg="dark", view="layout:A"),
+        dict(fmt="png", width=100, height=100, bg="dark", view="extents", style="screen"),
+        dict(fmt="svg", width=100, height=100, bg="white", view="extents", style="acad-plot"),
     ],
 )
 def test_params_rejected(kw):
     with pytest.raises(ParamError):
-        RenderParams.parse(kw["fmt"], kw["width"], kw["height"], kw["bg"], kw["view"])
+        RenderParams.parse(
+            kw["fmt"], kw["width"], kw["height"], kw["bg"], kw["view"],
+            kw.get("style", "source"),
+        )
 
 
 def test_cache_key_is_stable_and_sensitive():

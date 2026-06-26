@@ -9,6 +9,8 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Optional, Tuple
 
+from PIL import Image, ImageOps
+
 from .cache import RenderCache, cache_key, font_fingerprint, sha256_bytes, sha256_file
 from .config import MAX_PIXELS, MAX_SIDE_PX, Settings
 from .sandbox import SandboxRunner
@@ -18,6 +20,7 @@ from .smoke import SMOKE_DXF
 _BG_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 _ALLOWED_FMT = ("png", "svg")
 _ALLOWED_BG_NAMES = ("dark", "white")
+_ALLOWED_STYLE = ("source", "acad-plot")
 MEDIA_TYPES = {"png": "image/png", "svg": "image/svg+xml"}
 
 
@@ -63,6 +66,10 @@ class RenderParams:
     height: int
     bg: str
     view: str = "extents"
+    # Output post-processing style. "source" preserves renderer colours.
+    # "acad-plot" is a neutral grayscale plot-raster profile for AutoCAD
+    # reference comparisons and white-sheet previews; it never changes geometry.
+    style: str = "source"
     # Optional explicit world window (xmin, ymin, xmax, ymax). When set, view is
     # "window" and render_cli is driven with --window instead of auto-extents.
     # Internal to the /diff common-window upgrade; the HTTP surface still only
@@ -70,7 +77,7 @@ class RenderParams:
     window: Optional[Tuple[float, float, float, float]] = None
 
     @staticmethod
-    def parse(fmt: str, width, height, bg: str, view: str) -> "RenderParams":
+    def parse(fmt: str, width, height, bg: str, view: str, style: str = "source") -> "RenderParams":
         if fmt not in _ALLOWED_FMT:
             raise ParamError("format must be one of: " + ", ".join(_ALLOWED_FMT))
         try:
@@ -85,7 +92,11 @@ class RenderParams:
             raise ParamError("bg must be dark, white or #RRGGBB")
         if view not in ("extents", "sheet"):
             raise ParamError("view must be 'extents' or 'sheet'")
-        return RenderParams(fmt=fmt, width=w, height=h, bg=bg, view=view)
+        if style not in _ALLOWED_STYLE:
+            raise ParamError("style must be one of: " + ", ".join(_ALLOWED_STYLE))
+        if style != "source" and fmt != "png":
+            raise ParamError("style=%s requires format=png" % style)
+        return RenderParams(fmt=fmt, width=w, height=h, bg=bg, view=view, style=style)
 
     def windowed(self, window: Tuple[float, float, float, float]) -> "RenderParams":
         """Derive a copy that renders in an explicit world window. Validates the
@@ -111,11 +122,35 @@ class RenderParams:
             "bg": self.bg,
             "view": self.view,
         }
+        # Keep legacy/source cache keys unchanged. Non-source styles must enter
+        # the key so a coloured render cannot satisfy an AutoCAD-plot request.
+        if self.style != "source":
+            d["style"] = self.style
         # Include the window only when set, so non-windowed renders keep their
         # existing four-tuple cache keys unchanged.
         if self.window is not None:
             d["window"] = list(self.window)
         return d
+
+
+def apply_acad_plot_style(path: Path) -> None:
+    """Convert a PNG in-place to a neutral grayscale plot-raster style.
+
+    AutoCAD plot references in the training corpus are often generated through
+    plot/PDF-style colour tables rather than the saturated ACI screen palette.
+    The renderer's geometry should stay untouched; only the output colours are
+    neutralised so comparison metrics and human review are not dominated by
+    bright cyan/green/yellow annotation ink.
+    """
+    img = Image.open(path)
+    alpha = None
+    if img.mode in ("RGBA", "LA"):
+        alpha = img.getchannel("A")
+    gray = ImageOps.grayscale(img.convert("RGB"))
+    out = ImageOps.colorize(gray, black="#000000", white="#ffffff")
+    if alpha is not None:
+        out.putalpha(alpha)
+    out.save(path)
 
 
 SMOKE_TIMEOUT_S = 30.0
@@ -265,6 +300,11 @@ class RenderService:
                 )
             if not out.is_file() or out.stat().st_size == 0:
                 raise RenderFailed("render produced no output", res.stderr.strip())
+            if params.style == "acad-plot":
+                try:
+                    apply_acad_plot_style(out)
+                except OSError as e:
+                    raise RenderFailed("plot-style postprocess failed", str(e))
             cli_report = None
             if cli_report_path.is_file():
                 try:
