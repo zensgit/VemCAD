@@ -8,6 +8,7 @@ from PIL import Image, ImageDraw
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import compare as cmp  # noqa: E402
 import compare_vs_acad as cva  # noqa: E402
 
 
@@ -91,6 +92,96 @@ def _semantic_inputs(tmp_path):
         }
     }), encoding="utf-8")
     return mask, report
+
+
+def _framed(path, size, box):
+    """A single black outline rectangle on white — image size + box are explicit
+    so page-fill (ink-bbox ÷ image) and aspect are controllable per render."""
+    im = Image.new("RGB", size, (255, 255, 255))
+    d = ImageDraw.Draw(im)
+    d.rectangle(box, outline=(0, 0, 0), width=3)
+    im.save(path)
+    return str(path)
+
+
+# ── X3 framing / capture view-space mismatch detection ──
+
+def test_framing_divergence_flags_paperspace_vs_extents(tmp_path):
+    # SAME outline aspect (1.333), very different page-fill: the AutoCAD plot is
+    # inset by page margins (fill ~0.45) while render_cli fills the frame to
+    # extents (fill ~0.95). This is the exact G11 mechanism — the page-fill axis
+    # trips while aspect_delta stays UNDER ASPECT_TOL, so the existing aspect
+    # guard is silent.
+    ref = _framed(tmp_path / "acad.png", (800, 600), [220, 165, 580, 435])   # 360x270
+    ours = _framed(tmp_path / "ours.png", (760, 570), [20, 15, 740, 555])    # 720x540
+    fr = cmp.framing_divergence(ref, ours)
+    assert fr["framing_mismatch"] is True
+    assert fr["fill_divergence_x"] > cmp.FRAMING_TOL          # page-fill axis trips
+    assert fr["aspect_delta"] < cmp.ASPECT_TOL               # aspect guard would NOT have fired
+
+
+def test_framing_divergence_flags_aspect_only(tmp_path):
+    # The OR's second operand: page-fill matches (~0.5 both axes) but the ink
+    # bbox aspect differs beyond ASPECT_TOL → still a framing mismatch.
+    ref = _framed(tmp_path / "acad.png", (800, 600), [200, 150, 600, 450])   # 400x300, asp 1.333
+    ours = _framed(tmp_path / "ours.png", (870, 600), [217, 150, 652, 450])  # 435x300, asp 1.45
+    fr = cmp.framing_divergence(ref, ours)
+    assert fr["framing_mismatch"] is True
+    assert fr["aspect_delta"] > cmp.ASPECT_TOL
+    assert fr["fill_divergence_x"] <= cmp.FRAMING_TOL
+    assert fr["fill_divergence_y"] <= cmp.FRAMING_TOL
+
+
+def test_framing_divergence_clean_pair_not_flagged(tmp_path):
+    # Same view-space: identical image size + identical outer extents → NOT a
+    # framing mismatch (no false flag). The genuine content-differs/same-frame
+    # no-false-flag case is covered through the CLI by
+    # test_missing_ink_not_excellent (acad has interior lines, ours frame-only,
+    # same outer bbox → normal verdict, not the framing one).
+    ref = _framed(tmp_path / "acad.png", (760, 570), [20, 15, 740, 555])
+    ours = _framed(tmp_path / "ours.png", (760, 570), [20, 15, 740, 555])
+    fr = cmp.framing_divergence(ref, ours)
+    assert fr["framing_mismatch"] is False
+    assert fr["comparable"] is True
+
+
+def test_framing_divergence_blank_side_not_flagged(tmp_path):
+    # A blank render is a different failure (compare()'s blank path) — framing
+    # must not hijack it.
+    ref = _framed(tmp_path / "acad.png", (760, 570), [20, 15, 740, 555])
+    blank = tmp_path / "blank.png"
+    Image.new("RGB", (760, 570), (255, 255, 255)).save(blank)
+    fr = cmp.framing_divergence(ref, str(blank))
+    assert fr["framing_mismatch"] is False
+    assert fr["comparable"] is False
+    assert fr["reason"] == "blank-side"
+
+
+def test_cli_emits_not_comparable_framing_verdict(tmp_path, capsys):
+    # POSITIVE: the CLI replaces the ink-IoU verdict with the framing verdict so
+    # a view-space mismatch is not mis-reported as renderer infidelity. No --out
+    # (an overlay across view-spaces is meaningless).
+    ref = _framed(tmp_path / "acad.png", (800, 600), [220, 165, 580, 435])
+    ours = _framed(tmp_path / "ours.png", (760, 570), [20, 15, 740, 555])
+    rc = cva.main([ref, ours])
+    assert rc == 0
+    txt = capsys.readouterr().out
+    assert "framing/capture mismatch" in txt
+    assert "page-fill" in txt and "framing div" in txt
+    assert "DIVERGENT" not in txt          # the misleading infidelity verdict is suppressed
+
+
+def test_cli_clean_pair_keeps_normal_verdict(tmp_path, capsys):
+    # NEGATIVE/guard: a same-fit same-aspect self-compare is unaffected — the
+    # normal EXCELLENT verdict stands, proving no false-flag (no gate/golden
+    # impact for genuinely comparable renders).
+    ref = _framed(tmp_path / "acad.png", (760, 570), [20, 15, 740, 555])
+    ours = _framed(tmp_path / "ours.png", (760, 570), [20, 15, 740, 555])
+    rc = cva.main([ref, ours])
+    assert rc == 0
+    txt = capsys.readouterr().out
+    assert "framing/capture mismatch" not in txt
+    assert "EXCELLENT" in txt
 
 
 def test_semantic_class_report_json_and_stdout(tmp_path, capsys):
