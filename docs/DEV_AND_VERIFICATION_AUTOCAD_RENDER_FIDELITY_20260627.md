@@ -252,6 +252,31 @@ Result:
   diagnostic and intentionally does not turn visual closeness into a formal
   `PASS >= 0.97` claim.
 
+The batch tool also has a diagnostic-only candidate frame mode:
+
+```bash
+python3 tools/render_regression/autocad_batch_compare.py \
+  --cases /tmp/vemcad-fidelity-out/current_x3_source/cases.json \
+  --out-dir /tmp/vemcad-fidelity-out/reference_envelope_tool_check \
+  --candidate-frame reference-envelope
+```
+
+This writes temporary candidate PNGs into the output directory, frames VemCAD ink
+into each AutoCAD PNG's ink envelope, and records the original candidate as
+`source_ours`. It is not a render-service mode and not a gate; it is a diagnostic
+to answer whether a low score survives after the known paper/capture envelope
+difference is removed.
+
+Current 12-case check:
+
+- framing mismatches: `12/12 -> 0/12`
+- G04: `0.6745` (`view=acad-plot + style=acad-display`) -> `0.6762`
+- G11: `0.3750` (`view=acad-plot + style=acad-display`) -> `0.3364`
+
+Interpretation: G04/G11 are not explained away by paper-envelope mismatch. G04
+remains a dense table/text/linework fidelity problem; G11 remains an outlier
+whose residual is dominated by registration/shape, not the global envelope.
+
 ### Semantic class diagnostics
 
 The batch tool now reports capture/view-space framing divergence for every case
