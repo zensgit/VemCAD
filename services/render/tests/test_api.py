@@ -96,8 +96,15 @@ def test_bad_style_envelope(settings):
         assert r2.status_code == 422
         assert r2.json()["error_code"] == "BAD_PARAMS"
 
+        r3 = c.post(
+            "/render?format=svg&style=acad-display",
+            files={"file": ("x.dxf", b"0", "text/plain")},
+        )
+        assert r3.status_code == 422
+        assert r3.json()["error_code"] == "BAD_PARAMS"
 
-def test_render_style_reaches_service_and_response_header(settings, tmp_path):
+
+def test_render_acad_display_style_reaches_service_and_response_header(settings, tmp_path):
     with make_client(settings) as c:
         out = tmp_path / "fake.png"
         Image.new("RGB", (10, 10), "white").save(out)
@@ -110,13 +117,13 @@ def test_render_style_reaches_service_and_response_header(settings, tmp_path):
 
         c.app.state.svc.render_view_bytes = fake_render_view_bytes
         r = c.post(
-            "/render?format=png&width=200&height=100&bg=white&view=sheet&style=acad-plot",
+            "/render?format=png&width=200&height=100&bg=white&view=sheet&style=acad-display",
             files={"file": ("x.dxf", b"0\nEOF\n", "text/plain")},
         )
         assert r.status_code == 200, r.text
-        assert seen["params"].style == "acad-plot"
+        assert seen["params"].style == "acad-display"
         assert seen["params"].view == "sheet"
-        assert r.headers["X-Render-Style"] == "acad-plot"
+        assert r.headers["X-Render-Style"] == "acad-display"
         assert r.headers["X-Render-Key"] == "style-key"
 
 

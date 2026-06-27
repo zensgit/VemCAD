@@ -9,6 +9,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Optional, Tuple
 
+import numpy as np
 from PIL import Image, ImageOps
 
 from .cache import RenderCache, cache_key, font_fingerprint, sha256_bytes, sha256_file
@@ -20,7 +21,7 @@ from .smoke import SMOKE_DXF
 _BG_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 _ALLOWED_FMT = ("png", "svg")
 _ALLOWED_BG_NAMES = ("dark", "white")
-_ALLOWED_STYLE = ("source", "acad-plot")
+_ALLOWED_STYLE = ("source", "acad-plot", "acad-display")
 MEDIA_TYPES = {"png": "image/png", "svg": "image/svg+xml"}
 
 
@@ -69,6 +70,9 @@ class RenderParams:
     # Output post-processing style. "source" preserves renderer colours.
     # "acad-plot" is a neutral grayscale plot-raster profile for AutoCAD
     # reference comparisons and white-sheet previews; it never changes geometry.
+    # "acad-display" keeps source colours but maps low-saturation grey linework
+    # to black, matching AutoCAD's common plot/display treatment for table/grid
+    # strokes without applying a global lineweight or grayscale conversion.
     style: str = "source"
     # Optional explicit world window (xmin, ymin, xmax, ymax). When set, view is
     # "window" and render_cli is driven with --window instead of auto-extents.
@@ -148,6 +152,31 @@ def apply_acad_plot_style(path: Path) -> None:
         alpha = img.getchannel("A")
     gray = ImageOps.grayscale(img.convert("RGB"))
     out = ImageOps.colorize(gray, black="#000000", white="#ffffff")
+    if alpha is not None:
+        out.putalpha(alpha)
+    out.save(path)
+
+
+def apply_acad_display_style(path: Path) -> None:
+    """Darken neutral grey linework while preserving saturated CAD colours.
+
+    AutoCAD PLOT/display references often render table/grid strokes as black
+    even when the DXF source colour is a low-saturation grey. A full grayscale
+    `acad-plot` pass is useful for neutral diagnostics, but it destroys source
+    colour. This lighter-weight display profile only maps low-saturation,
+    non-background greys to black; red/green/yellow/cyan annotation ink remains
+    unchanged.
+    """
+    img = Image.open(path)
+    alpha = img.getchannel("A") if img.mode in ("RGBA", "LA") else None
+    arr = np.asarray(img.convert("RGB")).copy()
+    max_channel = arr.max(axis=2).astype(np.int16)
+    min_channel = arr.min(axis=2).astype(np.int16)
+    saturation = max_channel - min_channel
+    luminance = 0.299 * arr[:, :, 0] + 0.587 * arr[:, :, 1] + 0.114 * arr[:, :, 2]
+    grey_linework = (saturation <= 35) & (luminance < 225) & (luminance > 20)
+    arr[grey_linework] = (0, 0, 0)
+    out = Image.fromarray(arr, mode="RGB")
     if alpha is not None:
         out.putalpha(alpha)
     out.save(path)
@@ -305,6 +334,11 @@ class RenderService:
                     apply_acad_plot_style(out)
                 except OSError as e:
                     raise RenderFailed("plot-style postprocess failed", str(e))
+            elif params.style == "acad-display":
+                try:
+                    apply_acad_display_style(out)
+                except OSError as e:
+                    raise RenderFailed("display-style postprocess failed", str(e))
             cli_report = None
             if cli_report_path.is_file():
                 try:

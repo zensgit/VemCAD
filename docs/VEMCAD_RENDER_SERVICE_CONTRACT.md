@@ -95,6 +95,7 @@ Query params (both modes):
 | `width`, `height` | 2400, 1697 | each 16..8192, and `width*height ≤ 64 MP` |
 | `bg` | `dark` | `dark` \| `white` \| `#RRGGBB` |
 | `view` | `extents` | `extents` only in v0 |
+| `style` | `source` | `source` \| `acad-plot` \| `acad-display` (`png` only for non-source styles) |
 
 Direct-upload cap: **48 MiB** (`RENDER_MAX_UPLOAD_BYTES`), independent of the
 contract §2.4 package ceilings. Over → `413`.
@@ -114,10 +115,16 @@ A render is content-addressed by a **four-tuple**, JSON-canonicalised
 
 ```
 ( content_sha256,                      # sha256 of the input DXF bytes
-  params,                              # {format,width,height,bg,view}
+  params,                              # {format,width,height,bg,view[,style][,window]}
   render_cli_version,                  # sha256 of the render_cli binary
   font_store_fingerprint )             # sha256 over the font dir (name+hash), or "no-fonts"
 ```
+
+`source` keeps the legacy cache key by omitting `style`. Non-source styles enter
+the params object: `acad-plot` is a neutral grayscale plot-raster diagnostic;
+`acad-display` preserves saturated CAD colours but maps low-saturation grey
+linework to black for AutoCAD-like display review. Neither style changes
+geometry or view resolution.
 
 The renderer-version and font components exist from day one so a render_cli
 upgrade or a font-set change can never serve stale pixels. A cache hit serves
