@@ -1,7 +1,7 @@
 # Render Fidelity — Fork A (continue #100) scoping taskbook
 
-> Status: **SCOPING / opt-in pending**. Doc-only. No code in this PR.
-> Repo: VemCAD `services/render/` · base `origin/main` (`5a7c5e0`, post-#100/#107) · branch `claude/render-fork-a-taskbook`.
+> Status: scoping retained as background; **this branch ALSO implements A1a** (the advisory sheet-readiness CI smoke — see `.github/workflows/render-image.yml` + `DEV_AND_VERIFICATION_RENDER_SHEET_AUDIT_CI_SMOKE_A1A_20260627.md`). The §3 backlog (A1b/A2/A3) stays opt-in.
+> Repo: VemCAD `services/render/` · base `origin/main` (`5a7c5e0`, post-#100/#107) · branch `claude/render-sheet-audit-ci-smoke`.
 > Convention: this is the planning half; the chosen task gets its own `DEV_AND_VERIFICATION_*` impl record.
 
 ## 0. Why this doc exists
