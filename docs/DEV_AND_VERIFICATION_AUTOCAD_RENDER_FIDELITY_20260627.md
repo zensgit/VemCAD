@@ -267,15 +267,42 @@ into each AutoCAD PNG's ink envelope, and records the original candidate as
 to answer whether a low score survives after the known paper/capture envelope
 difference is removed.
 
-Current 12-case check:
+It can also apply the same diagnostic colour profiles as the render service
+before optional framing:
+
+```bash
+python3 tools/render_regression/autocad_batch_compare.py \
+  --cases /tmp/vemcad-fidelity-out/batch_after_13601788/cases.json \
+  --out-dir /tmp/vemcad-fidelity-out/batch_after_13601788/compare_acad_display_reference_envelope_tool \
+  --candidate-style acad-display \
+  --candidate-frame reference-envelope \
+  --tile-grid 6x4
+```
+
+The rows keep the raw source baseline (`source_ink_iou`,
+`source_color_dist`, `source_framing_mismatch`) and the diagnostic-mode delta
+(`delta_ink_iou`, `delta_color_dist`). This prevents the AutoCAD-like review
+mode from being mistaken for the unprocessed renderer score.
+
+Current 12-case source check after the ACI255/DIMENSION cleanup:
+
+- source framing mismatches: `12/12`
+- G04 source: `ink_iou=0.8423`, `color_dist=65.9`
+- G11 source: `ink_iou=0.7712`, `color_dist=122.9`
+
+Current 12-case `acad-display + reference-envelope` diagnostic:
 
 - framing mismatches: `12/12 -> 0/12`
-- G04: `0.6745` (`view=acad-plot + style=acad-display`) -> `0.6762`
-- G11: `0.3750` (`view=acad-plot + style=acad-display`) -> `0.3364`
+- average `ink_iou`: `0.8456 -> 0.8628`
+- average `color_dist`: `86.6 -> 69.7`
+- G04: `0.8423 / 65.9 -> 0.8633 / 52.3`
+- G11: `0.7712 / 122.9 -> 0.8025 / 75.6`
 
-Interpretation: G04/G11 are not explained away by paper-envelope mismatch. G04
-remains a dense table/text/linework fidelity problem; G11 remains an outlier
-whose residual is dominated by registration/shape, not the global envelope.
+Interpretation: AutoCAD-like colour styling and reference-envelope framing
+explain part of the measured gap and make the review view-space comparable.
+They do not close the corpus to `PASS >= 0.97`; remaining red/green overlay
+regions are now better candidates for renderer fixes rather than paper-frame or
+neutral-grey display-style noise.
 
 ### Semantic class diagnostics
 
