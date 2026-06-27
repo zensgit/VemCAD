@@ -91,6 +91,20 @@ test('launch -> ready resolves with the loopback url, then stop() exits the chil
   }
 });
 
+test('startRouterLauncher returns the stable handle shape before readiness completes', async () => {
+  const port = await freePort();
+  const launcher = launchFake(['--health-delay-ms', '300'], { port, startTimeoutMs: 5000 });
+  try {
+    assert.match(launcher.url, /^http:\/\/127\.0\.0\.1:\d+$/);
+    assert.equal(typeof launcher.pid, 'number');
+    assert.equal(typeof launcher.ready, 'function');
+    assert.equal(typeof launcher.stop, 'function');
+    assert.equal(await launcher.ready(), launcher.url);
+  } finally {
+    await launcher.stop();
+  }
+});
+
 test('ready polls until /health turns 200 (delayed readiness)', async () => {
   const started = Date.now();
   const launcher = await launchReady(['--health-delay-ms', '300'], { startTimeoutMs: 5000 });
@@ -104,6 +118,27 @@ test('ready polls until /health turns 200 (delayed readiness)', async () => {
 test('child that exits before readiness -> ROUTER_START_FAILED', async () => {
   const port = await freePort();
   const launcher = launchFake(['--crash'], { port, startTimeoutMs: 4000 });
+  await assert.rejects(launcher.ready(), (err) => {
+    assert.ok(err instanceof RouterLaunchError);
+    assert.equal(err.code, 'ROUTER_START_FAILED');
+    return true;
+  });
+  await launcher.stop();
+});
+
+test('spawn failure rejects ready() with ROUTER_START_FAILED', async () => {
+  const port = await freePort();
+  const launcher = startRouterLauncher({
+    command: '/definitely/not/a/vemcad/router-command',
+    args: [],
+    stdio: 'ignore',
+    host: '127.0.0.1',
+    port,
+    healthIntervalMs: 25,
+    healthTimeoutMs: 100,
+    startTimeoutMs: 1000,
+    stopTimeoutMs: 100,
+  });
   await assert.rejects(launcher.ready(), (err) => {
     assert.ok(err instanceof RouterLaunchError);
     assert.equal(err.code, 'ROUTER_START_FAILED');

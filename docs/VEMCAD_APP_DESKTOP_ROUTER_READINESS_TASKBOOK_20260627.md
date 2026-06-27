@@ -2,10 +2,12 @@
 
 Date: 2026-06-27
 
-Status: execution taskbook; no runtime change in this document.
+Status: R0 taskbook plus R1/R2 execution branch. The branch adds product Router
+contract guards and an opt-in real reference Router smoke; it still makes no
+desktop shell or cloud-runtime behavior change.
 
 Baseline:
-- VemCAD `origin/main`: `5a7c5e0`
+- VemCAD `origin/main`: `9e783a4`
 - `deps/cadgamefusion` gitlink on that baseline: `4327230`
 - Previous line closed: P2 workbench split through S4, with S5 deferred until a product need justifies the risky `bootstrapCadWorkspace` runtime extraction.
 
@@ -21,7 +23,7 @@ This line should not reopen the completed web workbench split, and it should not
 | --- | --- | --- |
 | Desktop shell | Product repo has `apps/desktop/README.md`; the working Electron shell still lives in CADGameFusion under `tools/web_viewer_desktop/main.js`. | Do not assume VemCAD already owns desktop runtime code. |
 | Product router | `services/router/launcher.mjs` and `main.mjs` supervise the CADGameFusion reference Python router. | VemCAD already owns the product-side Router process boundary. |
-| Router contract | `services/router/CONTRACT.md` documents `/health`, `/convert`, `/jobs/{job_id}`, and `/artifacts/{artifact_id}`. | Contract guards can be added in VemCAD without changing CADGameFusion. |
+| Router contract | `services/router/CONTRACT.md` documents `/health`, `/convert`, `/status/{task_id}`, `/manifest/{task_id}`, `/history`, and the project/document/version listing endpoints. | Contract guards can be added in VemCAD without changing CADGameFusion. |
 | Solve service | `services/solve/README.md` is a placeholder for future hosted solver orchestration. | Keep it out of this line. |
 | Web workbench | P2 S1-S4 are closed and verified; S5 is explicitly deferred. | Do not continue refactoring the web bootstrap as the next default move. |
 
@@ -60,8 +62,12 @@ This line should not reopen the completed web workbench split, and it should not
 
 - `GET /health`,
 - `POST /convert`,
-- `GET /jobs/{job_id}`,
-- `GET /artifacts/{artifact_id}`.
+- `GET /status/{task_id}`,
+- `GET /manifest/{task_id}`,
+- `GET /history`,
+- `GET /projects`,
+- `GET /projects/{project_id}/documents`,
+- `GET /documents/{document_id}/versions`.
 
 ### Desktop Shell Boundary
 
@@ -91,7 +97,7 @@ Deliverables:
 - a mocked-process launcher test for the `{ url, ready, stop }` shape,
 - failure tests for spawn failure and readiness timeout error codes,
 - an idempotent `stop()` test,
-- a contract inventory test that checks `services/router/CONTRACT.md` still names the four stable routes.
+- a contract inventory test that checks `services/router/CONTRACT.md` still names the stable Router routes and does not drift to stale `/jobs` or generic `/artifacts` wording.
 
 Verification:
 - `npm test`,
@@ -99,6 +105,10 @@ Verification:
 
 Merge policy:
 - VemCAD-only PR, owner/branch-rule gated.
+
+Status on this branch:
+- Added launcher handle-shape, spawn-failure, and contract-inventory tests.
+- Corrected the taskbook route inventory away from stale `/jobs` / generic `/artifacts` wording.
 
 ### R2 - Real Reference Router Smoke
 
@@ -118,6 +128,10 @@ Verification:
 
 Merge policy:
 - VemCAD PR after R1.
+
+Status on this branch:
+- Added `services/router/tools/router_reference_smoke.mjs`.
+- Kept it opt-in and out of `npm test`.
 
 ### R3 - Desktop Shell Cleanup Scoping
 
