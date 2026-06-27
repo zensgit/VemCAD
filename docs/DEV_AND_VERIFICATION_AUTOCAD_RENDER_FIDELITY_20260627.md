@@ -513,6 +513,39 @@ Use styles deliberately:
 - `style=acad-plot`: neutral grayscale diagnostic style, not the closest
   AutoCAD-like display style for this batch.
 
+Current G04 style matrix, re-run after semantic-tile diagnostics:
+
+| Candidate style | Ink IoU | Color dist | Framing mismatch | Interpretation |
+|---|---:|---:|---|---|
+| `source` | 0.6762 | 79.7 | false | source-colour baseline |
+| `acad-display` | 0.6788 | 47.3 | false | best current AutoCAD-like display candidate |
+| `acad-plot` | 0.6311 | 98.5 | false | worse for this coloured AutoCAD PLOT reference |
+
+Artifacts:
+
+- `/tmp/vemcad-fidelity-out/g04_style_matrix/compare/summary.tsv`
+- `/tmp/vemcad-fidelity-out/g04_style_matrix/compare/tile_summary.tsv`
+- `/tmp/vemcad-fidelity-out/g04_style_matrix/compare/overlays/acad_display_overlay.png`
+
+Two false leads were explicitly checked and ruled out:
+
+- **Global BYLAYER yellow text import is not broken.** A minimal DXF with
+  `TEXT`/`MTEXT`, layer ACI 2, and entity colour 256 renders yellow through the
+  current `render_cli` image.
+- **The right-side G04 mismatch is not caused by the `acad-display` postprocess.**
+  The relevant candidate crop is already grey/black in `style=source`; applying
+  `acad-display` mainly improves neutral linework, it does not create the text
+  colour mismatch.
+
+Correct next optimization split:
+
+1. **Left dense section-view tiles** — investigate hatch/geometry/dimension
+   rendering. Do not use a global lineweight or crop rule; semantic tiles show
+   hatch + geometry dominate.
+2. **Right table / material / technical-requirements tiles** — investigate
+   table/text placement and complex MTEXT/proxy paths separately. Treat colour
+   as display evidence, not as proof of a single BYLAYER importer bug.
+
 ## Boundary
 
 This slice does not mark the corpus "AutoCAD-equivalent". The strongest current

@@ -11,6 +11,7 @@ from sheet_readiness_audit import (  # noqa: E402
     Thresholds,
     analyse_pair,
     image_stats,
+    parse_args,
     write_contact_sheets,
 )
 
@@ -175,6 +176,15 @@ def test_curated_corpus_covers_all_four_categories():
     exactly the four readiness verdict categories."""
     assert len(CURATED_CASES) == 4
     assert {c[4] for c in CURATED_CASES} == {"pass", "fail", "review"}
+
+
+def test_cli_accepts_acad_display_style_for_preview_audits(tmp_path):
+    args = parse_args([
+        "--input-dir", str(tmp_path),
+        "--out-dir", str(tmp_path / "out"),
+        "--style", "acad-display",
+    ])
+    assert args.style == "acad-display"
 
 
 def test_curated_corpus_json_matches_inline_cases():
