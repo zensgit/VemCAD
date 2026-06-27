@@ -94,7 +94,7 @@ Query params (both modes):
 | `format` | `png` | `png` \| `svg` |
 | `width`, `height` | 2400, 1697 | each 16..8192, and `width*height ≤ 64 MP` |
 | `bg` | `dark` | `dark` \| `white` \| `#RRGGBB` |
-| `view` | `extents` | `extents` only in v0 |
+| `view` | `extents` | `extents` \| `sheet` \| `acad-plot` (`acad-plot` is `png` only) |
 | `style` | `source` | `source` \| `acad-plot` \| `acad-display` (`png` only for non-source styles) |
 
 Direct-upload cap: **48 MiB** (`RENDER_MAX_UPLOAD_BYTES`), independent of the
@@ -103,6 +103,10 @@ contract §2.4 package ceilings. Over → `413`.
 Success → `200` with the image bytes (`image/png` or `image/svg+xml`) and:
 - `X-Render-Cache: hit | miss`
 - `X-Render-Key: <cache key>`
+- `X-Render-Style: source | acad-plot | acad-display`
+- `X-Render-Resolved-View: ...` when a render report is available
+- `X-Render-Sheet-Mode: detected | fallback | unknown` for `view=sheet`
+- `X-Render-Acad-Plot-Mode: framed | fallback | unknown` for `view=acad-plot`
 
 **Thumbnails** are `/render` with small `width`/`height` — there is **no
 separate `/thumbnail` endpoint** in v0; a thin `GET /thumbnail` alias may be
@@ -125,6 +129,15 @@ the params object: `acad-plot` is a neutral grayscale plot-raster diagnostic;
 `acad-display` preserves saturated CAD colours but maps low-saturation grey
 linework to black for AutoCAD-like display review. Neither style changes
 geometry or view resolution.
+
+`view=acad-plot` is separate from `style=acad-plot`: it is an opt-in PNG view
+for comparing against the AutoCAD PLOT reference path used by the training
+batch (`A4 landscape`, `Extents`, `Fit`, `Center`). It renders normally, crops
+to the candidate ink bbox, and reframes that ink into the observed AutoCAD plot
+paper-fill envelope. It is not the default preview and it is not an AutoCAD
+equivalence claim; it only removes a known paper-framing mismatch before
+scoring display fidelity. Combine it with `style=acad-display` when the goal is
+AutoCAD-like display review.
 
 The renderer-version and font components exist from day one so a render_cli
 upgrade or a font-set change can never serve stale pixels. A cache hit serves

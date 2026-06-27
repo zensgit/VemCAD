@@ -142,6 +142,10 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
                 headers["X-Render-Sheet-Mode"] = "fallback"
             else:
                 headers["X-Render-Sheet-Mode"] = "unknown"
+        if params.view == "acad-plot":
+            frame = report.get("acad_plot_frame") if isinstance(report, dict) else None
+            if isinstance(frame, dict):
+                headers["X-Render-Acad-Plot-Mode"] = str(frame.get("mode") or "unknown")
         return headers
 
     @app.post("/package")
