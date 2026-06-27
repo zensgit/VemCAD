@@ -231,8 +231,10 @@ def apply_acad_plot_view_frame(path: Path) -> dict:
     keeps the rendered ink unchanged except for a uniform scale onto the observed
     AutoCAD plot paper fill envelope.
     """
-    img = Image.open(path)
-    arr = np.asarray(img.convert("RGB"))
+    with Image.open(path) as src:
+        img = src.convert("RGB")
+        img.load()
+    arr = np.asarray(img)
     bbox = _ink_bbox(arr)
     if bbox is None:
         return {"mode": "fallback", "reason": "blank"}
@@ -255,7 +257,7 @@ def apply_acad_plot_view_frame(path: Path) -> dict:
         target_h = target_h_max
         target_w = max(1, int(round(target_h * ink_aspect)))
 
-    crop = img.convert("RGB").crop((c0, r0, c1, r1))
+    crop = img.crop((c0, r0, c1, r1))
     resized = crop.resize((target_w, target_h), Image.Resampling.LANCZOS)
     out = Image.new("RGB", (width, height), _background_rgb(arr))
     x = (width - target_w) // 2
