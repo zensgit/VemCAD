@@ -254,6 +254,94 @@ def _tile_diagnostics(
     }
 
 
+def _semantic_tile_diagnostics(
+    case_id: str,
+    acad: Path,
+    candidate: Path,
+    *,
+    semantic_mask: Path,
+    render_report: Path,
+    grid: tuple[int, int],
+) -> dict[str, Any]:
+    cols, rows = grid
+    classes_meta, palette = cmp._semantic_classes_from_report(render_report)
+    ra, rb = cmp._load_rgb(Path(acad)), cmp._load_rgb(Path(candidate))
+    sem = cmp._load_rgb(Path(semantic_mask))
+    canvas = cmp.CANVAS
+    if sem.shape[:2] != rb.shape[:2]:
+        return {
+            "grid": {"cols": cols, "rows": rows},
+            "canvas": list(canvas),
+            "comparable": False,
+            "skip_reason": "semantic-mask-size-mismatch",
+            "classes": [],
+        }
+
+    ga, gb = ra.mean(axis=2), rb.mean(axis=2)
+    ma, mb = cmp._ink_mask(ga), cmp._ink_mask(gb)
+    bbox_a, bbox_b = cmp._ink_bbox(ma), cmp._ink_bbox(mb)
+    if bbox_a is None or bbox_b is None:
+        return {
+            "grid": {"cols": cols, "rows": rows},
+            "canvas": list(canvas),
+            "comparable": False,
+            "skip_reason": "both-blank" if bbox_a is None and bbox_b is None else "blank-side",
+            "classes": [],
+        }
+
+    ref = cmp._crop_resize_to_bbox(ma, bbox_a, canvas)
+    cand = cmp._crop_resize_to_bbox(mb, bbox_b, canvas)
+    dx, dy = cmp._best_shift(ref, cand)
+    class_masks = cmp._semantic_palette_masks(sem, palette)
+    width, height = canvas
+    rows_out: list[dict[str, Any]] = []
+    for tile_row, tile_col, x0, y0, x1, y1 in _tile_bounds(cols, rows, width, height):
+        ref_tile = ref[y0:y1, x0:x1]
+        ref_d = cmp._dilate(ref_tile, cmp.DILATE_TOL)
+        ref_total = float(ref_tile.sum())
+        tile_area = float(max(1, (x1 - x0) * (y1 - y0)))
+        for name, rgb, _ in palette:
+            class_mask = cmp._crop_resize_to_bbox(class_masks[name], bbox_b, canvas)
+            shifted = cmp._shift(class_mask, dy, dx)
+            class_tile = shifted[y0:y1, x0:x1]
+            cand_pixels = int(class_tile.sum())
+            if cand_pixels:
+                overlap = int(np.logical_and(class_tile, ref_d).sum())
+                precision = overlap / float(cand_pixels)
+                coverage = (
+                    np.logical_and(ref_tile, cmp._dilate(class_tile, cmp.DILATE_TOL)).sum() / ref_total
+                    if ref_total else 0.0
+                )
+            else:
+                precision = 0.0
+                coverage = 0.0
+            rows_out.append({
+                "id": case_id,
+                "row": tile_row,
+                "col": tile_col,
+                "bbox_px": [x0, y0, x1, y1],
+                "class": name,
+                "rgb": rgb,
+                "candidate_pixels": cand_pixels,
+                "candidate_fraction": round(cand_pixels / tile_area, 6),
+                "candidate_precision": round(float(precision), 4),
+                "reference_coverage": round(float(coverage), 4),
+                "candidate_present": cand_pixels > 0,
+                "band": "absent" if not cand_pixels else cmp.band_for(float(precision)),
+            })
+    return {
+        "grid": {"cols": cols, "rows": rows},
+        "canvas": list(canvas),
+        "comparable": True,
+        "skip_reason": "",
+        "dx": dx,
+        "dy": dy,
+        "reference_semantics": str(classes_meta.get("reference_semantics", "unknown")),
+        "candidate_semantics": str(classes_meta.get("mask_kind", "candidate-renderer-semantic-class-buffer")),
+        "classes": rows_out,
+    }
+
+
 def _background_rgb(img: Image.Image) -> tuple[int, int, int]:
     arr = np.asarray(img.convert("RGB"))
     edge = np.concatenate(
@@ -417,6 +505,7 @@ def main(argv: list[str] | None = None) -> int:
     rows: list[dict[str, Any]] = []
     semantic_rows: list[dict[str, Any]] = []
     tile_rows: list[dict[str, Any]] = []
+    semantic_tile_rows: list[dict[str, Any]] = []
     for case in cases:
         overlay = overlay_dir / f"{case['id']}_overlay.png"
         candidate = case["ours"]
@@ -513,6 +602,26 @@ def main(argv: list[str] | None = None) -> int:
                         "band": class_row.band,
                     }
                 )
+            if tile_grid is not None:
+                semantic_tile_report = _semantic_tile_diagnostics(
+                    case["id"],
+                    case["acad"],
+                    candidate,
+                    semantic_mask=semantic_mask,
+                    render_report=case["semantic_report"],
+                    grid=tile_grid,
+                )
+                row["semantic_tile_report"] = {
+                    "grid": semantic_tile_report["grid"],
+                    "canvas": semantic_tile_report["canvas"],
+                    "comparable": semantic_tile_report["comparable"],
+                    "skip_reason": semantic_tile_report["skip_reason"],
+                    "dx": semantic_tile_report.get("dx", 0),
+                    "dy": semantic_tile_report.get("dy", 0),
+                    "reference_semantics": semantic_tile_report.get("reference_semantics", "unknown"),
+                    "candidate_semantics": semantic_tile_report.get("candidate_semantics", "unknown"),
+                }
+                semantic_tile_rows.extend(semantic_tile_report["classes"])
 
     summary = {
         "schema": "vemcad.autocad_batch_compare/v1",
@@ -598,6 +707,36 @@ def main(argv: list[str] | None = None) -> int:
                     f"{row['severity']}\t{row['heatmap']}\n"
                 )
 
+    if semantic_tile_rows:
+        semantic_tile_summary = {
+            "schema": "vemcad.autocad_batch_semantic_tile_compare/v1",
+            "capture_method": args.capture_method,
+            "candidate_frame_mode": args.candidate_frame,
+            "grid": {"cols": tile_grid[0], "rows": tile_grid[1]} if tile_grid else None,
+            "count": len(semantic_tile_rows),
+            "note": (
+                "Candidate semantic class diagnostics per local tile after the same global X3 alignment. "
+                "AutoCAD reference semantics are unknown; rows report candidate class overlap with AutoCAD ink."
+            ),
+            "rows": semantic_tile_rows,
+        }
+        (args.out_dir / "semantic_tile_summary.json").write_text(
+            json.dumps(semantic_tile_summary, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        with (args.out_dir / "semantic_tile_summary.tsv").open("w", encoding="utf-8") as f:
+            f.write(
+                "id\trow\tcol\tclass\trgb\tcandidate_pixels\tcandidate_fraction\t"
+                "candidate_precision\treference_coverage\tcandidate_present\tband\n"
+            )
+            for row in semantic_tile_rows:
+                f.write(
+                    f"{row['id']}\t{row['row']}\t{row['col']}\t{row['class']}\t{row['rgb']}\t"
+                    f"{row['candidate_pixels']}\t{row['candidate_fraction']}\t"
+                    f"{row['candidate_precision']}\t{row['reference_coverage']}\t"
+                    f"{row['candidate_present']}\t{row['band']}\n"
+                )
+
     _write_contact(rows, args.out_dir / "contact_autocad.png", "acad", "AutoCAD reference")
     _write_contact(rows, args.out_dir / "contact_vemcad.png", "ours", "VemCAD candidate")
     _write_contact(rows, args.out_dir / "contact_overlay.png", "overlay", "overlay red=missing green=extra")
@@ -610,6 +749,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"semantic classes: {len(semantic_rows)} rows")
     if tile_rows:
         print(f"tile diagnostics: {len(tile_rows)} rows")
+    if semantic_tile_rows:
+        print(f"semantic tile classes: {len(semantic_tile_rows)} rows")
     print(f"summary: {args.out_dir / 'summary.tsv'}")
     return 0
 

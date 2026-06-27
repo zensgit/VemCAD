@@ -169,3 +169,71 @@ def test_batch_tile_grid_reports_localized_missing_ink(tmp_path):
     assert tile_summary["schema"] == "vemcad.autocad_batch_tile_compare/v1"
     assert len(tile_summary["rows"]) == 4
     assert "severity" in (out / "tile_summary.tsv").read_text(encoding="utf-8").splitlines()[0]
+
+
+def test_batch_semantic_tile_grid_reports_class_locality(tmp_path):
+    acad = _framed(tmp_path / "acad.png", (400, 300), [20, 20, 380, 280])
+    ours = _framed(tmp_path / "ours.png", (400, 300), [20, 20, 380, 280])
+
+    # Add a candidate-side dimension-like stroke in the top-right tile that
+    # does not overlap AutoCAD ink. The semantic tile report should attribute
+    # the local extra ink to the dimension class, not just to a generic bad
+    # tile score.
+    im = Image.open(ours).convert("RGB")
+    d = ImageDraw.Draw(im)
+    d.line([230, 70, 355, 70], fill=(0, 0, 0), width=3)
+    im.save(ours)
+
+    mask = tmp_path / "semantic_mask.png"
+    sem = Image.new("RGB", (400, 300), (0, 0, 0))
+    sd = ImageDraw.Draw(sem)
+    sd.line([230, 70, 355, 70], fill=(214, 39, 40), width=3)
+    sem.save(mask)
+
+    report = tmp_path / "render_report.json"
+    report.write_text(json.dumps({
+        "semantic_classes": {
+            "schema": "vemcad.render_semantic_classes",
+            "schema_version": "0.1",
+            "mask_kind": "candidate-renderer-semantic-class-buffer",
+            "reference_semantics": "unknown",
+            "palette": [
+                {"name": "geometry", "rgb": "#1F77B4"},
+                {"name": "dimension", "rgb": "#D62728"},
+            ],
+        }
+    }), encoding="utf-8")
+
+    cases = tmp_path / "cases.json"
+    cases.write_text(json.dumps([{
+        "id": "Gx",
+        "acad": acad,
+        "ours": ours,
+        "semantic_mask": str(mask),
+        "semantic_report": str(report),
+    }]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--cases", str(cases),
+        "--out-dir", str(out),
+        "--tile-grid", "2x2",
+    ]) == 0
+
+    summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
+    assert summary["rows"][0]["semantic_tile_report"]["grid"] == {"cols": 2, "rows": 2}
+
+    semantic_tiles = json.loads((out / "semantic_tile_summary.json").read_text(encoding="utf-8"))
+    dimension_rows = [
+        row for row in semantic_tiles["rows"]
+        if row["class"] == "dimension" and row["candidate_present"]
+    ]
+    assert len(dimension_rows) == 1
+    row = dimension_rows[0]
+    assert row["row"] == 0
+    assert row["col"] == 1
+    assert row["candidate_pixels"] > 0
+    assert row["candidate_precision"] < 0.5
+    assert "candidate_precision" in (
+        out / "semantic_tile_summary.tsv"
+    ).read_text(encoding="utf-8").splitlines()[0]

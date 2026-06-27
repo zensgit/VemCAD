@@ -445,6 +445,64 @@ fix. The next renderer change should target a class of primitives with semantic
 or local evidence, then prove it improves these hot tiles without regressing
 the good group.
 
+### P1b: Semantic tiles on the current render image
+
+After `#138`, the current render image was refreshed with an isolated Docker
+config to avoid the local credential-helper hang:
+
+```text
+ghcr.io/zensgit/vemcad-render:main
+digest: sha256:5688ffff6f29b43d32de45a69b132677ce2bc490ac02c189a3e4d176971fcb44
+```
+
+G04 was re-rendered with `--class-mask-out` and compared with both
+`--candidate-frame reference-envelope` and `--tile-grid 6x4`.
+
+Render report semantic entity counts:
+
+| Class | Count |
+|---|---:|
+| geometry | 5152 |
+| text | 803 |
+| dimension | 1147 |
+| hatch | 3067 |
+| insert_text | 27 |
+| other | 0 |
+
+Whole-drawing candidate semantic diagnostics:
+
+| Class | Candidate px | Precision | Reference coverage | Interpretation |
+|---|---:|---:|---:|---|
+| geometry | 107271 | 0.6809 | 0.4647 | largest contributor |
+| text | 38166 | 0.7834 | 0.1821 | right/table text contributes, not sole root |
+| dimension | 19729 | 0.5363 | 0.0724 | real contributor, but smaller than geometry |
+| hatch | 16578 | 0.4335 | 0.0407 | low precision in dense section views |
+| insert_text | 1090 | 0.5899 | 0.0077 | minor |
+| other | 403 | 0.7370 | 0.0067 | minor |
+
+The semantic-tile diagnostic localizes those classes:
+
+- worst tile `(1,0)` (left dense view): `hatch` and `geometry` dominate the
+  candidate-side mismatch, with `dimension` secondary;
+- worst tile `(2,5)` (right material/table area): mostly `text` plus some
+  `geometry`;
+- tiles `(1,5)`, `(0,5)`, `(3,5)` (right-side tables / title blocks): mostly
+  `geometry` and `text`;
+- lower-left dense tiles carry a mix of `geometry`, `dimension`, and hatch.
+
+Artifacts:
+
+- `/tmp/vemcad-fidelity-out/g04_current_digest_5688ffff/G04_report.json`
+- `/tmp/vemcad-fidelity-out/g04_semantic_tile_digest_5688ffff/semantic_tile_summary.tsv`
+- `/tmp/vemcad-fidelity-out/g04_semantic_tile_digest_5688ffff/tile_summary.tsv`
+- `/tmp/vemcad-fidelity-out/g04_semantic_tile_digest_5688ffff/overlays/G04_overlay.png`
+
+Interpretation: the next renderer optimization should be class-specific and
+evidence-led. A safe next candidate is a hatch/geometry-focused investigation on
+the left dense section-view tiles, then a separate table/text investigation for
+the right-side table blocks. Do not collapse this into a single global lineweight
+or crop rule.
+
 ### P2: Style selection for AutoCAD-like display comparison
 
 Use styles deliberately:

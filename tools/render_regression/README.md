@@ -143,5 +143,13 @@ global Ink-IoU score only says "bad" but not whether the miss is concentrated
 in a title block, table, dense text area, or main geometry. This is diagnostic
 only: it is not a semantic split and does not create a new pass/fail gate.
 
-测试：`python3 -m pytest tools/render_regression/tests -q`（57 tests，合成图，
+When the case also provides `semantic_mask` and `semantic_report`,
+`--tile-grid` additionally writes `semantic_tile_summary.json` and
+`semantic_tile_summary.tsv`. Those rows split each local tile by the
+candidate-renderer semantic classes emitted by `render_cli` (for example
+`geometry`, `text`, `dimension`, `hatch`). AutoCAD still has no semantic mask,
+so the values are candidate-class overlap with AutoCAD ink, not true
+reference-vs-candidate semantic IoU.
+
+测试：`python3 -m pytest tools/render_regression/tests -q`（58 tests，合成图，
 无需 render_cli）。
