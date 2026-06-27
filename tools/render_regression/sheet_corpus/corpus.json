@@ -1,0 +1,48 @@
+{
+  "schema": "vemcad.sheet_readiness_corpus/v1",
+  "description": "Curated sheet-readiness corpus: synthetic (extents, sheet) PNG pairs with KNOWN expected analyse_pair verdicts, one per verdict category. This is the regression spec for the audit's verdict logic under the SHIPPING DEFAULT thresholds (Thresholds()) - not a 'view=sheet is ready to be the default' verdict (that needs real operator drawing evidence; see the A1a-2 DEV/V doc). Cases are mirrored as the inline source-of-truth in services/render/tests/test_sheet_readiness_audit.py; the test asserts this file and the inline list agree, so neither can drift silently.",
+  "thresholds": "default (sheet_readiness_audit.Thresholds())",
+  "fixture_recipe": {
+    "frame": "_drawing(path) - full 380x240 frame + cross-hairs; ~7064 ink px, edge_ink_fraction 0.0",
+    "crop": "_drawing(path, crop=True) - tiny 60x60 box; ~912 ink px (over-crop: retains ~0.13 of frame ink)",
+    "edge": "_drawing(path, edge_touch=True) - frame + a line riding the top image edge; edge_ink_fraction ~0.056 (in the review band 0.020..0.060)"
+  },
+  "cases": [
+    {
+      "name": "clean_sheet",
+      "category": "clean",
+      "extents": "frame",
+      "sheet": "frame",
+      "sheet_mode": "detected",
+      "expected_verdict": "pass",
+      "rationale": "sheet retains ~all extents ink, no edge contact, frame detected -> pass"
+    },
+    {
+      "name": "over_crop",
+      "category": "over-crop",
+      "extents": "frame",
+      "sheet": "crop",
+      "sheet_mode": "detected",
+      "expected_verdict": "fail",
+      "rationale": "retained ~0.13 < retained_fail (0.35) -> fail"
+    },
+    {
+      "name": "edge_touch",
+      "category": "edge-touch",
+      "extents": "frame",
+      "sheet": "edge",
+      "sheet_mode": "detected",
+      "expected_verdict": "review",
+      "rationale": "edge_ink_fraction ~0.056 in (edge_review 0.020, edge_fail 0.060] -> review (NET-NEW coverage: existing tests only assert this stat, never the verdict)"
+    },
+    {
+      "name": "no_frame_fallback",
+      "category": "no-frame/fallback",
+      "extents": "frame",
+      "sheet": "frame",
+      "sheet_mode": "fallback",
+      "expected_verdict": "review",
+      "rationale": "no sheet frame detected; detector fell back to extents -> review even though pixels look clean"
+    }
+  ]
+}
