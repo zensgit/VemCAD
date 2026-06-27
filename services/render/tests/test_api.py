@@ -103,6 +103,13 @@ def test_bad_style_envelope(settings):
         assert r3.status_code == 422
         assert r3.json()["error_code"] == "BAD_PARAMS"
 
+        r4 = c.post(
+            "/render?format=svg&view=acad-plot",
+            files={"file": ("x.dxf", b"0", "text/plain")},
+        )
+        assert r4.status_code == 422
+        assert r4.json()["error_code"] == "BAD_PARAMS"
+
 
 def test_render_acad_display_style_reaches_service_and_response_header(settings, tmp_path):
     with make_client(settings) as c:
@@ -125,6 +132,35 @@ def test_render_acad_display_style_reaches_service_and_response_header(settings,
         assert seen["params"].view == "sheet"
         assert r.headers["X-Render-Style"] == "acad-display"
         assert r.headers["X-Render-Key"] == "style-key"
+
+
+def test_render_acad_plot_view_reaches_service_and_response_header(settings, tmp_path):
+    with make_client(settings) as c:
+        out = tmp_path / "fake.png"
+        Image.new("RGB", (10, 10), "white").save(out)
+        seen = {}
+
+        async def fake_render_view_bytes(content, params, content_sha=None):
+            seen["params"] = params
+            return out, "plot-view-key", False
+
+        c.app.state.svc.render_view_bytes = fake_render_view_bytes
+        c.app.state.svc.cache.get_report = lambda key: {
+            "params": {"view": "acad-plot"},
+            "acad_plot_frame": {"mode": "framed"},
+        }
+
+        r = c.post(
+            "/render?format=png&width=200&height=100&bg=white&view=acad-plot&style=acad-display",
+            files={"file": ("x.dxf", b"0\nEOF\n", "text/plain")},
+        )
+
+        assert r.status_code == 200, r.text
+        assert seen["params"].view == "acad-plot"
+        assert seen["params"].style == "acad-display"
+        assert r.headers["X-Render-Resolved-View"] == "acad-plot"
+        assert r.headers["X-Render-Acad-Plot-Mode"] == "framed"
+        assert r.headers["X-Render-Style"] == "acad-display"
 
 
 def test_render_sheet_mode_header_comes_from_cached_report(settings, tmp_path):

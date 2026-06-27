@@ -23,6 +23,8 @@ _ALLOWED_FMT = ("png", "svg")
 _ALLOWED_BG_NAMES = ("dark", "white")
 _ALLOWED_STYLE = ("source", "acad-plot", "acad-display")
 MEDIA_TYPES = {"png": "image/png", "svg": "image/svg+xml"}
+ACAD_PLOT_TARGET_FILL_X = 0.8854
+ACAD_PLOT_TARGET_FILL_Y = 0.9528
 
 
 def _report_view(report: Optional[dict]) -> Optional[dict]:
@@ -94,8 +96,10 @@ class RenderParams:
             raise ParamError("width*height must be <= %d pixels" % MAX_PIXELS)
         if bg not in _ALLOWED_BG_NAMES and not _BG_RE.match(bg or ""):
             raise ParamError("bg must be dark, white or #RRGGBB")
-        if view not in ("extents", "sheet"):
-            raise ParamError("view must be 'extents' or 'sheet'")
+        if view not in ("extents", "sheet", "acad-plot"):
+            raise ParamError("view must be 'extents', 'sheet' or 'acad-plot'")
+        if view == "acad-plot" and fmt != "png":
+            raise ParamError("view=acad-plot requires format=png")
         if style not in _ALLOWED_STYLE:
             raise ParamError("style must be one of: " + ", ".join(_ALLOWED_STYLE))
         if style != "source" and fmt != "png":
@@ -180,6 +184,91 @@ def apply_acad_display_style(path: Path) -> None:
     if alpha is not None:
         out.putalpha(alpha)
     out.save(path)
+
+
+def _background_rgb(arr: np.ndarray) -> tuple[int, int, int]:
+    """Estimate the render background from the canvas border."""
+    edge = np.concatenate(
+        [
+            arr[:3, :, :].reshape(-1, 3),
+            arr[-3:, :, :].reshape(-1, 3),
+            arr[:, :3, :].reshape(-1, 3),
+            arr[:, -3:, :].reshape(-1, 3),
+        ],
+        axis=0,
+    )
+    return tuple(int(round(v)) for v in np.median(edge, axis=0))
+
+
+def _ink_bbox(arr: np.ndarray) -> Optional[tuple[int, int, int, int]]:
+    """Return (top, bottom, left, right) ink bounds using border-relative ink.
+
+    This mirrors the render-regression comparator's framing detector: CAD
+    renders can be white or dark, so fixed black/white thresholds are fragile.
+    """
+    gray = 0.299 * arr[:, :, 0] + 0.587 * arr[:, :, 1] + 0.114 * arr[:, :, 2]
+    edge = np.concatenate(
+        [gray[:3, :].ravel(), gray[-3:, :].ravel(), gray[:, :3].ravel(), gray[:, -3:].ravel()]
+    )
+    bg = float(np.median(edge))
+    mask = np.abs(gray - bg) > 32.0
+    rows = np.any(mask, axis=1)
+    cols = np.any(mask, axis=0)
+    if not rows.any() or not cols.any():
+        return None
+    r0, r1 = np.where(rows)[0][[0, -1]]
+    c0, c1 = np.where(cols)[0][[0, -1]]
+    return int(r0), int(r1) + 1, int(c0), int(c1) + 1
+
+
+def apply_acad_plot_view_frame(path: Path) -> dict:
+    """Reframe a render into AutoCAD PLOT-like paper fill, in-place.
+
+    AutoCAD's training references are A4 landscape PLOT rasters using
+    Extents/Fit/Center. The renderer's raw model-extents view has a larger fixed
+    viewport margin, so otherwise comparable drawings can fail the view-space
+    framing check before any real fidelity issue is measured. This postprocess
+    keeps the rendered ink unchanged except for a uniform scale onto the observed
+    AutoCAD plot paper fill envelope.
+    """
+    img = Image.open(path)
+    arr = np.asarray(img.convert("RGB"))
+    bbox = _ink_bbox(arr)
+    if bbox is None:
+        return {"mode": "fallback", "reason": "blank"}
+
+    r0, r1, c0, c1 = bbox
+    ink_w = c1 - c0
+    ink_h = r1 - r0
+    if ink_w <= 0 or ink_h <= 0:
+        return {"mode": "fallback", "reason": "degenerate-ink-bbox"}
+
+    width, height = img.size
+    target_w_max = max(1, int(round(width * ACAD_PLOT_TARGET_FILL_X)))
+    target_h_max = max(1, int(round(height * ACAD_PLOT_TARGET_FILL_Y)))
+    ink_aspect = ink_w / ink_h
+    target_aspect = target_w_max / target_h_max
+    if ink_aspect >= target_aspect:
+        target_w = target_w_max
+        target_h = max(1, int(round(target_w / ink_aspect)))
+    else:
+        target_h = target_h_max
+        target_w = max(1, int(round(target_h * ink_aspect)))
+
+    crop = img.convert("RGB").crop((c0, r0, c1, r1))
+    resized = crop.resize((target_w, target_h), Image.Resampling.LANCZOS)
+    out = Image.new("RGB", (width, height), _background_rgb(arr))
+    x = (width - target_w) // 2
+    y = (height - target_h) // 2
+    out.paste(resized, (x, y))
+    out.save(path)
+    return {
+        "mode": "framed",
+        "source_bbox_px": [c0, r0, c1, r1],
+        "target_bbox_px": [x, y, x + target_w, y + target_h],
+        "target_fill_x": round(target_w / width, 4),
+        "target_fill_y": round(target_h / height, 4),
+    }
 
 
 SMOKE_TIMEOUT_S = 30.0
@@ -329,6 +418,12 @@ class RenderService:
                 )
             if not out.is_file() or out.stat().st_size == 0:
                 raise RenderFailed("render produced no output", res.stderr.strip())
+            acad_plot_frame = None
+            if params.view == "acad-plot":
+                try:
+                    acad_plot_frame = apply_acad_plot_view_frame(out)
+                except OSError as e:
+                    raise RenderFailed("acad-plot view postprocess failed", str(e))
             if params.style == "acad-plot":
                 try:
                     apply_acad_plot_style(out)
@@ -361,6 +456,8 @@ class RenderService:
                 "render_cli_stdout": res.stdout.strip(),
                 "render_cli_report": cli_report,
             }
+            if acad_plot_frame is not None:
+                report["acad_plot_frame"] = acad_plot_frame
             return self.cache.put(key, params.fmt, out, report)
 
     def smoke(self) -> dict:
