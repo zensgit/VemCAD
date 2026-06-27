@@ -41,6 +41,7 @@ Local build helper:
 - `docs/VEMCAD_PROJECT_RUNTIME.md`: product runtime boundary and `Project -> Document` derivation model.
 - `docs/VEMCAD_ROUTER_CONTRACT.md`: minimum product-layer Router HTTP contract.
 - `docs/VEMCAD_WORKBENCH_SPLIT_PLAN.md`: Web workbench split and migration plan.
+- `docs/VEMCAD_APP_P2_WORKBENCH_SPLIT_TASKBOOK_20260626.md`: current-main execution taskbook for the next safe P2 workbench split slices.
 - `docs/VEMCAD_VERIFICATION_PLAN.md`: validation matrix and gate strategy.
 
 ## Product-layer Web facades
