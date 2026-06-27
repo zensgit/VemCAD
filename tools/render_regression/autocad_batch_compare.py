@@ -121,6 +121,7 @@ def main(argv: list[str] | None = None) -> int:
     for case in cases:
         overlay = overlay_dir / f"{case['id']}_overlay.png"
         result = cmp.compare(case["acad"], case["ours"], capture_method=args.capture_method)
+        framing = cmp.framing_divergence(case["acad"], case["ours"])
         dff.diff_overlay(case["acad"], case["ours"], out_path=overlay)
         row = {
             "id": case["id"],
@@ -134,6 +135,8 @@ def main(argv: list[str] | None = None) -> int:
             "comparable": result.comparable,
             "band": result.band,
             "skip_reason": result.skip_reason,
+            "framing_mismatch": framing["framing_mismatch"],
+            "framing": framing,
         }
         rows.append(row)
         if "semantic_mask" in case and "semantic_report" in case:
@@ -177,11 +180,18 @@ def main(argv: list[str] | None = None) -> int:
         encoding="utf-8",
     )
     with (args.out_dir / "summary.tsv").open("w", encoding="utf-8") as f:
-        f.write("id\tink_iou\tssim\tcolor_dist\taspect_delta\tcomparable\tband\tacad\tours\toverlay\n")
+        f.write(
+            "id\tink_iou\tssim\tcolor_dist\taspect_delta\tcomparable\tband\t"
+            "framing_mismatch\tfill_divergence_x\tfill_divergence_y\t"
+            "acad\tours\toverlay\n"
+        )
         for row in rows:
+            framing = row["framing"]
             f.write(
                 f"{row['id']}\t{row['ink_iou']}\t{row['ssim']}\t{row['color_dist']}\t"
                 f"{row['aspect_delta']}\t{row['comparable']}\t{row['band']}\t"
+                f"{row['framing_mismatch']}\t"
+                f"{framing['fill_divergence_x']}\t{framing['fill_divergence_y']}\t"
                 f"{row['acad']}\t{row['ours']}\t{row['overlay']}\n"
             )
     if semantic_rows:
@@ -214,7 +224,9 @@ def main(argv: list[str] | None = None) -> int:
     _write_contact(rows, args.out_dir / "contact_overlay.png", "overlay", "overlay red=missing green=extra")
 
     failed = [r for r in rows if r["band"] == "fallback" or not r["comparable"]]
+    framing_mismatches = [r for r in rows if r["framing_mismatch"]]
     print(f"batch compare: {len(rows)} total, {len(failed)} fallback/not-comparable")
+    print(f"framing mismatches: {len(framing_mismatches)}")
     if semantic_rows:
         print(f"semantic classes: {len(semantic_rows)} rows")
     print(f"summary: {args.out_dir / 'summary.tsv'}")
