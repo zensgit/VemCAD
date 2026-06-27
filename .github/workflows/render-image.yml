@@ -87,17 +87,18 @@ jobs:
           python3 tools/render_regression/ci_e2e_check.py \
             --golden tools/render_regression/golden/golden.json --render-dir /tmp/golden_out
 
-      - name: Sheet-readiness audit E2E (advisory) — run the audit tool over the golden corpus
-        # ADVISORY (continue-on-error) until verified green on a real heavy-gate run; then flip
-        # to blocking — same Phase-A→B pattern as the pact gate. Mirrors the service-smoke wiring
-        # (--network none + docker exec via in-container loopback). The image ships numpy/Pillow
-        # (services/render/requirements.txt), so the audit's analysis half runs in-container.
+      - name: Sheet-readiness audit E2E (blocking) — run the audit tool over the golden corpus
+        # BLOCKING (no continue-on-error): verified green on the real heavy gate in #125
+        # ([sheet-audit] OK total=7 rendered_ok=7), so a broken/unverified audit now FAILS the
+        # build — the Phase-A→B flip (same pattern as the pact gate). Mirrors the service-smoke
+        # wiring (--network none + docker exec via in-container loopback). The image ships
+        # numpy/Pillow (services/render/requirements.txt), so the audit analysis runs in-container.
         # SCOPE: this is a TOOL plumbing/regression signal — the audit runs end-to-end and emits
         # a well-formed summary.json over the committed corpus — NOT a "view=sheet is ready to be
         # default" verdict: the golden set is render-regression material (it intentionally includes
         # garbage_extents / degenerate fixtures), so a real readiness verdict needs a curated sheet
         # corpus with known expectations (follow-up A1a-2; see the A1a DEV_AND_VERIFICATION doc).
-        continue-on-error: true
+        # Outage revert: restore `continue-on-error: true` here if a render/CI outage wedges the gate.
         run: |
           name=vemcad_sheet_audit
           docker run -d --network none --name "$name" vemcad-render:ci

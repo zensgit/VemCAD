@@ -27,7 +27,7 @@ New advisory step in `.github/workflows/render-image.yml` (after the golden E2E,
 This needs the built render image (render_cli + Qt + fonts), which does not build on this dev machine, so it was verified in CI (like the pact Phase-A→B path):
 1. Advisory (`continue-on-error: true`) — cannot break the heavy gate.
 2. **✅ Verified** — PR #125, `render-image` → `build-and-smoke` **success**; the *Sheet-readiness audit E2E (advisory)* step really ran and logged **`[sheet-audit] OK total=7 rendered_ok=7`** (all 7 goldens rendered both views via the real `/render` path; `garbage_extents.dxf` shows `status=fail` on content but rendered without error, so it still counts in `rendered_ok`). The `[sheet-audit] OK` line prints ONLY when the assertion passes, so this is a real pass — NOT a `continue-on-error`-masked failure.
-3. **Flip to blocking (pending owner go)**: now that it is green on a real run, a one-line follow-up removes `continue-on-error: true` so a broken/unverified audit fails the build (the audit becomes a guarded regression gate for the tool itself). Making the gate blocking is a deliberate, consequential change → owner-gated.
+3. **✅ Flipped to blocking** (owner-approved follow-up): `continue-on-error: true` removed, so a broken/unverified audit now FAILS the build — the audit is a guarded regression gate for the tool itself. Outage revert: restore `continue-on-error: true` if a render/CI outage wedges the gate. (The curated readiness corpus — A1a-2 — remains the separate next slice.)
 
 Static check done locally: `python -c "import yaml; yaml.safe_load(open('.github/workflows/render-image.yml'))"` parses clean.
 
