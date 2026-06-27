@@ -62,5 +62,16 @@ requires the router's converter (`convert_cli` + plugins), which is out of scope
 pure-node fake router stub (`tests/fixtures/fake_router.mjs`) — no Python, no submodule, no
 converter — so it runs in the `product_tests` **core** job (`npm test`).
 
+Opt-in real reference smoke:
+
+```
+node services/router/tools/router_reference_smoke.mjs
+```
+
+This starts the actual CADGameFusion `plm_router_service.py`, waits for `/health`, prints a
+structured PASS payload, and tears it down. Missing Python or submodule prerequisites print
+`SKIP: ...` and exit 0 so the script is safe for developer machines without the router
+checkout. It is deliberately **not** part of default `npm test`.
+
 Repository split note
 - [REPO_POINTER.md](./REPO_POINTER.md)
