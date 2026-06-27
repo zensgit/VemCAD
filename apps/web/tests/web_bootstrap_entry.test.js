@@ -394,3 +394,37 @@ test('bootstrapLegacyWebViewerApp wires preview mode and editor handoff contract
 
   cleanupDomStubs();
 });
+
+test('installVemcadAppBridge installs the documented __vemcadApp global contracts', async () => {
+  installDomStubs({ search: '?mode=editor' });
+  const appModule = await import(
+    `${pathToFileURL(path.join(repoRoot, 'apps/web/app.js')).href}?global-contract-tie`
+  );
+  const { WORKBENCH_GLOBAL_CONTRACTS } = await import(
+    `${pathToFileURL(path.join(repoRoot, 'apps/web/workbench/contracts/index.js')).href}?global-contract-tie`
+  );
+
+  appModule.installVemcadAppBridge({ params: new URLSearchParams('mode=editor') });
+
+  // The documented `window.__vemcadApp.*` methods must actually be installed by
+  // the product bridge — this ties the contract list to the runtime so a dropped
+  // bridge method fails here. (`window.__cadDebug`, the third documented global,
+  // is installed by the CADGameFusion editor bootstrap rather than this bridge,
+  // so it is pinned at the documented-list level in workbench_contracts.test.js
+  // and not asserted functionally here.)
+  const appBridgeMethods = WORKBENCH_GLOBAL_CONTRACTS
+    .filter((contract) => contract.startsWith('window.__vemcadApp.'))
+    .map((contract) => contract.slice('window.__vemcadApp.'.length).split('(')[0].trim());
+
+  assert.deepEqual(appBridgeMethods, ['switchToEditor', 'mountSolvePanel']);
+  for (const method of appBridgeMethods) {
+    assert.equal(
+      typeof globalThis.window.__vemcadApp[method],
+      'function',
+      `window.__vemcadApp.${method} must be installed by installVemcadAppBridge`,
+    );
+  }
+
+  appModule.resetVemcadWebAppBootstrapState();
+  cleanupDomStubs();
+});
