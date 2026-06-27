@@ -361,7 +361,7 @@ def parse_args(argv: list[str] | None = None):
     p.add_argument("--width", type=int, default=1600)
     p.add_argument("--height", type=int, default=1131)
     p.add_argument("--bg", default="white")
-    p.add_argument("--style", choices=("source", "acad-plot"), default="source")
+    p.add_argument("--style", choices=("source", "acad-plot", "acad-display"), default="source")
     p.add_argument("--auth-token", default=None)
     p.add_argument("--retained-review", type=float, default=0.55)
     p.add_argument("--retained-fail", type=float, default=0.35)

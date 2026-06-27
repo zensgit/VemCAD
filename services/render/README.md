@@ -10,9 +10,10 @@
   （数量/指纹）、并发水位。
 - `POST /render` — multipart 字段 `file`（**仅 DXF**，默认上限 48 MiB）+
   查询参数 `format=png|svg`、`width`、`height`（16–8192，且 width×height ≤
-  64 MP）、`bg=dark|white|#RRGGBB`、`view=extents|sheet`、
-  `style=source|acad-plot`（默认 `source`；`acad-plot` 仅 PNG，输出中性灰度
-  plot-raster 风格，用于 AutoCAD PLOT/EXPORTPNG 参照对比和白底图纸预览）。
+  64 MP）、`bg=dark|white|#RRGGBB`、`view=extents|sheet|acad-plot`、
+  `style=source|acad-plot|acad-display`（默认 `source`；非 `source` 仅 PNG。
+  `acad-plot` 输出中性灰度 plot-raster 风格；`acad-display` 保留饱和 CAD
+  颜色、压黑中性灰线稿，用于 AutoCAD-like 人工预览审计）。
   命中四元组缓存（内容 sha256 + 规范化参数 + render_cli 二进制 sha256 +
   字体库指纹）直接回图，响应头 `X-Render-Cache: hit|miss`、`X-Render-Key`。
   `view=sheet` 另带 `X-Render-Sheet-Mode: detected|fallback|unknown` 和
@@ -65,7 +66,7 @@ python3 services/render/tools/sheet_readiness_audit.py \
   --base-url http://127.0.0.1:8077 \
   --input-dir /path/to/dxf-corpus \
   --out-dir /tmp/vemcad-sheet-audit \
-  --width 1600 --height 1131 --bg white --style acad-plot
+  --width 1600 --height 1131 --bg white --style acad-display
 ```
 
 输出：
