@@ -170,12 +170,66 @@ Result:
   diagnostic and intentionally does not turn visual closeness into a formal
   `PASS >= 0.97` claim.
 
+### Semantic class diagnostics
+
+The batch tool now also accepts optional `semantic_mask` and `semantic_report`
+fields per case. These are render_cli's candidate-side semantic class buffer and
+report (`--class-mask-out` + `--report`). When present, the tool writes:
+
+- `semantic_summary.json`
+- `semantic_summary.tsv`
+
+The rows report candidate class precision and AutoCAD reference coverage for
+renderer-owned classes. This remains diagnostic: AutoCAD's semantic masks are
+unknown, so these are not true per-class IoU gates.
+
+Self-check on the current G04/G11 outliers:
+
+```bash
+python3 tools/render_regression/autocad_batch_compare.py \
+  --cases /tmp/vemcad-fidelity-out/semantic_probe_20260627120422/semantic_cases.json \
+  --out-dir /tmp/vemcad-fidelity-out/semantic_batch_tool_check
+```
+
+Result:
+
+- 2 AutoCAD/VemCAD PNG pairs processed.
+- 12 semantic class rows generated.
+- G04 splits into multiple contributors instead of one root cause:
+  - geometry precision: 0.6733
+  - text precision: 0.7586
+  - hatch precision: 0.4239
+- G11 remains a combined view-space/registration problem:
+  - geometry precision: 0.3278
+  - text precision: 0.3959
+
+This is the actionable read: G04 is not just a global lineweight problem, and
+G11 is not fixed by changing the default extents window.
+
+### G11 window scan
+
+A small render_cli window scan was run against G11 after the unsafe
+`union(header, content_bbox)` result above:
+
+| Window | Ink IoU | Aspect delta | Result |
+|---|---:|---:|---|
+| extents | 0.3464 | 0.0575 | baseline |
+| no-clip | 0.3464 | 0.0575 | no change |
+| content_bbox window | 0.3534 | 0.0564 | tiny improvement only |
+| taller header window | 0.3333 | 0.0561 | worse |
+
+Conclusion: there is no obvious safe G11 plot-window tweak in this family.
+Keep plot-window changes gated by multi-drawing evidence; do not make
+`content_bbox` or `sheet` the AutoCAD comparison default.
+
 ## Current Development Plan
 
 ### P0: Plot-window strategy for G11-class drawings
 
-Do not default render_cli to content-bounds union. Instead, design an explicit
-AutoCAD PLOT window strategy:
+Do not default render_cli to content-bounds union. Do not switch X3 to
+`view=sheet`. The current G11 window scan found no safe plot-window family that
+meaningfully improves G11. If this line continues, design an explicit AutoCAD
+PLOT window strategy:
 
 - source of truth: AutoCAD PLOT "Extents / Fit / Center" behavior, not GUI
   screenshot;

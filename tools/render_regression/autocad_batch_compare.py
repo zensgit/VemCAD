@@ -11,9 +11,16 @@ Cases JSON shape:
   {
     "id": "G01",
     "acad": "/path/to/autocad.png",
-    "ours": "/path/to/vemcad.png"
+    "ours": "/path/to/vemcad.png",
+    "semantic_mask": "/path/to/render_cli-class-mask.png",
+    "semantic_report": "/path/to/render_cli-report.json"
   }
 ]
+
+`semantic_mask` and `semantic_report` are optional. When both are present, the
+tool also writes candidate-side semantic class diagnostics. AutoCAD reference
+semantics are unknown, so these rows are diagnostic evidence, not a pass/fail
+gate.
 """
 
 from __future__ import annotations
@@ -47,7 +54,21 @@ def _load_cases(path: Path) -> list[dict[str, Any]]:
             raise FileNotFoundError(f"{cid}: AutoCAD PNG not found: {acad}")
         if not ours.is_file():
             raise FileNotFoundError(f"{cid}: VemCAD PNG not found: {ours}")
-        cases.append({"id": cid, "acad": acad, "ours": ours})
+        case: dict[str, Any] = {"id": cid, "acad": acad, "ours": ours}
+        semantic_mask_raw = item.get("semantic_mask")
+        semantic_report_raw = item.get("semantic_report")
+        if semantic_mask_raw or semantic_report_raw:
+            if not semantic_mask_raw or not semantic_report_raw:
+                raise ValueError(f"{cid}: semantic_mask and semantic_report must be provided together")
+            semantic_mask = Path(str(semantic_mask_raw))
+            semantic_report = Path(str(semantic_report_raw))
+            if not semantic_mask.is_file():
+                raise FileNotFoundError(f"{cid}: semantic mask PNG not found: {semantic_mask}")
+            if not semantic_report.is_file():
+                raise FileNotFoundError(f"{cid}: semantic render report not found: {semantic_report}")
+            case["semantic_mask"] = semantic_mask
+            case["semantic_report"] = semantic_report
+        cases.append(case)
     return cases
 
 
@@ -96,25 +117,54 @@ def main(argv: list[str] | None = None) -> int:
     overlay_dir.mkdir(parents=True, exist_ok=True)
 
     rows: list[dict[str, Any]] = []
+    semantic_rows: list[dict[str, Any]] = []
     for case in cases:
         overlay = overlay_dir / f"{case['id']}_overlay.png"
         result = cmp.compare(case["acad"], case["ours"], capture_method=args.capture_method)
         dff.diff_overlay(case["acad"], case["ours"], out_path=overlay)
-        rows.append(
-            {
-                "id": case["id"],
-                "acad": str(case["acad"]),
-                "ours": str(case["ours"]),
-                "overlay": str(overlay),
-                "ink_iou": result.ink_iou,
-                "ssim": result.ssim,
-                "color_dist": result.color_dist,
-                "aspect_delta": result.aspect_delta,
-                "comparable": result.comparable,
-                "band": result.band,
-                "skip_reason": result.skip_reason,
+        row = {
+            "id": case["id"],
+            "acad": str(case["acad"]),
+            "ours": str(case["ours"]),
+            "overlay": str(overlay),
+            "ink_iou": result.ink_iou,
+            "ssim": result.ssim,
+            "color_dist": result.color_dist,
+            "aspect_delta": result.aspect_delta,
+            "comparable": result.comparable,
+            "band": result.band,
+            "skip_reason": result.skip_reason,
+        }
+        rows.append(row)
+        if "semantic_mask" in case and "semantic_report" in case:
+            report = cmp.compare_semantic_classes(
+                case["acad"],
+                case["ours"],
+                candidate_mask_path=case["semantic_mask"],
+                render_report_path=case["semantic_report"],
+                capture_method=args.capture_method,
+            )
+            row["semantic"] = {
+                "diagnostic_kind": report.diagnostic_kind,
+                "comparable": report.comparable,
+                "skip_reason": report.skip_reason,
+                "mask": str(case["semantic_mask"]),
+                "report": str(case["semantic_report"]),
             }
-        )
+            for class_row in report.classes:
+                semantic_rows.append(
+                    {
+                        "id": case["id"],
+                        "class": class_row.name,
+                        "rgb": class_row.rgb,
+                        "candidate_pixels": class_row.candidate_pixels,
+                        "candidate_fraction": class_row.candidate_fraction,
+                        "candidate_precision": class_row.candidate_precision,
+                        "reference_coverage": class_row.reference_coverage,
+                        "candidate_present": class_row.candidate_present,
+                        "band": class_row.band,
+                    }
+                )
 
     summary = {
         "schema": "vemcad.autocad_batch_compare/v1",
@@ -134,6 +184,30 @@ def main(argv: list[str] | None = None) -> int:
                 f"{row['aspect_delta']}\t{row['comparable']}\t{row['band']}\t"
                 f"{row['acad']}\t{row['ours']}\t{row['overlay']}\n"
             )
+    if semantic_rows:
+        semantic_summary = {
+            "schema": "vemcad.autocad_batch_semantic_compare/v1",
+            "capture_method": args.capture_method,
+            "count": len(semantic_rows),
+            "rows": semantic_rows,
+            "note": cmp.SEMANTIC_CLASS_NOTE,
+        }
+        (args.out_dir / "semantic_summary.json").write_text(
+            json.dumps(semantic_summary, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        with (args.out_dir / "semantic_summary.tsv").open("w", encoding="utf-8") as f:
+            f.write(
+                "id\tclass\trgb\tcandidate_pixels\tcandidate_fraction\t"
+                "candidate_precision\treference_coverage\tcandidate_present\tband\n"
+            )
+            for row in semantic_rows:
+                f.write(
+                    f"{row['id']}\t{row['class']}\t{row['rgb']}\t"
+                    f"{row['candidate_pixels']}\t{row['candidate_fraction']}\t"
+                    f"{row['candidate_precision']}\t{row['reference_coverage']}\t"
+                    f"{row['candidate_present']}\t{row['band']}\n"
+                )
 
     _write_contact(rows, args.out_dir / "contact_autocad.png", "acad", "AutoCAD reference")
     _write_contact(rows, args.out_dir / "contact_vemcad.png", "ours", "VemCAD candidate")
@@ -141,6 +215,8 @@ def main(argv: list[str] | None = None) -> int:
 
     failed = [r for r in rows if r["band"] == "fallback" or not r["comparable"]]
     print(f"batch compare: {len(rows)} total, {len(failed)} fallback/not-comparable")
+    if semantic_rows:
+        print(f"semantic classes: {len(semantic_rows)} rows")
     print(f"summary: {args.out_dir / 'summary.tsv'}")
     return 0
 
