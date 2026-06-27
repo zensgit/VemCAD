@@ -56,10 +56,52 @@ def test_batch_reference_envelope_candidate_frame_removes_framing_mismatch(tmp_p
     assert payload["candidate_frame_mode"] == "reference-envelope"
     assert row["candidate_frame"]["mode"] == "reference-envelope"
     assert row["framing_mismatch"] is False
+    assert row["source_framing_mismatch"] is True
+    assert row["delta_ink_iou"] > 0.0
     assert row["ink_iou"] >= 0.90
     assert Path(row["ours"]).is_file()
     assert Path(row["overlay"]).is_file()
     assert row["source_ours"] == ours
+    header = (out / "summary.tsv").read_text(encoding="utf-8").splitlines()[0]
+    assert "source_ink_iou" in header
+    assert "delta_ink_iou" in header
+
+
+def test_batch_candidate_style_uses_render_service_acad_display_profile(tmp_path):
+    def make(path: Path, color: tuple[int, int, int]) -> str:
+        im = Image.new("RGB", (240, 180), (255, 255, 255))
+        d = ImageDraw.Draw(im)
+        d.rectangle([40, 40, 200, 140], outline=color, width=5)
+        im.save(path)
+        return str(path)
+
+    acad = make(tmp_path / "acad.png", (0, 0, 0))
+    ours = make(tmp_path / "ours.png", (120, 120, 120))
+    cases = tmp_path / "cases.json"
+    cases.write_text(json.dumps([{"id": "Gx", "acad": acad, "ours": ours}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--cases", str(cases),
+        "--out-dir", str(out),
+        "--candidate-style", "acad-display",
+        "--candidate-frame", "reference-envelope",
+    ]) == 0
+
+    payload = json.loads((out / "summary.json").read_text(encoding="utf-8"))
+    row = payload["rows"][0]
+    assert payload["candidate_style_mode"] == "acad-display"
+    assert row["candidate_style"]["mode"] == "acad-display"
+    assert row["candidate_frame"]["mode"] == "reference-envelope"
+    assert Path(row["candidate_style"]["path"]).parent.name == "styled_candidates"
+    assert Path(row["ours"]).parent.name == "framed_candidates"
+    assert row["source_color_dist"] > 60.0
+    assert row["color_dist"] < row["source_color_dist"]
+    assert row["delta_color_dist"] < 0.0
+    assert Image.open(row["ours"]).convert("RGB").getpixel((40, 40)) == (0, 0, 0)
+    header = (out / "summary.tsv").read_text(encoding="utf-8").splitlines()[0]
+    assert "candidate_style_mode" in header
+    assert "delta_color_dist" in header
 
 
 def test_batch_contact_sheet_tolerates_missing_overlay_for_uncomparable_diff(tmp_path):

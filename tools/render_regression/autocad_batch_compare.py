@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from pathlib import Path
 from typing import Any, Optional
@@ -38,6 +39,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import compare as cmp  # noqa: E402
 import diff as dff  # noqa: E402
+
+
+def _render_service_styles():
+    """Load render-service postprocess styles lazily.
+
+    Batch comparison is an offline diagnostic, but it must use the same
+    AutoCAD-like colour profiles as /render so review evidence does not drift
+    from the service implementation.
+    """
+    service_root = Path(__file__).resolve().parents[2] / "services" / "render"
+    if str(service_root) not in sys.path:
+        sys.path.insert(0, str(service_root))
+    from app.renderer import apply_acad_display_style, apply_acad_plot_style
+
+    return {
+        "acad-display": apply_acad_display_style,
+        "acad-plot": apply_acad_plot_style,
+    }
 
 
 def _load_cases(path: Path) -> list[dict[str, Any]]:
@@ -469,6 +488,18 @@ def _frame_candidate_to_reference(
     }
 
 
+def _style_candidate(source: Path, out: Path, style: str) -> tuple[Path, dict[str, Any]]:
+    if style == "source":
+        return source, {"mode": "source", "path": str(source)}
+    styles = _render_service_styles()
+    if style not in styles:
+        raise ValueError(f"unknown candidate style: {style}")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, out)
+    styles[style](out)
+    return out, {"mode": style, "path": str(out), "source": str(source)}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Batch compare AutoCAD PNGs to VemCAD PNGs.")
     parser.add_argument("--cases", type=Path, required=True, help="JSON list of {id, acad, ours}")
@@ -481,6 +512,15 @@ def main(argv: list[str] | None = None) -> int:
         help=(
             "diagnostic-only candidate reframing before scoring. "
             "reference-envelope frames VemCAD ink into the AutoCAD PNG ink envelope."
+        ),
+    )
+    parser.add_argument(
+        "--candidate-style",
+        choices=("source", "acad-display", "acad-plot"),
+        default="source",
+        help=(
+            "diagnostic-only candidate colour profile before scoring. "
+            "source preserves the PNG; acad-display and acad-plot reuse the /render service profiles."
         ),
     )
     parser.add_argument(
@@ -498,6 +538,7 @@ def main(argv: list[str] | None = None) -> int:
     args.out_dir.mkdir(parents=True, exist_ok=True)
     overlay_dir = args.out_dir / "overlays"
     overlay_dir.mkdir(parents=True, exist_ok=True)
+    styled_dir = args.out_dir / "styled_candidates"
     framed_dir = args.out_dir / "framed_candidates"
     semantic_framed_dir = args.out_dir / "framed_semantic_masks"
     tile_dir = args.out_dir / "tile_heatmaps"
@@ -508,17 +549,24 @@ def main(argv: list[str] | None = None) -> int:
     semantic_tile_rows: list[dict[str, Any]] = []
     for case in cases:
         overlay = overlay_dir / f"{case['id']}_overlay.png"
-        candidate = case["ours"]
+        source_result = cmp.compare(case["acad"], case["ours"], capture_method=args.capture_method)
+        source_framing = cmp.framing_divergence(case["acad"], case["ours"])
+        candidate, candidate_style = _style_candidate(
+            case["ours"],
+            styled_dir / f"{case['id']}_candidate_{args.candidate_style}.png",
+            args.candidate_style,
+        )
         semantic_mask = case.get("semantic_mask")
         candidate_frame = {"mode": "none"}
         if args.candidate_frame == "reference-envelope":
+            frame_source = candidate
             candidate = framed_dir / f"{case['id']}_candidate_reference_envelope.png"
             semantic_out = None
             if semantic_mask is not None:
                 semantic_out = semantic_framed_dir / f"{case['id']}_semantic_reference_envelope.png"
             candidate_frame = _frame_candidate_to_reference(
                 case["acad"],
-                case["ours"],
+                frame_source,
                 candidate,
                 semantic_mask=semantic_mask,
                 semantic_out=semantic_out,
@@ -537,7 +585,14 @@ def main(argv: list[str] | None = None) -> int:
             "overlay": diff_result.overlay_path or "",
             "diff_comparable": diff_result.comparable,
             "diff_skip_reason": diff_result.skip_reason,
+            "candidate_style": candidate_style,
             "candidate_frame": candidate_frame,
+            "source_ink_iou": source_result.ink_iou,
+            "source_color_dist": source_result.color_dist,
+            "source_framing_mismatch": source_framing["framing_mismatch"],
+            "source_framing": source_framing,
+            "delta_ink_iou": round(result.ink_iou - source_result.ink_iou, 6),
+            "delta_color_dist": round(result.color_dist - source_result.color_dist, 6),
             "ink_iou": result.ink_iou,
             "ssim": result.ssim,
             "color_dist": result.color_dist,
@@ -626,6 +681,7 @@ def main(argv: list[str] | None = None) -> int:
     summary = {
         "schema": "vemcad.autocad_batch_compare/v1",
         "capture_method": args.capture_method,
+        "candidate_style_mode": args.candidate_style,
         "candidate_frame_mode": args.candidate_frame,
         "count": len(rows),
         "rows": rows,
@@ -637,6 +693,8 @@ def main(argv: list[str] | None = None) -> int:
     with (args.out_dir / "summary.tsv").open("w", encoding="utf-8") as f:
         f.write(
             "id\tink_iou\tssim\tcolor_dist\taspect_delta\tcomparable\tband\t"
+            "source_ink_iou\tsource_color_dist\tdelta_ink_iou\tdelta_color_dist\t"
+            "source_framing_mismatch\tcandidate_style_mode\t"
             "framing_mismatch\tfill_divergence_x\tfill_divergence_y\t"
             "candidate_frame_mode\tacad\tours\tsource_ours\toverlay\n"
         )
@@ -645,6 +703,9 @@ def main(argv: list[str] | None = None) -> int:
             f.write(
                 f"{row['id']}\t{row['ink_iou']}\t{row['ssim']}\t{row['color_dist']}\t"
                 f"{row['aspect_delta']}\t{row['comparable']}\t{row['band']}\t"
+                f"{row['source_ink_iou']}\t{row['source_color_dist']}\t"
+                f"{row['delta_ink_iou']}\t{row['delta_color_dist']}\t"
+                f"{row['source_framing_mismatch']}\t{row['candidate_style']['mode']}\t"
                 f"{row['framing_mismatch']}\t"
                 f"{framing['fill_divergence_x']}\t{framing['fill_divergence_y']}\t"
                 f"{row['candidate_frame']['mode']}\t"
@@ -679,6 +740,7 @@ def main(argv: list[str] | None = None) -> int:
         tile_summary = {
             "schema": "vemcad.autocad_batch_tile_compare/v1",
             "capture_method": args.capture_method,
+            "candidate_style_mode": args.candidate_style,
             "candidate_frame_mode": args.candidate_frame,
             "grid": {"cols": tile_grid[0], "rows": tile_grid[1]} if tile_grid else None,
             "count": len(tile_rows),
@@ -711,6 +773,7 @@ def main(argv: list[str] | None = None) -> int:
         semantic_tile_summary = {
             "schema": "vemcad.autocad_batch_semantic_tile_compare/v1",
             "capture_method": args.capture_method,
+            "candidate_style_mode": args.candidate_style,
             "candidate_frame_mode": args.candidate_frame,
             "grid": {"cols": tile_grid[0], "rows": tile_grid[1]} if tile_grid else None,
             "count": len(semantic_tile_rows),
