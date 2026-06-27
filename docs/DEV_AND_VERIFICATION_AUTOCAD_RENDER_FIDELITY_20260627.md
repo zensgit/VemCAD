@@ -208,9 +208,31 @@ Result:
 
 ### Semantic class diagnostics
 
-The batch tool now also accepts optional `semantic_mask` and `semantic_report`
-fields per case. These are render_cli's candidate-side semantic class buffer and
-report (`--class-mask-out` + `--report`). When present, the tool writes:
+The batch tool now reports capture/view-space framing divergence for every case
+using the same `compare.framing_divergence()` logic as `compare_vs_acad.py`.
+This is important because the existing 12 AutoCAD PLOT references are not
+strictly in the same view-space as render_cli model-extents output:
+
+```text
+batch compare: 12 total, 11 fallback/not-comparable
+framing mismatches: 12
+```
+
+Examples:
+
+| ID | Ink IoU | framing_mismatch | fill Δx | fill Δy |
+|---|---:|---|---:|---:|
+| G03 | 0.9080 | true | 0.0667 | 0.0665 |
+| G04 | 0.6664 | true | 0.1484 | 0.1506 |
+| G11 | 0.3464 | true | 0.0261 | 0.1022 |
+
+That means the old 12-case scores remain useful for exploratory trend checks
+and visual review, but they are not a formal X3 gate until the AutoCAD reference
+PNGs are re-captured in the same extents/window contract.
+
+The batch tool also accepts optional `semantic_mask` and `semantic_report` fields
+per case. These are render_cli's candidate-side semantic class buffer and report
+(`--class-mask-out` + `--report`). When present, the tool writes:
 
 - `semantic_summary.json`
 - `semantic_summary.tsv`
