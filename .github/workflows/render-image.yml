@@ -87,6 +87,43 @@ jobs:
           python3 tools/render_regression/ci_e2e_check.py \
             --golden tools/render_regression/golden/golden.json --render-dir /tmp/golden_out
 
+      - name: Sheet-readiness audit E2E (advisory) — run the audit tool over the golden corpus
+        # ADVISORY (continue-on-error) until verified green on a real heavy-gate run; then flip
+        # to blocking — same Phase-A→B pattern as the pact gate. Mirrors the service-smoke wiring
+        # (--network none + docker exec via in-container loopback). The image ships numpy/Pillow
+        # (services/render/requirements.txt), so the audit's analysis half runs in-container.
+        # SCOPE: this is a TOOL plumbing/regression signal — the audit runs end-to-end and emits
+        # a well-formed summary.json over the committed corpus — NOT a "view=sheet is ready to be
+        # default" verdict: the golden set is render-regression material (it intentionally includes
+        # garbage_extents / degenerate fixtures), so a real readiness verdict needs a curated sheet
+        # corpus with known expectations (follow-up A1a-2; see the A1a DEV_AND_VERIFICATION doc).
+        continue-on-error: true
+        run: |
+          name=vemcad_sheet_audit
+          docker run -d --network none --name "$name" vemcad-render:ci
+          probe=$'import urllib.request,sys\ntry:\n urllib.request.urlopen("http://127.0.0.1:8077/healthz").read();sys.exit(0)\nexcept Exception:\n sys.exit(1)'
+          ok=
+          for i in $(seq 1 45); do
+            if docker exec "$name" python3 -c "$probe"; then ok=1; break; fi
+            sleep 2
+          done
+          if [ -z "$ok" ]; then echo "render service did not come up"; docker logs "$name"; docker rm -f "$name"; exit 1; fi
+          # Bring the (uncopied) audit tool + the committed golden corpus into the container.
+          docker cp services/render/tools/sheet_readiness_audit.py "$name:/app/sheet_readiness_audit.py"
+          docker cp tools/render_regression/golden "$name:/golden"
+          # The audit exits nonzero when any drawing fails (expected for the regression corpus,
+          # which intentionally includes garbage/degenerate inputs) — capture, do NOT gate on it.
+          docker exec "$name" python3 /app/sheet_readiness_audit.py \
+            --input-dir /golden --out-dir /tmp/audit_out --base-url http://127.0.0.1:8077 || true
+          # Real assertion: >=5 goldens rendered BOTH views through /render with NO exception
+          # (error is None AND both PNGs present). A schema+count check alone would pass even if
+          # /render failed on all 7 — the audit records each render exception as a status="fail"
+          # row WITH the summary still written, so counting error-free render pairs is what proves
+          # the real render path ran (the false-green this line exists to catch).
+          docker exec "$name" python3 -c "import json; s=json.load(open('/tmp/audit_out/summary.json')); assert s['schema']=='vemcad.sheet_readiness_audit/v1', s.get('schema'); res=s['results']; ok=sum(1 for r in res if r.get('error') is None and r.get('extents_png') and r.get('sheet_png')); assert ok>=5, 'only %d/%d goldens rendered both views without error (real /render path not exercised)' % (ok, len(res)); print('[sheet-audit] OK total=%d rendered_ok=%d' % (len(res), ok))" \
+            || { echo '=== sheet-audit summary assertion failed; container logs ==='; docker logs "$name"; docker rm -f "$name"; exit 1; }
+          docker rm -f "$name"
+
       - name: Push to GHCR (main only)
         if: github.ref == 'refs/heads/main'
         run: |
