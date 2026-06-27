@@ -122,6 +122,138 @@ def _write_contact(rows: list[dict[str, Any]], out: Path, key: str, title: str) 
     sheet.save(out)
 
 
+def _parse_tile_grid(value: str) -> tuple[int, int]:
+    normalized = value.lower().replace(",", "x")
+    parts = [p.strip() for p in normalized.split("x") if p.strip()]
+    if len(parts) != 2:
+        raise ValueError("--tile-grid must be formatted as COLSxROWS, for example 4x3")
+    cols, rows = (int(parts[0]), int(parts[1]))
+    if cols < 1 or rows < 1 or cols > 24 or rows > 24:
+        raise ValueError("--tile-grid dimensions must be in the range 1..24")
+    return cols, rows
+
+
+def _tile_bounds(cols: int, rows: int, width: int, height: int):
+    for row in range(rows):
+        y0 = round(row * height / rows)
+        y1 = round((row + 1) * height / rows)
+        for col in range(cols):
+            x0 = round(col * width / cols)
+            x1 = round((col + 1) * width / cols)
+            yield row, col, x0, y0, x1, y1
+
+
+def _write_tile_heatmap(
+    tiles: list[dict[str, Any]],
+    out: Path,
+    *,
+    cols: int,
+    rows: int,
+    canvas: tuple[int, int],
+) -> None:
+    width, height = canvas
+    image = Image.new("RGB", (width, height), (252, 252, 252))
+    draw = ImageDraw.Draw(image, "RGBA")
+    for tile in tiles:
+        x0, y0, x1, y1 = tile["bbox_px"]
+        if tile["band"] == "absent":
+            fill = (245, 245, 245, 255)
+        else:
+            loss = max(0.0, min(1.0, 1.0 - float(tile["ink_iou"])))
+            red = int(70 + 185 * loss)
+            green = int(210 - 160 * loss)
+            fill = (red, green, 80, 190)
+        draw.rectangle([x0, y0, x1 - 1, y1 - 1], fill=fill, outline=(70, 70, 70, 230))
+        label = "blank" if tile["band"] == "absent" else f"{tile['ink_iou']:.2f}"
+        draw.text((x0 + 6, y0 + 6), f"{tile['row']},{tile['col']} {label}", fill=(0, 0, 0, 255))
+    draw.rectangle([0, 0, width - 1, height - 1], outline=(0, 0, 0, 255))
+    out.parent.mkdir(parents=True, exist_ok=True)
+    image.save(out)
+
+
+def _tile_diagnostics(
+    case_id: str,
+    acad: Path,
+    candidate: Path,
+    *,
+    grid: tuple[int, int],
+    out_dir: Path,
+) -> dict[str, Any]:
+    cols, rows = grid
+    ra, rb = cmp._load_rgb(Path(acad)), cmp._load_rgb(Path(candidate))
+    ga, gb = ra.mean(axis=2), rb.mean(axis=2)
+    ma, mb = cmp._ink_mask(ga), cmp._ink_mask(gb)
+    bbox_a, bbox_b = cmp._ink_bbox(ma), cmp._ink_bbox(mb)
+    canvas = cmp.CANVAS
+    if bbox_a is None or bbox_b is None:
+        return {
+            "grid": {"cols": cols, "rows": rows},
+            "canvas": list(canvas),
+            "comparable": False,
+            "skip_reason": "both-blank" if bbox_a is None and bbox_b is None else "blank-side",
+            "heatmap": "",
+            "worst_tiles": [],
+            "tiles": [],
+        }
+
+    ref = cmp._crop_resize_to_bbox(ma, bbox_a, canvas)
+    cand = cmp._crop_resize_to_bbox(mb, bbox_b, canvas)
+    dx, dy = cmp._best_shift(ref, cand)
+    cand_shift = cmp._shift(cand, dy, dx)
+    width, height = canvas
+    tiles: list[dict[str, Any]] = []
+    total_ref = max(int(ref.sum()), 1)
+    total_cand = max(int(cand_shift.sum()), 1)
+    for row, col, x0, y0, x1, y1 in _tile_bounds(cols, rows, width, height):
+        ref_tile = ref[y0:y1, x0:x1]
+        cand_tile = cand_shift[y0:y1, x0:x1]
+        ref_px = int(ref_tile.sum())
+        cand_px = int(cand_tile.sum())
+        if ref_px == 0 and cand_px == 0:
+            score = 1.0
+            band = "absent"
+        else:
+            score = cmp._ink_iou_tol(ref_tile, cand_tile, tol=cmp.DILATE_TOL)
+            band = cmp.band_for(score)
+        cand_d = cmp._dilate(cand_tile, cmp.DILATE_TOL)
+        ref_d = cmp._dilate(ref_tile, cmp.DILATE_TOL)
+        missing_px = int(np.logical_and(ref_tile, ~cand_d).sum())
+        extra_px = int(np.logical_and(cand_tile, ~ref_d).sum())
+        severity = (1.0 - score) * (ref_px + cand_px)
+        tiles.append({
+            "row": row,
+            "col": col,
+            "bbox_px": [x0, y0, x1, y1],
+            "ink_iou": round(float(score), 4),
+            "band": band,
+            "ref_pixels": ref_px,
+            "cand_pixels": cand_px,
+            "ref_fraction": round(ref_px / total_ref, 6),
+            "cand_fraction": round(cand_px / total_cand, 6),
+            "missing_pixels": missing_px,
+            "extra_pixels": extra_px,
+            "severity": round(float(severity), 3),
+        })
+    heatmap = out_dir / f"{case_id}_tile_heatmap.png"
+    _write_tile_heatmap(tiles, heatmap, cols=cols, rows=rows, canvas=canvas)
+    worst_tiles = sorted(
+        [tile for tile in tiles if tile["band"] != "absent"],
+        key=lambda item: (item["severity"], 1.0 - item["ink_iou"]),
+        reverse=True,
+    )[:6]
+    return {
+        "grid": {"cols": cols, "rows": rows},
+        "canvas": list(canvas),
+        "comparable": True,
+        "skip_reason": "",
+        "dx": dx,
+        "dy": dy,
+        "heatmap": str(heatmap),
+        "worst_tiles": worst_tiles,
+        "tiles": tiles,
+    }
+
+
 def _background_rgb(img: Image.Image) -> tuple[int, int, int]:
     arr = np.asarray(img.convert("RGB"))
     edge = np.concatenate(
@@ -263,17 +395,28 @@ def main(argv: list[str] | None = None) -> int:
             "reference-envelope frames VemCAD ink into the AutoCAD PNG ink envelope."
         ),
     )
+    parser.add_argument(
+        "--tile-grid",
+        default="",
+        help=(
+            "optional diagnostic local-error grid as COLSxROWS, for example 4x3. "
+            "Scores tiles after the same global X3 crop/resize/shift alignment."
+        ),
+    )
     args = parser.parse_args(argv)
 
     cases = _load_cases(args.cases)
+    tile_grid = _parse_tile_grid(args.tile_grid) if args.tile_grid else None
     args.out_dir.mkdir(parents=True, exist_ok=True)
     overlay_dir = args.out_dir / "overlays"
     overlay_dir.mkdir(parents=True, exist_ok=True)
     framed_dir = args.out_dir / "framed_candidates"
     semantic_framed_dir = args.out_dir / "framed_semantic_masks"
+    tile_dir = args.out_dir / "tile_heatmaps"
 
     rows: list[dict[str, Any]] = []
     semantic_rows: list[dict[str, Any]] = []
+    tile_rows: list[dict[str, Any]] = []
     for case in cases:
         overlay = overlay_dir / f"{case['id']}_overlay.png"
         candidate = case["ours"]
@@ -316,6 +459,30 @@ def main(argv: list[str] | None = None) -> int:
             "framing_mismatch": framing["framing_mismatch"],
             "framing": framing,
         }
+        if tile_grid is not None:
+            tile_report = _tile_diagnostics(
+                case["id"],
+                case["acad"],
+                candidate,
+                grid=tile_grid,
+                out_dir=tile_dir,
+            )
+            row["tile_report"] = {
+                "grid": tile_report["grid"],
+                "canvas": tile_report["canvas"],
+                "comparable": tile_report["comparable"],
+                "skip_reason": tile_report["skip_reason"],
+                "dx": tile_report.get("dx", 0),
+                "dy": tile_report.get("dy", 0),
+                "heatmap": tile_report["heatmap"],
+                "worst_tiles": tile_report["worst_tiles"],
+            }
+            for tile in tile_report["tiles"]:
+                tile_rows.append({
+                    "id": case["id"],
+                    **tile,
+                    "heatmap": tile_report["heatmap"],
+                })
         rows.append(row)
         if "semantic_mask" in case and "semantic_report" in case:
             report = cmp.compare_semantic_classes(
@@ -399,6 +566,38 @@ def main(argv: list[str] | None = None) -> int:
                     f"{row['candidate_present']}\t{row['band']}\n"
                 )
 
+    if tile_rows:
+        tile_summary = {
+            "schema": "vemcad.autocad_batch_tile_compare/v1",
+            "capture_method": args.capture_method,
+            "candidate_frame_mode": args.candidate_frame,
+            "grid": {"cols": tile_grid[0], "rows": tile_grid[1]} if tile_grid else None,
+            "count": len(tile_rows),
+            "note": (
+                "Diagnostic local-error tiles after the same global X3 alignment. "
+                "This is not a pass/fail gate and not a semantic split."
+            ),
+            "rows": tile_rows,
+        }
+        (args.out_dir / "tile_summary.json").write_text(
+            json.dumps(tile_summary, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        with (args.out_dir / "tile_summary.tsv").open("w", encoding="utf-8") as f:
+            f.write(
+                "id\trow\tcol\tink_iou\tband\tref_pixels\tcand_pixels\t"
+                "ref_fraction\tcand_fraction\tmissing_pixels\textra_pixels\t"
+                "severity\theatmap\n"
+            )
+            for row in tile_rows:
+                f.write(
+                    f"{row['id']}\t{row['row']}\t{row['col']}\t{row['ink_iou']}\t"
+                    f"{row['band']}\t{row['ref_pixels']}\t{row['cand_pixels']}\t"
+                    f"{row['ref_fraction']}\t{row['cand_fraction']}\t"
+                    f"{row['missing_pixels']}\t{row['extra_pixels']}\t"
+                    f"{row['severity']}\t{row['heatmap']}\n"
+                )
+
     _write_contact(rows, args.out_dir / "contact_autocad.png", "acad", "AutoCAD reference")
     _write_contact(rows, args.out_dir / "contact_vemcad.png", "ours", "VemCAD candidate")
     _write_contact(rows, args.out_dir / "contact_overlay.png", "overlay", "overlay red=missing green=extra")
@@ -409,6 +608,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"framing mismatches: {len(framing_mismatches)}")
     if semantic_rows:
         print(f"semantic classes: {len(semantic_rows)} rows")
+    if tile_rows:
+        print(f"tile diagnostics: {len(tile_rows)} rows")
     print(f"summary: {args.out_dir / 'summary.tsv'}")
     return 0
 
