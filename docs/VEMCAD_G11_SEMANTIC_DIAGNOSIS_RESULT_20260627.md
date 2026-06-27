@@ -146,14 +146,23 @@ Do not mark G11 AutoCAD-equivalent while X3 is in `fallback`. Do not relax the
 G11's IoU. The next concrete code step is gated on the Direction A / B / Park
 decision above.
 
-## Update (2026-06-27): Direction A (dimension) executed
+## Update (2026-06-27): Direction A (dimension) shipped and consumed
 
-Direction A's **dimension slice** is implemented in **CADGameFusion PR #422**
-(`feat(render): emit dimension provenance metadata in render_cli import path`).
-render_cli's `CadgfDrwAdapter` now tags `*D` dimension-block primitives with
-`source_type="DIMENSION"`, so the semantic mask classifies the `dimension` class
-(G11: 0 → 86; a corpus drawing: 0 → 48; color render byte-identical before/after,
-i.e. no fidelity regression; new `qt_`-gated regression test).
+Direction A's **dimension slice** shipped in **CADGameFusion PR #422**
+(`feat(render): emit dimension provenance metadata in render_cli import path`,
+merged as `312bce4`). render_cli's `CadgfDrwAdapter` now tags `*D`
+dimension-block primitives with `source_type="DIMENSION"`, so the semantic mask
+classifies the `dimension` class (G11: 0 -> 86; a corpus drawing: 0 -> 48; color
+render byte-identical before/after, i.e. no fidelity regression; new `qt_`-gated
+regression test).
+
+VemCAD consumed that CADGameFusion capability in **VemCAD PR #127** as a
+gitlink-only bump to `312bce4` (merged as `383aa26`). The bump passed the
+ancestor guard (`312bce4` is on CADGameFusion `origin/main`) and VemCAD's
+consumer checks:
+
+- `editor-light`: pass
+- `render-image / build-and-smoke`: pass
 
 **This ships the capability, not the G11 conclusion.** The actual class-level read
 of G11 (which renderable class accounts for the AutoCAD mismatch) is the next step,
