@@ -134,5 +134,14 @@ survive after paper/capture envelope differences are removed?" It is not a
 render-service mode and not a pass/fail gate; the original candidate path is
 preserved as `source_ours` in the summary.
 
-测试：`python3 -m pytest tools/render_regression/tests -q`（56 tests，合成图，
+`autocad_batch_compare.py --tile-grid COLSxROWS` adds a local-error diagnostic
+on top of the same global X3 alignment. For each pair, the tool crops/resizes
+both sides to the comparator canvas, applies the normal small translation
+alignment, then scores each grid tile. It writes `tile_summary.json`,
+`tile_summary.tsv`, and `tile_heatmaps/*_tile_heatmap.png`. Use this when a
+global Ink-IoU score only says "bad" but not whether the miss is concentrated
+in a title block, table, dense text area, or main geometry. This is diagnostic
+only: it is not a semantic split and does not create a new pass/fail gate.
+
+测试：`python3 -m pytest tools/render_regression/tests -q`（57 tests，合成图，
 无需 render_cli）。

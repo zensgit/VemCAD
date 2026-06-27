@@ -130,3 +130,42 @@ def test_batch_reference_envelope_frames_semantic_mask_with_candidate(tmp_path):
     semantic = json.loads((out / "semantic_summary.json").read_text(encoding="utf-8"))
     assert semantic["rows"][0]["class"] == "geometry"
     assert semantic["rows"][0]["candidate_present"] is True
+
+
+def test_batch_tile_grid_reports_localized_missing_ink(tmp_path):
+    def make(path: Path, *, missing_top_right: bool) -> str:
+        im = Image.new("RGB", (400, 300), (255, 255, 255))
+        d = ImageDraw.Draw(im)
+        # Shared outer frame keeps both ink bboxes identical. The only real
+        # divergence is the dense annotation-like strokes in the top-right tile.
+        d.rectangle([20, 20, 380, 280], outline=(0, 0, 0), width=3)
+        if not missing_top_right:
+            for y in range(45, 135, 12):
+                d.line([230, y, 355, y], fill=(0, 0, 0), width=2)
+        im.save(path)
+        return str(path)
+
+    acad = make(tmp_path / "acad.png", missing_top_right=False)
+    ours = make(tmp_path / "ours.png", missing_top_right=True)
+    cases = tmp_path / "cases.json"
+    cases.write_text(json.dumps([{"id": "Gx", "acad": acad, "ours": ours}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--cases", str(cases),
+        "--out-dir", str(out),
+        "--tile-grid", "2x2",
+    ]) == 0
+
+    payload = json.loads((out / "summary.json").read_text(encoding="utf-8"))
+    report = payload["rows"][0]["tile_report"]
+    assert report["grid"] == {"cols": 2, "rows": 2}
+    assert Path(report["heatmap"]).is_file()
+    assert report["worst_tiles"][0]["row"] == 0
+    assert report["worst_tiles"][0]["col"] == 1
+    assert report["worst_tiles"][0]["missing_pixels"] > 0
+
+    tile_summary = json.loads((out / "tile_summary.json").read_text(encoding="utf-8"))
+    assert tile_summary["schema"] == "vemcad.autocad_batch_tile_compare/v1"
+    assert len(tile_summary["rows"]) == 4
+    assert "severity" in (out / "tile_summary.tsv").read_text(encoding="utf-8").splitlines()[0]

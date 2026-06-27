@@ -381,6 +381,70 @@ annotation/table/linework style. Next diagnostics should split:
 
 Do not apply a global lineweight multiplier.
 
+### P1a: Local-error heatmap for dense drawings
+
+G04 remains low after both paper-envelope alignment and AutoCAD-like display
+style:
+
+- reference-envelope removes the global paper/capture envelope mismatch;
+- global lineweight/thickening only moves the score modestly and regresses other
+  drawings;
+- the residual needs localization before another renderer change is justified.
+
+`autocad_batch_compare.py --tile-grid COLSxROWS` adds a diagnostic local-error
+grid after the same global X3 crop/resize/shift alignment. It writes
+`tile_summary.json`, `tile_summary.tsv`, and per-case heatmaps. The report is
+intended to answer whether a drawing's residual is concentrated in a table,
+title block, dense text area, hatch area, or main geometry.
+
+Boundary:
+
+- diagnostic only, not a pass/fail gate;
+- not a semantic mask and not an AutoCAD semantic oracle;
+- useful for picking the next renderer fix, not for declaring equivalence.
+
+Implementation check on the 12 AutoCAD PLOT references:
+
+```bash
+python3 tools/render_regression/autocad_batch_compare.py \
+  --cases /tmp/vemcad-fidelity-out/current_x3_acad_display/cases.json \
+  --out-dir /tmp/vemcad-fidelity-out/g04_tile_grid_diag \
+  --candidate-frame reference-envelope \
+  --tile-grid 6x4
+```
+
+Result:
+
+- `12` pairs processed;
+- `framing mismatches: 0` after reference-envelope framing;
+- `288` local tile rows generated;
+- G04 remains low (`ink_iou=0.6788`, `color_dist=47.3`), but the residual is
+  now localized rather than treated as one opaque score.
+
+G04's worst 6 local tiles:
+
+| Tile | Ink IoU | Ref px | Cand px | Missing px | Extra px | Interpretation |
+|---|---:|---:|---:|---:|---:|---|
+| r1 c0 | 0.4689 | 7424 | 10257 | 3458 | 5971 | left dense view / annotation area |
+| r2 c5 | 0.4716 | 10421 | 6576 | 6748 | 1891 | right-side material/table area |
+| r1 c5 | 0.6212 | 12110 | 10928 | 5078 | 3630 | right-side table / text block |
+| r3 c5 | 0.6684 | 11541 | 11767 | 3825 | 3904 | bottom-right title/table block |
+| r0 c5 | 0.7228 | 14698 | 9782 | 5267 | 1687 | upper-right table/header block |
+| r3 c4 | 0.7336 | 10848 | 13340 | 2706 | 3771 | bottom table block |
+
+Artifacts:
+
+- `/tmp/vemcad-fidelity-out/g04_tile_grid_diag/tile_summary.tsv`
+- `/tmp/vemcad-fidelity-out/g04_tile_grid_diag/tile_heatmaps/G04_tile_heatmap.png`
+- `/tmp/vemcad-fidelity-out/g04_tile_grid_diag/overlays/G04_overlay.png`
+
+Interpretation: after paper-envelope mismatch is removed, G04's residual is
+distributed across dense annotation/table regions and a left dense view. That
+rules out another single global crop/scale/lineweight knob as the next safe
+fix. The next renderer change should target a class of primitives with semantic
+or local evidence, then prove it improves these hot tiles without regressing
+the good group.
+
 ### P2: Style selection for AutoCAD-like display comparison
 
 Use styles deliberately:
