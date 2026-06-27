@@ -125,6 +125,24 @@ jobs:
             || { echo '=== sheet-audit summary assertion failed; container logs ==='; docker logs "$name"; docker rm -f "$name"; exit 1; }
           docker rm -f "$name"
 
+      - name: Semantic-class provenance E2E — render fixture, assert dimension+hatch+insert_text populate
+        # The real per-PR CI gate for render_cli's semantic class provenance (the
+        # CADGF ctest is local-only — CADGF CI does not build render_cli). Renders
+        # the in-submodule synthetic fixture (a *D dimension + a block-nested SOLID
+        # hatch + INSERT text) through the image's real Linux render_cli and asserts
+        # all three provenance-derived classes are non-zero. Guards the import-path
+        # geometry/text-only fallback that this submodule bump fixes.
+        run: |
+          mkdir -p /tmp/sem_out
+          docker run --rm --network none \
+            -v "$PWD/deps/cadgamefusion/tests/plugin_data:/fix:ro" \
+            -v /tmp/sem_out:/out \
+            --entrypoint render_cli vemcad-render:ci \
+            --input /fix/render_cli_semantic_sample.dxf --out /out/sem.png \
+            --report /out/sem.json --class-mask-out /out/sem_mask.png \
+            --width 800 --height 600 --bg white
+          python3 -c "import json,sys; c=json.load(open('/tmp/sem_out/sem.json'))['semantic_classes']['entity_counts']; print('entity_counts:', c); bad=[k for k in ('dimension','hatch','insert_text') if c.get(k,0)<=0]; sys.exit('FAIL: semantic classes %s are zero (render_cli import-path provenance regressed)'%bad) if bad else print('[semantic-provenance] OK', {k:c[k] for k in ('dimension','hatch','insert_text')})"
+
       - name: Push to GHCR (main only)
         if: github.ref == 'refs/heads/main'
         run: |
