@@ -11,13 +11,22 @@ def test_params_ok():
     assert "style" not in p.as_dict()  # source style keeps legacy cache keys stable
 
 
-def test_acad_plot_style_enters_params_and_cache_key():
+def test_non_source_styles_enter_params_and_cache_key():
     source = RenderParams.parse("png", 100, 50, "white", "sheet")
     plot = RenderParams.parse("png", 100, 50, "white", "sheet", "acad-plot")
+    display = RenderParams.parse("png", 100, 50, "white", "sheet", "acad-display")
     assert plot.style == "acad-plot"
     assert plot.as_dict()["style"] == "acad-plot"
+    assert display.style == "acad-display"
+    assert display.as_dict()["style"] == "acad-display"
     assert cache_key("c" * 64, source.as_dict(), "cli", "fp") != cache_key(
         "c" * 64, plot.as_dict(), "cli", "fp"
+    )
+    assert cache_key("c" * 64, source.as_dict(), "cli", "fp") != cache_key(
+        "c" * 64, display.as_dict(), "cli", "fp"
+    )
+    assert cache_key("c" * 64, plot.as_dict(), "cli", "fp") != cache_key(
+        "c" * 64, display.as_dict(), "cli", "fp"
     )
 
 
@@ -33,6 +42,7 @@ def test_acad_plot_style_enters_params_and_cache_key():
         dict(fmt="png", width=100, height=100, bg="dark", view="layout:A"),
         dict(fmt="png", width=100, height=100, bg="dark", view="extents", style="screen"),
         dict(fmt="svg", width=100, height=100, bg="white", view="extents", style="acad-plot"),
+        dict(fmt="svg", width=100, height=100, bg="white", view="extents", style="acad-display"),
     ],
 )
 def test_params_rejected(kw):

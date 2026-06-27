@@ -107,7 +107,43 @@ Result:
 Conclusion: do not apply a global lineweight multiplier. The issue is
 drawing/style dependent.
 
-### 4. Render-cli content-bounds experiment
+### 4. AutoCAD-like display style probe
+
+A narrower post-render probe mapped only low-saturation grey linework to black,
+while preserving saturated CAD colours. This targets AutoCAD's common
+plot/display treatment for table/grid strokes without turning the render into a
+full grayscale diagnostic and without changing geometry.
+
+Result on the 12 AutoCAD PLOT references:
+
+| ID | Ink IoU before | Ink IoU after | Color dist before | Color dist after |
+|---|---:|---:|---:|---:|
+| G01 | 0.8816 | 0.8818 | 87.3 | 19.7 |
+| G02 | 0.8792 | 0.8867 | 113.2 | 68.9 |
+| G03 | 0.9080 | 0.9081 | 78.3 | 5.7 |
+| G04 | 0.6664 | 0.6682 | 58.4 | 43.4 |
+| G05 | 0.8241 | 0.8245 | 86.8 | 59.8 |
+| G06 | 0.8965 | 0.8967 | 91.0 | 12.1 |
+| G07 | 0.8453 | 0.8456 | 99.7 | 55.2 |
+| G08 | 0.8113 | 0.8114 | 96.7 | 32.7 |
+| G09 | 0.8644 | 0.8656 | 81.2 | 23.7 |
+| G10 | 0.7980 | 0.7981 | 54.5 | 8.8 |
+| G11 | 0.3464 | 0.3567 | 131.2 | 31.4 |
+| G12 | 0.8256 | 0.8259 | 61.9 | 17.4 |
+
+There were no Ink-IoU regressions in this probe. The improvement is mostly in
+display colour distance, with small positive IoU movement. This is suitable as
+an opt-in display style, not as a geometry fix and not as an AutoCAD-equivalent
+claim.
+
+Implemented as `style=acad-display`:
+
+- default `style=source` remains unchanged;
+- `style=acad-plot` remains the existing neutral grayscale diagnostic;
+- `style=acad-display` preserves saturated source colours and only darkens
+  neutral grey linework.
+
+### 5. Render-cli content-bounds experiment
 
 G11 report showed:
 
@@ -250,10 +286,15 @@ annotation/table/linework style. Next diagnostics should split:
 
 Do not apply a global lineweight multiplier.
 
-### P2: Source style as the default for AutoCAD-like display comparison
+### P2: Style selection for AutoCAD-like display comparison
 
-Use `style=source` for AutoCAD display-fidelity comparisons. Keep
-`style=acad-plot` as a neutral grayscale diagnostic style.
+Use styles deliberately:
+
+- `style=source`: source-colour baseline and default render-service behavior.
+- `style=acad-display`: AutoCAD-like display review; preserves saturated CAD
+  colours but maps neutral grey linework to black.
+- `style=acad-plot`: neutral grayscale diagnostic style, not the closest
+  AutoCAD-like display style for this batch.
 
 ## Boundary
 
