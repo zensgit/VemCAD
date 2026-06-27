@@ -590,6 +590,19 @@ Result:
   render_cli extents render remain in different view spaces:
   `framing div Δx=0.0628 Δy=0.1301`.
 
+Follow-up batch rerun with the same `sha256:13601788...` render image:
+
+- 12 AutoCAD references were re-rendered from `B01.dxf` ... `B12.dxf` and
+  compared with `compare_vs_acad.py`.
+- G04 improved from the earlier `source` baseline `0.6664` to `0.8423`.
+- G11 improved from the earlier `source` baseline `0.3464` to `0.7712`.
+- The other ten drawings stayed at their previous source-baseline values within
+  rounding, so the ACI255/DIMENSION cleanup did not introduce a broad corpus
+  regression.
+- Artifacts:
+  `/tmp/vemcad-fidelity-out/batch_after_13601788/compare/summary.tsv` and
+  `/tmp/vemcad-fidelity-out/g04_current_after_13601788/G04_acad_old_new_overlay_contact.png`.
+
 Interpretation: this is a real localized fidelity improvement, not a full G11
 closure. The remaining G11 score is dominated by paper-frame/view-space
 alignment and title-block/text appearance; do not use the global X3 number for
