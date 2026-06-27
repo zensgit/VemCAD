@@ -546,6 +546,55 @@ Correct next optimization split:
    table/text placement and complex MTEXT/proxy paths separately. Treat colour
    as display evidence, not as proof of a single BYLAYER importer bug.
 
+### P3: G11 ACI 255 helper/audit dimension cleanup
+
+G11 (`B11.dxf`, `J2925004-04-01底板v2`) exposed an AutoCAD display mismatch
+that was visible even before solving the broader paper-frame mismatch:
+VemCAD displayed extra DIMENSION text and helper strokes such as
+`600`, `190X3=570`, `15`, `230`, and `8-M8(...)` around the main view.
+The AutoCAD reference did not display those helper dimensions the same way.
+
+DXF inspection showed that the owning DIMENSION entities are on layer
+`$TD_AUDIT_GENERATED_(2C7)`, whose layer colour is ACI 255 (true white). Their
+referenced anonymous `*D` blocks, however, contain child primitives with
+explicit ACI 2/3 colours. The renderer previously expanded the child primitives
+and honoured those child colours, leaking the audit/helper dimension block into
+the white-background render.
+
+Two CADGameFusion fixes were shipped and consumed by VemCAD:
+
+- CADGameFusion #424 / VemCAD #141: preserve ACI 255 as true white on light
+  backgrounds while keeping AutoCAD's ACI 7 foreground-colour flip intact.
+- CADGameFusion #425 / VemCAD #142: for `*D` blocks owned by a DIMENSION on an
+  ACI 255 layer, expand child primitives on the parent DIMENSION layer and
+  BYLAYER colour so the true-white parent layer controls visibility.
+
+Verification:
+
+- CADGameFusion #424 and #425 both passed the full CI matrix before merge.
+- VemCAD #141 and #142 both passed `editor-light` and `render-image`
+  `build-and-smoke`.
+- VemCAD main `b80eceb` rebuilt and pushed `ghcr.io/zensgit/vemcad-render:main`
+  digest `sha256:13601788bc9583276aa50d99efd94a2f6380e7560c3d8d0b5898e1756602ef95`.
+- G11 was re-rendered from that image:
+  `/tmp/vemcad-fidelity-out/g11_dimension_aci255_after_13601788/G11_ours.png`.
+- Visual before/after contact sheet:
+  `/tmp/vemcad-fidelity-out/g11_dimension_aci255_after_13601788/G11_acad_before_after_contact.png`.
+
+Result:
+
+- The extra visible audit/helper dimension labels and lines around the main
+  G11 view were removed from VemCAD's render.
+- `color_dist` improved from `139.2` after #424 to `122.9` after #425.
+- Overall X3 is still **not comparable** because the AutoCAD PLOT reference and
+  render_cli extents render remain in different view spaces:
+  `framing div Δx=0.0628 Δy=0.1301`.
+
+Interpretation: this is a real localized fidelity improvement, not a full G11
+closure. The remaining G11 score is dominated by paper-frame/view-space
+alignment and title-block/text appearance; do not use the global X3 number for
+this pair until the reference and candidate are in the same view-space.
+
 ## Boundary
 
 This slice does not mark the corpus "AutoCAD-equivalent". The strongest current
