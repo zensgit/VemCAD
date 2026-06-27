@@ -29,8 +29,9 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
+import numpy as np
 from PIL import Image, ImageDraw, ImageOps
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -80,6 +81,17 @@ def _thumb(path: Path, size: tuple[int, int]) -> Image.Image:
     return out
 
 
+def _placeholder(size: tuple[int, int], text: str) -> Image.Image:
+    out = Image.new("RGB", size, "white")
+    draw = ImageDraw.Draw(out)
+    draw.rectangle([0, 0, size[0] - 1, size[1] - 1], outline=(200, 200, 200))
+    y = 12
+    for line in text.splitlines()[:8]:
+        draw.text((12, y), line[:72], fill=(80, 80, 80))
+        y += 18
+    return out
+
+
 def _write_contact(rows: list[dict[str, Any]], out: Path, key: str, title: str) -> None:
     if not rows:
         return
@@ -98,10 +110,143 @@ def _write_contact(rows: list[dict[str, Any]], out: Path, key: str, title: str) 
             fill=(0, 0, 0),
         )
         draw.text((x + 8, y + 30), title, fill=(60, 60, 60))
-        thumb = _thumb(Path(row[key]), (tile_w - 44, tile_h - 68))
+        path_value = row.get(key)
+        path = Path(path_value) if path_value else None
+        if path is not None and path.is_file():
+            thumb = _thumb(path, (tile_w - 44, tile_h - 68))
+        else:
+            reason = str(row.get("diff_skip_reason") or row.get("skip_reason") or "not written")
+            thumb = _placeholder((tile_w - 44, tile_h - 68), f"no {key} image\n{reason}")
         sheet.paste(thumb, (x + (tile_w - thumb.width) // 2, y + 60))
     out.parent.mkdir(parents=True, exist_ok=True)
     sheet.save(out)
+
+
+def _background_rgb(img: Image.Image) -> tuple[int, int, int]:
+    arr = np.asarray(img.convert("RGB"))
+    edge = np.concatenate(
+        [
+            arr[:3, :, :].reshape(-1, 3),
+            arr[-3:, :, :].reshape(-1, 3),
+            arr[:, :3, :].reshape(-1, 3),
+            arr[:, -3:, :].reshape(-1, 3),
+        ],
+        axis=0,
+    )
+    return tuple(int(round(v)) for v in np.median(edge, axis=0))
+
+
+def _ink_bbox(path: Path) -> Optional[tuple[int, int, int, int]]:
+    with Image.open(path) as opened:
+        img = opened.convert("RGB")
+        img.load()
+    gray = np.asarray(img).mean(axis=2)
+    edge = np.concatenate(
+        [gray[:3, :].ravel(), gray[-3:, :].ravel(), gray[:, :3].ravel(), gray[:, -3:].ravel()]
+    )
+    bg = float(np.median(edge))
+    mask = np.abs(gray - bg) > 32.0
+    rows = np.any(mask, axis=1)
+    cols = np.any(mask, axis=0)
+    if not rows.any() or not cols.any():
+        return None
+    r0, r1 = np.where(rows)[0][[0, -1]]
+    c0, c1 = np.where(cols)[0][[0, -1]]
+    return int(c0), int(r0), int(c1) + 1, int(r1) + 1
+
+
+def _scale_bbox_to_size(
+    bbox: tuple[int, int, int, int],
+    from_size: tuple[int, int],
+    to_size: tuple[int, int],
+) -> tuple[int, int, int, int]:
+    x0, y0, x1, y1 = bbox
+    fw, fh = from_size
+    tw, th = to_size
+    return (
+        int(round(x0 / fw * tw)),
+        int(round(y0 / fh * th)),
+        int(round(x1 / fw * tw)),
+        int(round(y1 / fh * th)),
+    )
+
+
+def _paste_bbox(
+    src: Path,
+    dst: Path,
+    *,
+    source_bbox: tuple[int, int, int, int],
+    target_bbox: tuple[int, int, int, int],
+    background: tuple[int, int, int],
+    resample: Image.Resampling,
+) -> None:
+    with Image.open(src) as opened:
+        img = opened.convert("RGB")
+        img.load()
+    sx0, sy0, sx1, sy1 = source_bbox
+    tx0, ty0, tx1, ty1 = target_bbox
+    target_w = max(1, tx1 - tx0)
+    target_h = max(1, ty1 - ty0)
+    crop = img.crop((sx0, sy0, sx1, sy1)).resize((target_w, target_h), resample)
+    out = Image.new("RGB", img.size, background)
+    out.paste(crop, (tx0, ty0))
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    out.save(dst)
+
+
+def _frame_candidate_to_reference(
+    acad: Path,
+    candidate: Path,
+    out: Path,
+    *,
+    semantic_mask: Optional[Path] = None,
+    semantic_out: Optional[Path] = None,
+) -> dict[str, Any]:
+    """Diagnostic-only: frame candidate ink into the AutoCAD reference envelope.
+
+    This is not a render mode. It answers whether the remaining X3 delta survives
+    after paper/capture envelope differences are removed for a known AutoCAD
+    reference PNG.
+    """
+    ref_bbox = _ink_bbox(acad)
+    cand_bbox = _ink_bbox(candidate)
+    if ref_bbox is None or cand_bbox is None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(candidate) as opened:
+            opened.save(out)
+        return {
+            "mode": "fallback",
+            "reason": "blank-side",
+            "reference_bbox_px": list(ref_bbox) if ref_bbox else None,
+            "candidate_bbox_px": list(cand_bbox) if cand_bbox else None,
+        }
+    with Image.open(acad) as ref_img, Image.open(candidate) as cand_img:
+        target_bbox = _scale_bbox_to_size(ref_bbox, ref_img.size, cand_img.size)
+        background = _background_rgb(cand_img)
+    _paste_bbox(
+        candidate, out,
+        source_bbox=cand_bbox,
+        target_bbox=target_bbox,
+        background=background,
+        resample=Image.Resampling.LANCZOS,
+    )
+    semantic_written = None
+    if semantic_mask is not None and semantic_out is not None:
+        _paste_bbox(
+            semantic_mask, semantic_out,
+            source_bbox=cand_bbox,
+            target_bbox=target_bbox,
+            background=(0, 0, 0),
+            resample=Image.Resampling.NEAREST,
+        )
+        semantic_written = str(semantic_out)
+    return {
+        "mode": "reference-envelope",
+        "reference_bbox_px": list(ref_bbox),
+        "candidate_bbox_px": list(cand_bbox),
+        "target_bbox_px": list(target_bbox),
+        "semantic_mask": semantic_written,
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -109,25 +254,58 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cases", type=Path, required=True, help="JSON list of {id, acad, ours}")
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--capture-method", default="plot-raster")
+    parser.add_argument(
+        "--candidate-frame",
+        choices=("none", "reference-envelope"),
+        default="none",
+        help=(
+            "diagnostic-only candidate reframing before scoring. "
+            "reference-envelope frames VemCAD ink into the AutoCAD PNG ink envelope."
+        ),
+    )
     args = parser.parse_args(argv)
 
     cases = _load_cases(args.cases)
     args.out_dir.mkdir(parents=True, exist_ok=True)
     overlay_dir = args.out_dir / "overlays"
     overlay_dir.mkdir(parents=True, exist_ok=True)
+    framed_dir = args.out_dir / "framed_candidates"
+    semantic_framed_dir = args.out_dir / "framed_semantic_masks"
 
     rows: list[dict[str, Any]] = []
     semantic_rows: list[dict[str, Any]] = []
     for case in cases:
         overlay = overlay_dir / f"{case['id']}_overlay.png"
-        result = cmp.compare(case["acad"], case["ours"], capture_method=args.capture_method)
-        framing = cmp.framing_divergence(case["acad"], case["ours"])
-        dff.diff_overlay(case["acad"], case["ours"], out_path=overlay)
+        candidate = case["ours"]
+        semantic_mask = case.get("semantic_mask")
+        candidate_frame = {"mode": "none"}
+        if args.candidate_frame == "reference-envelope":
+            candidate = framed_dir / f"{case['id']}_candidate_reference_envelope.png"
+            semantic_out = None
+            if semantic_mask is not None:
+                semantic_out = semantic_framed_dir / f"{case['id']}_semantic_reference_envelope.png"
+            candidate_frame = _frame_candidate_to_reference(
+                case["acad"],
+                case["ours"],
+                candidate,
+                semantic_mask=semantic_mask,
+                semantic_out=semantic_out,
+            )
+            if candidate_frame.get("semantic_mask"):
+                semantic_mask = Path(str(candidate_frame["semantic_mask"]))
+
+        result = cmp.compare(case["acad"], candidate, capture_method=args.capture_method)
+        framing = cmp.framing_divergence(case["acad"], candidate)
+        diff_result = dff.diff_overlay(case["acad"], candidate, out_path=overlay)
         row = {
             "id": case["id"],
             "acad": str(case["acad"]),
-            "ours": str(case["ours"]),
-            "overlay": str(overlay),
+            "ours": str(candidate),
+            "source_ours": str(case["ours"]),
+            "overlay": diff_result.overlay_path or "",
+            "diff_comparable": diff_result.comparable,
+            "diff_skip_reason": diff_result.skip_reason,
+            "candidate_frame": candidate_frame,
             "ink_iou": result.ink_iou,
             "ssim": result.ssim,
             "color_dist": result.color_dist,
@@ -142,8 +320,8 @@ def main(argv: list[str] | None = None) -> int:
         if "semantic_mask" in case and "semantic_report" in case:
             report = cmp.compare_semantic_classes(
                 case["acad"],
-                case["ours"],
-                candidate_mask_path=case["semantic_mask"],
+                candidate,
+                candidate_mask_path=semantic_mask,
                 render_report_path=case["semantic_report"],
                 capture_method=args.capture_method,
             )
@@ -151,7 +329,7 @@ def main(argv: list[str] | None = None) -> int:
                 "diagnostic_kind": report.diagnostic_kind,
                 "comparable": report.comparable,
                 "skip_reason": report.skip_reason,
-                "mask": str(case["semantic_mask"]),
+                "mask": str(semantic_mask),
                 "report": str(case["semantic_report"]),
             }
             for class_row in report.classes:
@@ -172,6 +350,7 @@ def main(argv: list[str] | None = None) -> int:
     summary = {
         "schema": "vemcad.autocad_batch_compare/v1",
         "capture_method": args.capture_method,
+        "candidate_frame_mode": args.candidate_frame,
         "count": len(rows),
         "rows": rows,
     }
@@ -183,7 +362,7 @@ def main(argv: list[str] | None = None) -> int:
         f.write(
             "id\tink_iou\tssim\tcolor_dist\taspect_delta\tcomparable\tband\t"
             "framing_mismatch\tfill_divergence_x\tfill_divergence_y\t"
-            "acad\tours\toverlay\n"
+            "candidate_frame_mode\tacad\tours\tsource_ours\toverlay\n"
         )
         for row in rows:
             framing = row["framing"]
@@ -192,7 +371,8 @@ def main(argv: list[str] | None = None) -> int:
                 f"{row['aspect_delta']}\t{row['comparable']}\t{row['band']}\t"
                 f"{row['framing_mismatch']}\t"
                 f"{framing['fill_divergence_x']}\t{framing['fill_divergence_y']}\t"
-                f"{row['acad']}\t{row['ours']}\t{row['overlay']}\n"
+                f"{row['candidate_frame']['mode']}\t"
+                f"{row['acad']}\t{row['ours']}\t{row['source_ours']}\t{row['overlay']}\n"
             )
     if semantic_rows:
         semantic_summary = {
