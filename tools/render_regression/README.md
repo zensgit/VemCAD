@@ -80,5 +80,51 @@ v0 的门控指标 `ink_iou` 是文字+几何合并值（**故不命名 geometry
   下一步 Yuantus `/cad/diff?v1=&v2=` 走版本库取两版 → 调服务 → 前端展示。属 L1
   收费功能（见 `docs/VEMCAD_RENDER_PRODUCTIZATION_NOTE_20260613.md`）。
 
-测试：`python3 -m pytest tools/render_regression/tests -q`（34 = D2 回归台 23 +
-版本对比 11，合成图，无需 render_cli）。
+## X3 媲美 AutoCAD 对比（compare_vs_acad.py）+ 取图/视图空间一致性检测
+
+`compare_vs_acad.py` 复用 D2 comparator（对齐 + 墨迹 IoU + color/aspect 守卫）
+和 `diff.py`（三色叠加），把"像不像 AutoCAD"变成一个可引用的分数。**纯图入**：
+喂两张 PNG（参照=AutoCAD，候选=我们）。
+
+### 取图契约（apples-to-apples，必须先满足）
+
+X3 分数只有在**两张图同处一个视图空间**时才有意义。AutoCAD 参照必须按下式产出：
+
+- **PLOT / EXPORTPNG（或 PUBLISH）按"图形范围/EXTENTS"出图**（fit-to-EXTENTS），
+  与 render_cli 的模型空间外延一致；**不要**用某个图纸/布局的 paper-space 版面
+  （版面会把图形按页边距内缩，填充比/纵横比都与外延渲染对不上）。
+- **白底**、**单色(monochrome) 关闭**（保留各图层颜色，否则 color_dist 误报）。
+- **与我们的渲染同纵横比**，长边 ≥ 1600 px。
+
+### 取图不一致 → 不是渲染缺陷（framing/capture mismatch 检测）
+
+D2 对齐故意"各自按墨迹 bbox 裁剪再统一画布"，因此**对图形在页面上的位置与
+填充比是盲的**——这在同视图空间下是对的，却会让"paper-space PLOT（墨迹被页边距
+内缩）vs 模型外延渲染（墨迹铺满画框）"这种**取图不一致**伪装成低 IoU、被误读为
+渲染失真。
+
+`compare.framing_divergence(ref, cand)`（纯函数、确定性、无副作用，复用
+`_ink_mask`/`_ink_bbox`）在出 IoU 判定**之前**先量两个被门控指标丢弃的视图空间
+信号：
+
+- **页面填充比/轴** = 墨迹 bbox 边长 ÷ 图像边长；paper PLOT 与外延渲染即使几何
+  相同也会在此分叉。
+- **aspect_delta** = `|1 - cand_aspect/ref_aspect|`（与 compare 的 aspect 守卫同定义）。
+
+`framing_mismatch` = 任一轴填充比差 > `FRAMING_TOL`(0.05) **或** aspect_delta >
+`ASPECT_TOL`(0.06)。命中时 `compare_vs_acad.py` 改打：
+**`NOT COMPARABLE (framing/capture mismatch)`**——并打印各轴填充比与 div 数值——
+明确这是**取图窗口不同**，而非渲染器错误；正常 IoU 判定（EXCELLENT/CLOSE/
+DIVERGENT）被抑制，避免误归因。`framing_divergence` 只读图、**不动** `compare()`
+的 `CompareResult`、也不影响 D2/regress 门控。
+
+> 实例 G11：填充比 HEIGHT 差 ~0.10 触发，而 aspect_delta 0.0569 仍 **低于**
+> ASPECT_TOL——即原 aspect 守卫静默、正是本检测要补的盲区。
+
+**真正能改分的对等修复**（让 render_cli 按 `--window` 渲到与 AutoCAD 同窗，或把
+AutoCAD 参照重新按 EXTENTS 导出）需要 AutoCAD 环境/渲染端改动，**不在本次改动
+范围**；本检测只负责正确"归因"——把一对 framing 不一致的图标出来，不假装它是渲染
+缺陷。
+
+测试：`python3 -m pytest tools/render_regression/tests -q`（52 = D2 comparator 19 +
+X3 对比/framing 10 + 版本对比 15 + regress 8，合成图，无需 render_cli）。

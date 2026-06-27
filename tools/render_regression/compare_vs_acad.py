@@ -42,6 +42,14 @@ import compare as cmp  # noqa: E402
 import diff as dff      # noqa: E402
 
 
+FRAMING_VERDICT = (
+    "NOT COMPARABLE (framing/capture mismatch) — the AutoCAD reference and "
+    "render_cli are not in the same view-space (paper-space PLOT vs "
+    "model-extents). Re-capture the AutoCAD ref fit-to-EXTENTS at the same "
+    "aspect, or render with a matching --window."
+)
+
+
 def _verdict(band: str, comparable: bool, skip_reason: str) -> str:
     if not comparable:
         return "NOT COMPARABLE (%s) — re-export the AutoCAD PNG at the same extents/bg/aspect." % (
@@ -103,6 +111,11 @@ def main(argv=None) -> int:
 
     # ref = AutoCAD (ground truth), cand = ours.
     res = cmp.compare(args.acad, args.ours, capture_method=args.capture_method)
+    # Capture / view-space check BEFORE the ink-IoU verdict: a paper-space PLOT
+    # vs a model-extents render is NOT comparable, and a low ink-IoU there is a
+    # framing artefact, not renderer infidelity. Diagnostic only — does not
+    # touch `res`, the D2 CompareResult, or the regress/D2 gate.
+    framing = cmp.framing_divergence(args.acad, args.ours)
     overlay_note = ""
     if args.out is not None:
         ov = dff.diff_overlay(args.acad, args.ours, out_path=args.out)
@@ -120,6 +133,11 @@ def main(argv=None) -> int:
     print("  aspect delta : %-7s [ok <=%.2f]  纵横比/缩放一致性" % (res.aspect_delta, cmp.ASPECT_TOL))
     print("  comparable   : %s" % res.comparable)
     print("  band         : %s" % res.band)
+    print("  page-fill    : ref(x=%-6s y=%-6s) ours(x=%-6s y=%-6s)  页面填充比" % (
+        framing["ref_fill_x"], framing["ref_fill_y"],
+        framing["cand_fill_x"], framing["cand_fill_y"]))
+    print("  framing div  : Δx=%-6s Δy=%-6s [mismatch if either >%.2f]  视图空间一致性" % (
+        framing["fill_divergence_x"], framing["fill_divergence_y"], cmp.FRAMING_TOL))
     if overlay_note:
         print(overlay_note)
     if args.class_report is not None or args.print_classes:
@@ -156,7 +174,10 @@ def main(argv=None) -> int:
                 encoding="utf-8")
         if args.print_semantic_classes:
             _print_semantic_class_rows(semantic_report)
-    print("verdict: %s" % _verdict(res.band, res.comparable, res.skip_reason))
+    if framing["framing_mismatch"]:
+        print("verdict: %s" % FRAMING_VERDICT)
+    else:
+        print("verdict: %s" % _verdict(res.band, res.comparable, res.skip_reason))
     return 0
 
 

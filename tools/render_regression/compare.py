@@ -33,6 +33,7 @@ from PIL import Image
 CANVAS = (1200, 850)
 DILATE_TOL = 2
 ASPECT_TOL = 0.06          # |1 - cand_aspect/ref_aspect| beyond this → review
+FRAMING_TOL = 0.05         # |ref_fill - cand_fill| per axis beyond this → framing/capture mismatch
 COLOR_TOL = 60.0           # mean ink-RGB distance beyond this → review
 INK_FLOOR = 1e-4           # below this ink fraction a render counts as blank
 
@@ -234,6 +235,88 @@ def _crop_resize_to_bbox(mask: np.ndarray, bbox, canvas: Tuple[int, int]) -> np.
         return sub
     img = Image.fromarray((sub * 255).astype(np.uint8)).resize(canvas, Image.NEAREST)
     return np.asarray(img) > 127
+
+
+def framing_divergence(ref_path: Path, cand_path: Path) -> dict:
+    """Detect a capture / view-space mismatch BEFORE the ink-IoU verdict.
+
+    The X3 comparator aligns by cropping each render to its own ink bbox, so it
+    is deliberately blind to where the drawing sits on the page and how much of
+    the page it fills. That is correct when both renders share a view-space, but
+    it hides the case where the AutoCAD reference is a paper-space PLOT (ink
+    inset by page margins) while render_cli draws model-space EXTENTS (ink fills
+    the frame). Then the renders are simply NOT comparable, yet the ink-IoU
+    reports a low score that looks like renderer infidelity.
+
+    This helper measures two view-space signals the gate metric throws away:
+
+    - page-fill per axis = ink-bbox extent ÷ image extent. A paper PLOT and an
+      extents render disagree here even when the geometry is identical.
+    - aspect_delta = |1 - cand_aspect/ref_aspect| on the raw ink bboxes (same
+      definition as compare()'s aspect guard).
+
+    `framing_mismatch` is True when page-fill diverges by more than FRAMING_TOL
+    on either axis OR aspect_delta exceeds ASPECT_TOL. (The G11 case trips the
+    page-fill axis at ~0.10 while aspect_delta 0.0569 stays under ASPECT_TOL —
+    i.e. the existing aspect guard is silent, which is the whole point.)
+
+    Pure / deterministic / side-effect-free: image-in, dict-out, no rendering.
+    A blank side is reported `comparable=False` with `framing_mismatch=False`
+    (blankness is a different failure, handled by compare()'s blank path — this
+    helper must not hijack that verdict).
+    """
+    ra = _load_rgb(Path(ref_path))
+    rb = _load_rgb(Path(cand_path))
+    ga, gb = ra.mean(axis=2), rb.mean(axis=2)   # same grayscale path as compare()
+    ma, mb = _ink_mask(ga), _ink_mask(gb)
+    bbox_a, bbox_b = _ink_bbox(ma), _ink_bbox(mb)
+
+    base = {
+        "ref_fill_x": 0.0, "ref_fill_y": 0.0,
+        "cand_fill_x": 0.0, "cand_fill_y": 0.0,
+        "fill_divergence_x": 0.0, "fill_divergence_y": 0.0,
+        "aspect_delta": 0.0,
+        "framing_mismatch": False,
+        "comparable": True,
+        "reason": "",
+    }
+    if bbox_a is None or bbox_b is None:
+        both_blank = bbox_a is None and bbox_b is None
+        base["comparable"] = False
+        base["reason"] = "both-blank" if both_blank else "blank-side"
+        return base
+
+    ah, aw = ga.shape
+    bh, bw = gb.shape
+    r0, r1, c0, c1 = bbox_a
+    s0, s1, t0, t1 = bbox_b
+    aw_ink, ah_ink = c1 - c0, r1 - r0
+    bw_ink, bh_ink = t1 - t0, s1 - s0
+
+    ref_fill_x = aw_ink / aw if aw else 0.0
+    ref_fill_y = ah_ink / ah if ah else 0.0
+    cand_fill_x = bw_ink / bw if bw else 0.0
+    cand_fill_y = bh_ink / bh if bh else 0.0
+    fill_div_x = abs(ref_fill_x - cand_fill_x)
+    fill_div_y = abs(ref_fill_y - cand_fill_y)
+
+    aspa = aw_ink / ah_ink if ah_ink else 0.0
+    aspb = bw_ink / bh_ink if bh_ink else 0.0
+    aspect_delta = abs(1.0 - (aspb / aspa)) if aspa else 0.0
+
+    mismatch = (fill_div_x > FRAMING_TOL or fill_div_y > FRAMING_TOL
+                or aspect_delta > ASPECT_TOL)
+
+    return {
+        "ref_fill_x": round(ref_fill_x, 4), "ref_fill_y": round(ref_fill_y, 4),
+        "cand_fill_x": round(cand_fill_x, 4), "cand_fill_y": round(cand_fill_y, 4),
+        "fill_divergence_x": round(fill_div_x, 4),
+        "fill_divergence_y": round(fill_div_y, 4),
+        "aspect_delta": round(aspect_delta, 4),
+        "framing_mismatch": bool(mismatch),
+        "comparable": True,
+        "reason": "",
+    }
 
 
 def _best_shift(a: np.ndarray, b: np.ndarray, search: int = 3):
