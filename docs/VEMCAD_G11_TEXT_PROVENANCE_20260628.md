@@ -77,6 +77,48 @@ CADGameFusion PR #436 CI passed:
 - Local CI (Ubuntu)
 - quick-check
 
+VemCAD main `render-image` passed after the gitlink bump and pushed the rebuilt
+`ghcr.io/zensgit/vemcad-render:main` image. The rebuilt image was then used to
+rerender the existing G11/B11 fixture:
+
+```bash
+docker run --rm \
+  -v /tmp/vacadbatchinputs:/in:ro \
+  -v /tmp/vemcad-fidelity-out/g11_text_provenance_20260628T120605:/out \
+  --entrypoint render_cli ghcr.io/zensgit/vemcad-render:main \
+  --input /in/B11.dxf \
+  --out /out/G11_ours.png \
+  --bg white \
+  --width 2339 --height 1653 \
+  --report /out/G11_report.json \
+  --class-mask-out /out/G11_semantic_mask.png
+```
+
+Observed report:
+
+```text
+schema_version            0.4
+text_records              39
+insert_records            16
+nonempty_block_name       30
+nonempty_text_kind        39
+nonempty_attribute_tag    11
+```
+
+Top G11 text-provenance buckets:
+
+| `source_type` | `text_kind` | `block_name` | has `attribute_tag` | count |
+| --- | --- | --- | --- | ---: |
+| `INSERT` | `text` | `HC_BTL_BLK` | no | 12 |
+| `(empty)` | `attrib` | `(empty)` | yes | 8 |
+| `INSERT` | `attdef` | `HC_BTL_BLK` | yes | 3 |
+| `(empty)` | `mtext` | `(empty)` | no | 1 |
+| `DIMENSION` | `mtext` | `*D19`...`*D26` | no | 8 |
+
+This proves the live G11 report now distinguishes the visible title-block text
+paths that were previously collapsed to generic `insert_text` / empty
+`text_kind` records.
+
 ## Boundary
 
 This closes the **provenance-observability** hole for G11 title-block text. It
