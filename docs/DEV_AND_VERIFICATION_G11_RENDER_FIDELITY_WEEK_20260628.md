@@ -82,7 +82,7 @@ Boundary:
 
 ### Slice 2 — Manifest-Driven Matched-View Harness
 
-Status: in progress in this PR.
+Status: merged in PR #169 (`989ec77`).
 
 Deliverables:
 
@@ -118,13 +118,46 @@ Boundary:
 - No AutoCAD-equivalence claim; even matched view-space only means X3 is
   eligible to be interpreted.
 
+### Slice 3 — Triage Summary and Artifact Index
+
+Status: in progress in this PR.
+
+Deliverables:
+
+- Extend `tools/render_regression/acad_manifest_compare.py`.
+- Extend `tools/render_regression/tests/test_acad_manifest_compare.py`.
+
+Behavior:
+
+- Adds `text_flags` and `text_notes` columns to the harness TSV.
+- If a candidate case includes `render_report`, reuses
+  `text_provenance_diagnostics.analyze_report()` to surface text-placement
+  flag/note counts in the per-case JSON row.
+- Writes `artifact_index.json`, listing stable artifact paths for AutoCAD
+  reference PNGs, VemCAD candidate PNGs, overlays, view-space reports, render
+  reports, semantic masks/reports, and text-provenance summaries.
+
+Verification:
+
+- `python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q`
+  - `5 passed`
+- `python3 -m pytest tools/render_regression/tests -q`
+  - `80 passed`
+
+Boundary:
+
+- Diagnostic enrichment only; no renderer change.
+- Text provenance is not a gate; unreadable text diagnostics are recorded as
+  diagnostic errors without turning the X3 view-space gate into a text gate.
+
 ## Verification Matrix
 
 | Slice | Local tests | CI | Runtime / artifact proof | Result |
 | --- | --- | --- | --- | --- |
 | Slice 0 plan | docs-only | docs-only PR #167, no checks | n/a | merged |
 | Slice 1 AutoCAD reference manifest | `test_acad_reference_manifest.py`; adjacent compare tests; full `tools/render_regression/tests` | PR #168: `pytest`, `build-and-smoke` | synthetic PNG/DXF fixtures only | merged |
-| Slice 2 manifest compare harness | `test_acad_manifest_compare.py`; adjacent manifest/compare tests; full `tools/render_regression/tests` | pending | synthetic PNG pairs only; no renderer | local green |
+| Slice 2 manifest compare harness | `test_acad_manifest_compare.py`; adjacent manifest/compare tests; full `tools/render_regression/tests` | PR #169: `pytest`, `build-and-smoke` | synthetic PNG pairs only; no renderer | merged |
+| Slice 3 triage summary / artifact index | `test_acad_manifest_compare.py`; full `tools/render_regression/tests` | pending | synthetic PNG + synthetic render report only; no renderer | local green |
 
 ## Evidence To Fill During The Week
 

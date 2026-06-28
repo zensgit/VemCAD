@@ -15,12 +15,14 @@ import io
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import acad_reference_manifest as arm  # noqa: E402
 import compare_vs_acad as cva  # noqa: E402
+import text_provenance_diagnostics as tpd  # noqa: E402
 
 
 SCHEMA = "vemcad.acad_manifest_compare/v1"
@@ -121,18 +123,84 @@ def _write_tsv(path: Path, rows: list[dict[str, Any]]) -> None:
     with path.open("w", encoding="utf-8") as handle:
         handle.write(
             "id\tdrawing_id\tviewspace_status\tx3_band\tink_iou\tcolor_dist\t"
-            "aspect_delta\tcompare_exit_code\tacad_png\tours\toverlay\tviewspace_report\n"
+            "aspect_delta\tcompare_exit_code\ttext_flags\ttext_notes\t"
+            "acad_png\tours\toverlay\tviewspace_report\n"
         )
         for row in rows:
             summary = row.get("x3_summary") or {}
+            text_counts = (row.get("text_provenance") or {}).get("counts") or {}
+            text_flags = ",".join(
+                f"{key}:{value}" for key, value in sorted((text_counts.get("flag_counts") or {}).items())
+            )
+            text_notes = ",".join(
+                f"{key}:{value}" for key, value in sorted((text_counts.get("note_counts") or {}).items())
+            )
             handle.write(
                 f"{row['id']}\t{row.get('drawing_id', '')}\t{row.get('viewspace_status', '')}\t"
                 f"{summary.get('band', '')}\t{summary.get('ink_iou', '')}\t"
                 f"{summary.get('color_dist', '')}\t{summary.get('aspect_delta', '')}\t"
-                f"{row.get('compare_exit_code', '')}\t{row.get('acad_png', '')}\t"
+                f"{row.get('compare_exit_code', '')}\t{text_flags}\t{text_notes}\t{row.get('acad_png', '')}\t"
                 f"{row.get('ours', '')}\t{row.get('overlay', '')}\t"
                 f"{row.get('viewspace_report', '')}\n"
             )
+
+
+def _text_provenance_summary(render_report: str, out_path: Path) -> dict[str, Any]:
+    if not render_report:
+        return {"status": "unavailable", "reason": "no_render_report"}
+    try:
+        report = json.loads(Path(render_report).read_text(encoding="utf-8"))
+        payload = tpd.analyze_report(
+            report,
+            SimpleNamespace(
+                title_block=False,
+                block=None,
+                source_type=None,
+                text_kind=None,
+                semantic_class=None,
+            ),
+        )
+        _write_json(out_path, payload)
+        return {
+            "status": "available",
+            "summary": str(out_path),
+            "schema": payload["schema"],
+            "text_placement_schema": payload["text_placement_schema"],
+            "text_placement_schema_version": payload["text_placement_schema_version"],
+            "counts": payload["counts"],
+            "selected_screen_bbox": payload["selected_screen_bbox"],
+        }
+    except Exception as exc:  # Diagnostic-only: do not turn X3 gate into text-provenance gate.
+        return {
+            "status": "error",
+            "render_report": render_report,
+            "error": str(exc),
+        }
+
+
+def _artifact_index(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    artifacts: list[dict[str, str]] = []
+    for row in rows:
+        for key, kind in (
+            ("acad_png", "autocad_reference"),
+            ("ours", "vemcad_candidate"),
+            ("overlay", "x3_overlay"),
+            ("viewspace_report", "viewspace_report"),
+            ("render_report", "render_report"),
+            ("semantic_mask", "semantic_mask"),
+            ("semantic_class_report", "semantic_class_report"),
+        ):
+            path = row.get(key)
+            if path:
+                artifacts.append({"id": row["id"], "kind": kind, "path": str(path)})
+        text_summary = (row.get("text_provenance") or {}).get("summary")
+        if text_summary:
+            artifacts.append({"id": row["id"], "kind": "text_provenance_summary", "path": str(text_summary)})
+    return {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "count": len(artifacts),
+        "artifacts": artifacts,
+    }
 
 
 def _compare_case(case: dict[str, Any], candidate: dict[str, Any], out_dir: Path) -> dict[str, Any]:
@@ -159,17 +227,19 @@ def _compare_case(case: dict[str, Any], candidate: dict[str, Any], out_dir: Path
             "--semantic-class-report", str(semantic_report),
         ])
         semantic_report_path = str(semantic_report)
+    text_summary_path = out_dir / "text" / f"{safe}_text_provenance.json"
     stdout = io.StringIO()
     with contextlib.redirect_stdout(stdout):
         rc = cva.main(argv)
     view_payload = json.loads(viewspace.read_text(encoding="utf-8"))
+    render_report = candidate.get("render_report", "")
     return {
         "id": case_id,
         "drawing_id": case["drawing_id"],
         "source_dxf": case["source_dxf"],
         "acad_png": case["acad_png"],
         "ours": candidate["ours"],
-        "render_report": candidate.get("render_report", ""),
+        "render_report": render_report,
         "semantic_mask": candidate.get("semantic_mask", ""),
         "semantic_report": candidate.get("semantic_report", ""),
         "semantic_class_report": semantic_report_path,
@@ -182,6 +252,7 @@ def _compare_case(case: dict[str, Any], candidate: dict[str, Any], out_dir: Path
         "viewspace_reason": view_payload["reason"],
         "recommended_action": view_payload["recommended_action"],
         "x3_summary": view_payload["x3_summary"],
+        "text_provenance": _text_provenance_summary(render_report, text_summary_path),
         "compare_exit_code": rc,
         "compare_stdout": stdout.getvalue(),
     }
@@ -280,6 +351,7 @@ def main(argv: list[str] | None = None) -> int:
     _write_json(args.out_dir / "summary.json", report)
     if report["rows"] and not args.dry_run:
         _write_tsv(args.out_dir / "summary.tsv", report["rows"])
+        _write_json(args.out_dir / "artifact_index.json", _artifact_index(report["rows"]))
 
     print(
         f"AutoCAD manifest compare: {report['status']} "
