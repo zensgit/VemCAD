@@ -103,6 +103,7 @@ def _report():
                     "max_line_width_px": 50,
                     "screen_x": 20,
                     "screen_y": 40,
+                    "rotation_deg": 30,
                     "width_factor": 1.0,
                 },
             ],
@@ -129,6 +130,16 @@ def test_analyze_report_groups_title_block_records_and_flags_risks():
     row = next(row for row in payload["records"] if row["entity_id"] == "BAD")
     assert row["font_target_ratio"] == 30 / 16
     assert row["block_height_target_ratio"] == 28 / 16
+
+
+def test_rotated_bbox_is_a_note_not_a_layout_flag():
+    payload = tpd.analyze_report(_report(), _args())
+
+    assert "rotated_bbox_is_approximate" not in payload["counts"]["flag_counts"]
+    assert payload["counts"]["note_counts"]["rotated_bbox_is_approximate"] == 1
+    row = next(row for row in payload["records"] if row["entity_id"] == "N1")
+    assert row["layout_flags"] == []
+    assert row["layout_notes"] == ["rotated_bbox_is_approximate"]
 
 
 def test_large_font_pixel_size_is_not_a_layout_flag_when_visible_height_matches():
@@ -185,5 +196,7 @@ def test_cli_writes_json_tsv_and_overlay(tmp_path):
     assert rc == 0
     payload = json.loads((out / "text_provenance_summary.json").read_text(encoding="utf-8"))
     assert payload["counts"]["selected_text_records"] == 3
-    assert (out / "text_provenance_records.tsv").read_text(encoding="utf-8").splitlines()[0].startswith("entity_id\t")
+    header = (out / "text_provenance_records.tsv").read_text(encoding="utf-8").splitlines()[0]
+    assert header.startswith("entity_id\t")
+    assert "layout_notes" in header
     assert (out / "text_provenance_overlay.png").is_file()

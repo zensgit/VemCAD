@@ -41,6 +41,7 @@ The tool reads `text_placement.records[]` and records, per visible text entity:
 - screen position and approximate screen bbox
 - layout flags such as missing provenance, missing attribute tags, suspicious
   visible block-height scaling, or viewport overflow.
+- layout notes for non-risk caveats such as rotated-text approximate bboxes.
 
 ## Boundary
 
@@ -100,9 +101,53 @@ block_height_px / target_px  ~1.07
 layout flags                 none
 ```
 
+## Full G11 Text Closeout
+
+The corrected diagnostic was then rerun for all G11 text records and for the
+`HC_BTL_BLK` title block specifically:
+
+```bash
+python3 tools/render_regression/text_provenance_diagnostics.py \
+  /tmp/vemcad-fidelity-out/g11_text_provenance_20260628T120605/G11_report.json \
+  --image /tmp/vemcad-fidelity-out/g11_text_provenance_20260628T120605/G11_ours.png \
+  --out-dir /tmp/vemcad-fidelity-out/g11_text_closeout_notes_20260628T055954/all \
+  --print-summary
+
+python3 tools/render_regression/text_provenance_diagnostics.py \
+  /tmp/vemcad-fidelity-out/g11_text_provenance_20260628T120605/G11_report.json \
+  --image /tmp/vemcad-fidelity-out/g11_text_provenance_20260628T120605/G11_ours.png \
+  --block HC_BTL_BLK \
+  --out-dir /tmp/vemcad-fidelity-out/g11_text_closeout_notes_20260628T055954/title \
+  --print-summary
+```
+
+Observed:
+
+```text
+all text records:
+selected / all  39 / 39
+flags           none
+notes           rotated_bbox_is_approximate=7
+
+HC_BTL_BLK title block:
+selected / all  15 / 39
+flags           none
+notes           none
+```
+
+The seven rotated rows are diagnostic-note-only: their overlay bboxes are
+approximate because the current helper draws axis-aligned boxes around rotated
+text. They are not evidence of a text layout defect.
+
 ## Next Use
 
 Use the generated rows to pick one suspicious title-block path, for example a
 specific `HC_BTL_BLK` `ATTRIB` / `ATTDEF` record or an outlier visible-height row.
 Then inspect or fix that entity path directly in CADGameFusion, followed by a
 normal A to C bump if rendering behavior changes.
+
+If the corrected tool reports no layout flags, the next hard G11 step is not
+another text tweak: it is the view-space contract path in
+`VEMCAD_G11_VIEWSPACE_CONTRACT_20260628.md` — recapture AutoCAD with a matched
+model-extents view or render VemCAD with a proven matching `--window`, then run
+X3 with `--require-viewspace-match`.
