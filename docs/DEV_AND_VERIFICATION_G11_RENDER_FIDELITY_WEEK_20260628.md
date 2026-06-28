@@ -267,18 +267,86 @@ For each future slice, append:
 - AutoCAD input provenance, if used;
 - comparison verdict and why it is or is not an equivalence claim.
 
-## Final Closeout Template
+## Final Closeout
 
-At the end of the week, record:
+Final VemCAD `origin/main`:
 
-```text
-Final VemCAD origin/main:
+- `1c88801ac47ab76b62c6c147f51382f9267e770e`
+
 Final CADGameFusion gitlink:
+
+- `deps/cadgamefusion` -> `5871fced88507c87f6ac03578c45a4072e51ee42`
+
+Merged slices:
+
+| Slice | PR | Merge | Result |
+| --- | --- | --- | --- |
+| Slice 0 — one-week plan | #167 | `73ad85f` | plan + DEV/V ledger |
+| Slice 1 — AutoCAD reference manifest gate | #168 | `5436247` | fail-closed reference validator |
+| Slice 2 — manifest-driven matched-view harness | #169 | `989ec77` | manifest + candidate PNG -> X3 view-space gate |
+| Slice 3 — triage summary / artifact index | #170 | `f2afea3` | text flags/notes + artifact index |
+| Slice 4 — first real G11 run evidence | #171 | `1c88801` | real run recorded; view-space mismatch |
+
 Render image / workflow evidence:
+
+- Local Docker render used `ghcr.io/zensgit/vemcad-render:main`.
+- PR CI evidence:
+  - #168: `pytest`, `build-and-smoke`
+  - #169: `pytest`, `build-and-smoke`
+  - #170: `pytest`, `build-and-smoke`
+  - #171: docs-only, no checks reported
+- Local real-run artifact root:
+  `/tmp/vemcad-fidelity-out/g11_week_real_20260628T133732Z`
+
 AutoCAD reference:
+
+- `/tmp/vemcadautocadplot/batch/png/G11-1.png`
+- `2339x1653`, RGB, prior local AutoCAD plot/export batch.
+
 View-space status:
+
+- `viewspace_mismatch`
+- Reason: `page-fill/aspect divergence exceeds tolerance`
+- Recommended action from the harness: recapture AutoCAD at model EXTENTS with
+  matching aspect, or render the candidate with an explicit matching `--window`
+  before interpreting X3.
+
 X3 result:
+
+- Recorded but not interpretable as renderer fidelity while view-space is
+  mismatched.
+- `ink_iou`: `0.8021`
+- `ssim`: `0.4959`
+- `color_dist`: `134.1`
+- `aspect_delta`: `0.0035`
+- `band`: `fallback`
+
 Semantic/text diagnostics:
+
+- Text provenance:
+  - `text_placement_schema`: `vemcad.render_text_placement`
+  - `text_placement_schema_version`: `0.4`
+  - `all_text_records`: `39`
+  - `flag_counts`: `{}`
+  - `note_counts`: `{"rotated_bbox_is_approximate": 7}`
+- Candidate-side semantic diagnostics were produced, but AutoCAD semantics are
+  unknown and the view-space mismatch makes class scores diagnostic only.
+
 Conclusion:
+
+- The week's development goal is complete: the comparison loop now has a
+  versioned input gate, a manifest-driven view-space harness, triage summaries,
+  artifact indexing, and a recorded real G11 run.
+- G11 is **not** closed as AutoCAD-equivalent.
+- The next blocker is no longer tooling. It is input/view contract:
+  the available AutoCAD plot/export is not matched to the VemCAD render
+  view-space.
+
 Next action:
-```
+
+- Get a clean AutoCAD export at model EXTENTS with matching aspect, or provide
+  the explicit world `--window` for the AutoCAD plot.
+- Then rerun:
+  `tools/render_regression/acad_manifest_compare.py --manifest ... --candidate-cases ... --out-dir ...`
+- Only if that rerun reports `viewspace_status=match` should X3 and semantic
+  rows be used to open renderer work.
