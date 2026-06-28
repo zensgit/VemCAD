@@ -133,10 +133,6 @@ def _layout_flags(record: dict[str, Any], bbox: dict[str, float] | None, viewpor
     if width_factor is not None and (width_factor < 0.35 or width_factor > 1.5):
         flags.append("width_factor_outlier")
 
-    rotation = _float(record.get("rotation_deg")) or 0.0
-    if abs(rotation) > 0.01:
-        flags.append("rotated_bbox_is_approximate")
-
     viewport_w = _float(viewport.get("viewport_w"))
     viewport_h = _float(viewport.get("viewport_h"))
     if bbox and viewport_w and viewport_h:
@@ -148,9 +144,18 @@ def _layout_flags(record: dict[str, Any], bbox: dict[str, float] | None, viewpor
     return flags
 
 
+def _layout_notes(record: dict[str, Any]) -> list[str]:
+    notes: list[str] = []
+    rotation = _float(record.get("rotation_deg")) or 0.0
+    if abs(rotation) > 0.01:
+        notes.append("rotated_bbox_is_approximate")
+    return notes
+
+
 def _record_row(record: dict[str, Any], viewport: dict[str, Any]) -> dict[str, Any]:
     bbox = _screen_bbox(record)
     flags = _layout_flags(record, bbox, viewport)
+    notes = _layout_notes(record)
     font_px = _float(record.get("font_px"))
     target_px = _float(record.get("target_px"))
     block_height_px = _float(record.get("block_height_px"))
@@ -182,6 +187,7 @@ def _record_row(record: dict[str, Any], viewport: dict[str, Any]) -> dict[str, A
         "non_empty_line_count": _float(record.get("non_empty_line_count")),
         "screen_bbox": bbox,
         "layout_flags": flags,
+        "layout_notes": notes,
     }
 
 
@@ -233,9 +239,11 @@ def analyze_report(report: dict[str, Any], args: argparse.Namespace) -> dict[str
             "entity_ids": [row["entity_id"] for row in bucket_rows],
             "screen_bbox": _union_bbox(row["screen_bbox"] for row in bucket_rows),
             "flags": sorted({flag for row in bucket_rows for flag in row["layout_flags"]}),
+            "notes": sorted({note for row in bucket_rows for note in row["layout_notes"]}),
         })
 
     flag_counts = Counter(flag for row in rows for flag in row["layout_flags"])
+    note_counts = Counter(note for row in rows for note in row["layout_notes"])
     return {
         "schema": SCHEMA,
         "source": report.get("source", ""),
@@ -255,6 +263,7 @@ def analyze_report(report: dict[str, Any], args: argparse.Namespace) -> dict[str
             "selected_text_records": len(rows),
             "bucket_count": len(buckets),
             "flag_counts": dict(sorted(flag_counts.items())),
+            "note_counts": dict(sorted(note_counts.items())),
         },
         "viewport": {
             "width": _float(viewport.get("viewport_w")),
@@ -276,7 +285,7 @@ def write_tsv(payload: dict[str, Any], path: Path) -> None:
         "resolved_family", "font_px", "target_px", "block_height_px",
         "font_target_ratio", "block_height_target_ratio",
         "max_line_width_px", "screen_x", "screen_y", "rotation_deg",
-        "width_factor", "layout_flags",
+        "width_factor", "layout_flags", "layout_notes",
     ]
     with path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fields, delimiter="\t")
@@ -284,6 +293,7 @@ def write_tsv(payload: dict[str, Any], path: Path) -> None:
         for row in payload["records"]:
             flat = {field: row.get(field, "") for field in fields}
             flat["layout_flags"] = ",".join(row.get("layout_flags", []))
+            flat["layout_notes"] = ",".join(row.get("layout_notes", []))
             writer.writerow(flat)
 
 
@@ -320,15 +330,20 @@ def _print_summary(payload: dict[str, Any]) -> None:
         print("  flags              : " + ", ".join(f"{k}={v}" for k, v in counts["flag_counts"].items()))
     else:
         print("  flags              : none")
+    if counts.get("note_counts"):
+        print("  notes              : " + ", ".join(f"{k}={v}" for k, v in counts["note_counts"].items()))
+    else:
+        print("  notes              : none")
     for bucket in payload["buckets"][:12]:
         tag = "tag" if bucket["has_attribute_tag"] else "no-tag"
-        print("  - count=%-3d source=%-9s kind=%-7s block=%-14s %s flags=%s" % (
+        print("  - count=%-3d source=%-9s kind=%-7s block=%-14s %s flags=%s notes=%s" % (
             bucket["count"],
             bucket["source_type"] or "(empty)",
             bucket["text_kind"] or "(empty)",
             bucket["block_name"] or "(empty)",
             tag,
             ",".join(bucket["flags"]) or "-",
+            ",".join(bucket.get("notes", [])) or "-",
         ))
 
 
