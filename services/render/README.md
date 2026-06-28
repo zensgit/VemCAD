@@ -19,6 +19,9 @@
   `view=sheet` 另带 `X-Render-Sheet-Mode: detected|fallback|unknown` 和
   `X-Render-Resolved-View`，用于确认图框窗口是否成功检测，或是否按 fail-safe
   回退到 extents。
+  `view=acad-plot` 另带 `X-Render-Acad-Plot-Mode`，用于 AutoCAD PLOT
+  参考对比；它优先使用 render_cli report 里的 A 系列 `view.clip` 作为 PLOT
+  外延窗口，只有该 clip 不可信或没有提供有效留白时才回退到 tight ink bbox。
   饱和返回 429。错误一律结构化信封
   `{"status":"error","error_code":...,"error":...}`（口径同 ROUTER_CONTRACT）。
 - `POST /diff` — **版本可视化对比（L1 旗舰）**：multipart `file_a`(Rev A) +

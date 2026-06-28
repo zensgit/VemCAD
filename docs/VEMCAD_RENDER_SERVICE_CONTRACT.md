@@ -132,9 +132,11 @@ geometry or view resolution.
 
 `view=acad-plot` is separate from `style=acad-plot`: it is an opt-in PNG view
 for comparing against the AutoCAD PLOT reference path used by the training
-batch (`A4 landscape`, `Extents`, `Fit`, `Center`). It renders normally, crops
-to the candidate ink bbox, and reframes that ink into the observed AutoCAD plot
-paper-fill envelope. It is not the default preview and it is not an AutoCAD
+batch (`A4 landscape`, `Extents`, `Fit`, `Center`). It renders normally, then
+reframes into the observed AutoCAD plot paper-fill envelope. When render_cli
+reports an A-series-like `view.clip` that adds material plot margin around the
+ink, that clip is the source frame; otherwise the service falls back to the
+legacy tight ink bbox. It is not the default preview and it is not an AutoCAD
 equivalence claim; it only removes a known paper-framing mismatch before
 scoring display fidelity. Combine it with `style=acad-display` when the goal is
 AutoCAD-like display review.

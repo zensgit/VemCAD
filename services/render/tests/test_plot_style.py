@@ -103,6 +103,88 @@ def test_acad_plot_view_frame_reframes_wide_ink_to_plot_width(tmp_path: Path):
     assert round((x1 - x0) / out.width, 2) == round(ACAD_PLOT_TARGET_FILL_X, 2)
 
 
+def test_acad_plot_view_frame_prefers_a_series_clip_over_tight_ink(tmp_path: Path):
+    p = tmp_path / "clip.png"
+    img = Image.new("RGB", (200, 100), "white")
+    # Tight ink occupies the central 40x40 square. If framed by ink it would
+    # fill the plot height. When framed by the A-series clip, it must retain
+    # the whitespace inside the plot extents window.
+    for x in range(80, 120):
+        for y in range(30, 70):
+            img.putpixel((x, y), (0, 0, 0))
+    img.save(p)
+    view = {
+        "clip": {"min_x": 0, "min_y": 0, "max_x": 100, "max_y": 70.7107},
+        "scale": 1.0,
+        "pan_x": 50.0,
+        "pan_y": 85.0,
+        "viewport_w": 200,
+        "viewport_h": 100,
+    }
+
+    report = apply_acad_plot_view_frame(p, view)
+
+    out = Image.open(p).convert("RGB")
+    bbox = _ink_bbox(out)
+    assert report["mode"] == "framed"
+    assert report["source_bbox_kind"] == "clip"
+    assert bbox is not None
+    x0, y0, x1, y1 = bbox
+    assert (y1 - y0) / out.height < ACAD_PLOT_TARGET_FILL_Y * 0.7
+
+
+def test_acad_plot_view_frame_ignores_non_plot_clip_aspect(tmp_path: Path):
+    p = tmp_path / "non_plot_clip.png"
+    img = Image.new("RGB", (200, 100), "white")
+    for x in range(80, 120):
+        for y in range(30, 70):
+            img.putpixel((x, y), (0, 0, 0))
+    img.save(p)
+    view = {
+        # Aspect 2.0 is not close to A-series landscape/portrait, so this
+        # header-like clip is not trusted as an AutoCAD PLOT frame.
+        "clip": {"min_x": 0, "min_y": 0, "max_x": 100, "max_y": 50},
+        "scale": 1.0,
+        "pan_x": 50.0,
+        "pan_y": 75.0,
+        "viewport_w": 200,
+        "viewport_h": 100,
+    }
+
+    report = apply_acad_plot_view_frame(p, view)
+
+    out = Image.open(p).convert("RGB")
+    bbox = _ink_bbox(out)
+    assert report["mode"] == "framed"
+    assert report["source_bbox_kind"] == "ink"
+    assert bbox is not None
+    x0, y0, x1, y1 = bbox
+    assert round((y1 - y0) / out.height, 2) == round(ACAD_PLOT_TARGET_FILL_Y, 2)
+
+
+def test_acad_plot_view_frame_keeps_ink_when_a_series_clip_is_tight(tmp_path: Path):
+    p = tmp_path / "tight_clip.png"
+    img = Image.new("RGB", (200, 140), "white")
+    for x in range(30, 170):
+        for y in range(20, 119):
+            img.putpixel((x, y), (0, 0, 0))
+    img.save(p)
+    view = {
+        # A-series-ish, but it adds no material plot margin around the ink.
+        "clip": {"min_x": 30, "min_y": 21, "max_x": 170, "max_y": 120},
+        "scale": 1.0,
+        "pan_x": 0.0,
+        "pan_y": 140.0,
+        "viewport_w": 200,
+        "viewport_h": 140,
+    }
+
+    report = apply_acad_plot_view_frame(p, view)
+
+    assert report["mode"] == "framed"
+    assert report["source_bbox_kind"] == "ink"
+
+
 def test_acad_plot_view_frame_falls_back_on_blank(tmp_path: Path):
     p = tmp_path / "blank.png"
     Image.new("RGB", (200, 100), "white").save(p)
