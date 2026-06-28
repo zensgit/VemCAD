@@ -37,9 +37,10 @@ The tool reads `text_placement.records[]` and records, per visible text entity:
 - `text_kind`
 - `attribute_tag`
 - style/font fields
+- `font_target_ratio` and `block_height_target_ratio`
 - screen position and approximate screen bbox
 - layout flags such as missing provenance, missing attribute tags, suspicious
-  font-target scaling, or viewport overflow.
+  visible block-height scaling, or viewport overflow.
 
 ## Boundary
 
@@ -75,13 +76,33 @@ flags              : font_px_target_ratio_outlier=3
 - count=3   source=INSERT    kind=attdef  block=HC_BTL_BLK     tag flags=font_px_target_ratio_outlier
 ```
 
-This does not prove a visual defect by itself. It gives the next investigation a
-specific, reviewable target: the three `HC_BTL_BLK` `ATTDEF` rows whose font
-pixel size is high relative to the report's target pixel size.
+This did not prove a visual defect by itself. It gave the next investigation a
+specific, reviewable target: the three `HC_BTL_BLK` `ATTDEF` rows whose raw
+`font_px` value was high relative to the report's `target_px`.
+
+## ATTDEF Outlier Follow-up
+
+The follow-up source audit found that `font_px` is not the visible text height.
+CADGameFusion computes it as the Qt `QFont` pixel size needed to make the
+string's tight glyph bbox reach the intended DXF world height. Sparse ATTDEF
+glyphs can therefore have `font_px / target_px > 1` while their visible
+`block_height_px / target_px` remains normal.
+
+The diagnostic flag now uses `block_height_px / target_px` when available and
+keeps `font_px / target_px` as an informational field. The same live G11 rows
+now become evidence that the previous finding was a diagnostic false-positive,
+not a renderer layout bug:
+
+```text
+HC_BTL_BLK ATTDEF rows:
+font_px / target_px          ~1.62
+block_height_px / target_px  ~1.07
+layout flags                 none
+```
 
 ## Next Use
 
 Use the generated rows to pick one suspicious title-block path, for example a
-specific `HC_BTL_BLK` `ATTRIB` / `ATTDEF` record or an outlier font-scaling row.
+specific `HC_BTL_BLK` `ATTRIB` / `ATTDEF` record or an outlier visible-height row.
 Then inspect or fix that entity path directly in CADGameFusion, followed by a
 normal A to C bump if rendering behavior changes.
