@@ -54,6 +54,37 @@ def _candidates(path: Path, ours: str, **extra) -> Path:
     return path
 
 
+def _render_report(path: Path) -> str:
+    path.write_text(json.dumps({
+        "schema": "vemcad.render_report",
+        "schema_version": "0.1",
+        "view": {
+            "viewport_w": 760,
+            "viewport_h": 570,
+            "scale": 1,
+        },
+        "text_placement": {
+            "schema": "vemcad.render_text_placement",
+            "schema_version": "0.3",
+            "records": [{
+                "entity_id": "T1",
+                "source_type": "TEXT",
+                "semantic_class": "text",
+                "text_kind": "text",
+                "resolved_family": "Noto Serif CJK SC",
+                "target_px": 12,
+                "block_height_px": 12,
+                "max_line_width_px": 64,
+                "screen_x": 100,
+                "screen_y": 120,
+                "rotation_deg": 15,
+                "width_factor": 1,
+            }],
+        },
+    }), encoding="utf-8")
+    return str(path)
+
+
 def test_dry_run_validates_manifest_without_candidate_png(tmp_path):
     acad = _png(tmp_path / "acad.png", box=[20, 15, 740, 555])
     dxf = _dxf(tmp_path / "B11.dxf")
@@ -100,6 +131,41 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path):
     assert Path(row["viewspace_report"]).is_file()
     assert Path(row["overlay"]).is_file()
     assert (out / "summary.tsv").is_file()
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert artifact_index["schema"] == "vemcad.acad_manifest_compare_artifact_index/v1"
+    assert {item["kind"] for item in artifact_index["artifacts"]} >= {
+        "autocad_reference",
+        "vemcad_candidate",
+        "x3_overlay",
+        "viewspace_report",
+    }
+
+
+def test_manifest_harness_surfaces_text_provenance_notes(tmp_path):
+    acad = _png(tmp_path / "acad.png", box=[20, 15, 740, 555])
+    ours = _png(tmp_path / "ours.png", box=[20, 15, 740, 555])
+    report = _render_report(tmp_path / "render_report.json")
+    dxf = _dxf(tmp_path / "B11.dxf")
+    manifest = _manifest(tmp_path / "manifest.json", acad=acad, dxf=dxf)
+    candidates = _candidates(tmp_path / "candidates.json", ours, render_report=report)
+    out = tmp_path / "out"
+
+    assert harness.main([
+        "--manifest", str(manifest),
+        "--candidate-cases", str(candidates),
+        "--out-dir", str(out),
+    ]) == 0
+
+    summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
+    text = summary["rows"][0]["text_provenance"]
+    assert text["status"] == "available"
+    assert text["counts"]["flag_counts"] == {}
+    assert text["counts"]["note_counts"] == {"rotated_bbox_is_approximate": 1}
+    assert Path(text["summary"]).is_file()
+    tsv_header = (out / "summary.tsv").read_text(encoding="utf-8").splitlines()[0]
+    assert "text_flags" in tsv_header and "text_notes" in tsv_header
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert "text_provenance_summary" in {item["kind"] for item in artifact_index["artifacts"]}
 
 
 def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tmp_path):
