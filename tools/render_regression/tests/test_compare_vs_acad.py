@@ -171,6 +171,34 @@ def test_cli_emits_not_comparable_framing_verdict(tmp_path, capsys):
     assert "DIVERGENT" not in txt          # the misleading infidelity verdict is suppressed
 
 
+def test_cli_writes_viewspace_contract_report_for_framing_mismatch(tmp_path, capsys):
+    ref = _framed(tmp_path / "acad.png", (800, 600), [220, 165, 580, 435])
+    ours = _framed(tmp_path / "ours.png", (760, 570), [20, 15, 740, 555])
+    report = tmp_path / "viewspace.json"
+
+    rc = cva.main([ref, ours, "--viewspace-report", str(report)])
+
+    assert rc == 0
+    payload = json.loads(report.read_text(encoding="utf-8"))
+    assert payload["schema"] == "vemcad.x3_viewspace_contract/v1"
+    assert payload["status"] == "mismatch"
+    assert payload["reason"] == "page-fill/aspect divergence exceeds tolerance"
+    assert "explicit matching --window" in payload["recommended_action"]
+    assert payload["framing"]["framing_mismatch"] is True
+    assert payload["thresholds"]["framing_tol"] == cmp.FRAMING_TOL
+    assert payload["x3_summary"]["comparable"] is True  # X3 alone still has a numeric score
+    assert "framing/capture mismatch" in capsys.readouterr().out
+
+
+def test_cli_require_viewspace_match_fails_on_mismatch(tmp_path):
+    ref = _framed(tmp_path / "acad.png", (800, 600), [220, 165, 580, 435])
+    ours = _framed(tmp_path / "ours.png", (760, 570), [20, 15, 740, 555])
+
+    rc = cva.main([ref, ours, "--require-viewspace-match"])
+
+    assert rc == 2
+
+
 def test_cli_clean_pair_keeps_normal_verdict(tmp_path, capsys):
     # NEGATIVE/guard: a same-fit same-aspect self-compare is unaffected — the
     # normal EXCELLENT verdict stands, proving no false-flag (no gate/golden
@@ -182,6 +210,20 @@ def test_cli_clean_pair_keeps_normal_verdict(tmp_path, capsys):
     txt = capsys.readouterr().out
     assert "framing/capture mismatch" not in txt
     assert "EXCELLENT" in txt
+
+
+def test_cli_viewspace_contract_report_for_clean_pair(tmp_path):
+    ref = _framed(tmp_path / "acad.png", (760, 570), [20, 15, 740, 555])
+    ours = _framed(tmp_path / "ours.png", (760, 570), [20, 15, 740, 555])
+    report = tmp_path / "viewspace.json"
+
+    rc = cva.main([ref, ours, "--viewspace-report", str(report), "--require-viewspace-match"])
+
+    assert rc == 0
+    payload = json.loads(report.read_text(encoding="utf-8"))
+    assert payload["status"] == "match"
+    assert payload["recommended_action"] == "score-render-fidelity"
+    assert payload["framing"]["framing_mismatch"] is False
 
 
 def test_semantic_class_report_json_and_stdout(tmp_path, capsys):
