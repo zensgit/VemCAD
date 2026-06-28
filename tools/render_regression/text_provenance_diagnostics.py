@@ -115,9 +115,18 @@ def _layout_flags(record: dict[str, Any], bbox: dict[str, float] | None, viewpor
 
     target_px = _float(record.get("target_px"))
     font_px = _float(record.get("font_px"))
-    if target_px and font_px:
+    block_height_px = _float(record.get("block_height_px"))
+    if target_px and block_height_px:
+        # `font_px` is QFont's pixel size, chosen so the actual glyph tight bbox
+        # reaches the target. For sparse ATTDEF glyphs it can legitimately be
+        # much larger than target_px. Flag the visible text block instead.
+        ratio = block_height_px / target_px
+        if ratio < 0.65 or ratio > 1.45:
+            flags.append("block_height_target_ratio_outlier")
+    elif target_px and font_px:
+        # Last-resort only for older reports that do not carry block_height_px.
         ratio = font_px / target_px
-        if ratio < 0.75 or ratio > 1.35:
+        if ratio < 0.75 or ratio > 1.75:
             flags.append("font_px_target_ratio_outlier")
 
     width_factor = _float(record.get("width_factor"))
@@ -142,6 +151,9 @@ def _layout_flags(record: dict[str, Any], bbox: dict[str, float] | None, viewpor
 def _record_row(record: dict[str, Any], viewport: dict[str, Any]) -> dict[str, Any]:
     bbox = _screen_bbox(record)
     flags = _layout_flags(record, bbox, viewport)
+    font_px = _float(record.get("font_px"))
+    target_px = _float(record.get("target_px"))
+    block_height_px = _float(record.get("block_height_px"))
     return {
         "entity_id": _str(record.get("entity_id")),
         "source_type": _str(record.get("source_type")),
@@ -155,9 +167,11 @@ def _record_row(record: dict[str, Any], viewport: dict[str, Any]) -> dict[str, A
         "requested_family": _str(record.get("requested_family")),
         "resolved_family": _str(record.get("resolved_family")),
         "height_world": _float(record.get("height_world")),
-        "font_px": _float(record.get("font_px")),
-        "target_px": _float(record.get("target_px")),
-        "block_height_px": _float(record.get("block_height_px")),
+        "font_px": font_px,
+        "target_px": target_px,
+        "block_height_px": block_height_px,
+        "font_target_ratio": font_px / target_px if font_px is not None and target_px else None,
+        "block_height_target_ratio": block_height_px / target_px if block_height_px is not None and target_px else None,
         "max_line_width_px": _float(record.get("max_line_width_px")),
         "screen_x": _float(record.get("screen_x")),
         "screen_y": _float(record.get("screen_y")),
@@ -260,6 +274,7 @@ def write_tsv(payload: dict[str, Any], path: Path) -> None:
         "entity_id", "source_type", "semantic_class", "block_name", "text_kind",
         "attribute_tag", "text_style", "text_font_file", "text_bigfont_file",
         "resolved_family", "font_px", "target_px", "block_height_px",
+        "font_target_ratio", "block_height_target_ratio",
         "max_line_width_px", "screen_x", "screen_y", "rotation_deg",
         "width_factor", "layout_flags",
     ]
