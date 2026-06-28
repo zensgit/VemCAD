@@ -25,6 +25,10 @@ _ALLOWED_STYLE = ("source", "acad-plot", "acad-display")
 MEDIA_TYPES = {"png": "image/png", "svg": "image/svg+xml"}
 ACAD_PLOT_TARGET_FILL_X = 0.8854
 ACAD_PLOT_TARGET_FILL_Y = 0.9528
+_A_SERIES_LANDSCAPE_ASPECT = 2 ** 0.5
+_A_SERIES_PORTRAIT_ASPECT = 1 / _A_SERIES_LANDSCAPE_ASPECT
+_ACAD_PLOT_CLIP_ASPECT_TOL = 0.06
+_ACAD_PLOT_CLIP_MARGIN_RATIO = 0.99
 
 
 def _report_view(report: Optional[dict]) -> Optional[dict]:
@@ -221,7 +225,80 @@ def _ink_bbox(arr: np.ndarray) -> Optional[tuple[int, int, int, int]]:
     return int(r0), int(r1) + 1, int(c0), int(c1) + 1
 
 
-def apply_acad_plot_view_frame(path: Path) -> dict:
+def _is_a_series_plot_aspect(aspect: float) -> bool:
+    if aspect <= 0:
+        return False
+    return (
+        abs(aspect - _A_SERIES_LANDSCAPE_ASPECT) <= _ACAD_PLOT_CLIP_ASPECT_TOL
+        or abs(aspect - _A_SERIES_PORTRAIT_ASPECT) <= _ACAD_PLOT_CLIP_ASPECT_TOL
+    )
+
+
+def _clip_bbox_from_view(view: Optional[dict]) -> Optional[tuple[int, int, int, int]]:
+    """Project render_cli's world clip into pixel space.
+
+    The training AutoCAD references are PLOT/Extents/Fit/Center rasters. For
+    those, the source frame is the plot extents window, not the tight ink bbox.
+    Only trust a clip that looks like an A-series plot frame; arbitrary/stale
+    header clips stay on the legacy ink-bbox path.
+    """
+    if not isinstance(view, dict):
+        return None
+    clip = view.get("clip")
+    if not isinstance(clip, dict):
+        return None
+    try:
+        scale = float(view["scale"])
+        pan_x = float(view["pan_x"])
+        pan_y = float(view["pan_y"])
+        width = int(view["viewport_w"])
+        height = int(view["viewport_h"])
+        min_x = float(clip["min_x"])
+        max_x = float(clip["max_x"])
+        min_y = float(clip["min_y"])
+        max_y = float(clip["max_y"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if scale <= 0 or width <= 0 or height <= 0:
+        return None
+
+    x0 = min_x * scale + pan_x
+    x1 = max_x * scale + pan_x
+    # render_cli reports y_axis=down, with pan_y matching the world-to-pixel
+    # transform y_px = pan_y - y_world * scale.
+    y0 = pan_y - max_y * scale
+    y1 = pan_y - min_y * scale
+    c0 = max(0, min(width, int(round(min(x0, x1)))))
+    c1 = max(0, min(width, int(round(max(x0, x1)))))
+    r0 = max(0, min(height, int(round(min(y0, y1)))))
+    r1 = max(0, min(height, int(round(max(y0, y1)))))
+    if c1 <= c0 or r1 <= r0:
+        return None
+    if not _is_a_series_plot_aspect((c1 - c0) / float(r1 - r0)):
+        return None
+    return r0, r1, c0, c1
+
+
+def _clip_adds_material_plot_margin(
+    ink: tuple[int, int, int, int],
+    clip: tuple[int, int, int, int],
+) -> bool:
+    ir0, ir1, ic0, ic1 = ink
+    cr0, cr1, cc0, cc1 = clip
+    iw = max(1, ic1 - ic0)
+    ih = max(1, ir1 - ir0)
+    cw = max(1, cc1 - cc0)
+    ch = max(1, cr1 - cr0)
+    # If clip and ink are effectively identical, keep the legacy ink path. This
+    # preserves already-good drawings where the report clip is just the tight
+    # visible frame. Use the clip only when it carries real AutoCAD PLOT extents
+    # margin that would otherwise be lost by tight-ink reframing.
+    return (iw / float(cw) < _ACAD_PLOT_CLIP_MARGIN_RATIO) or (
+        ih / float(ch) < _ACAD_PLOT_CLIP_MARGIN_RATIO
+    )
+
+
+def apply_acad_plot_view_frame(path: Path, view: Optional[dict] = None) -> dict:
     """Reframe a render into AutoCAD PLOT-like paper fill, in-place.
 
     AutoCAD's training references are A4 landscape PLOT rasters using
@@ -235,9 +312,16 @@ def apply_acad_plot_view_frame(path: Path) -> dict:
         img = src.convert("RGB")
         img.load()
     arr = np.asarray(img)
-    bbox = _ink_bbox(arr)
-    if bbox is None:
+    ink_bbox = _ink_bbox(arr)
+    if ink_bbox is None:
         return {"mode": "fallback", "reason": "blank"}
+    clip_bbox = _clip_bbox_from_view(view)
+    if clip_bbox is not None and _clip_adds_material_plot_margin(ink_bbox, clip_bbox):
+        bbox_kind = "clip"
+        bbox = clip_bbox
+    else:
+        bbox_kind = "ink"
+        bbox = ink_bbox
 
     r0, r1, c0, c1 = bbox
     ink_w = c1 - c0
@@ -267,6 +351,7 @@ def apply_acad_plot_view_frame(path: Path) -> dict:
     return {
         "mode": "framed",
         "source_bbox_px": [c0, r0, c1, r1],
+        "source_bbox_kind": bbox_kind,
         "target_bbox_px": [x, y, x + target_w, y + target_h],
         "target_fill_x": round(target_w / width, 4),
         "target_fill_y": round(target_h / height, 4),
@@ -420,10 +505,17 @@ class RenderService:
                 )
             if not out.is_file() or out.stat().st_size == 0:
                 raise RenderFailed("render produced no output", res.stderr.strip())
+            cli_report = None
+            if cli_report_path.is_file():
+                try:
+                    cli_report = json.loads(cli_report_path.read_text("utf-8"))
+                except (OSError, ValueError):
+                    cli_report = None
             acad_plot_frame = None
             if params.view == "acad-plot":
                 try:
-                    acad_plot_frame = apply_acad_plot_view_frame(out)
+                    view = cli_report.get("view") if isinstance(cli_report, dict) else None
+                    acad_plot_frame = apply_acad_plot_view_frame(out, view)
                 except OSError as e:
                     raise RenderFailed("acad-plot view postprocess failed", str(e))
             if params.style == "acad-plot":
@@ -436,12 +528,6 @@ class RenderService:
                     apply_acad_display_style(out)
                 except OSError as e:
                     raise RenderFailed("display-style postprocess failed", str(e))
-            cli_report = None
-            if cli_report_path.is_file():
-                try:
-                    cli_report = json.loads(cli_report_path.read_text("utf-8"))
-                except (OSError, ValueError):
-                    cli_report = None
             report = {
                 # Service-side audit record; B1's renderer-emitted
                 # "vemcad.render_report" (view rect/scale, counts, font records)
