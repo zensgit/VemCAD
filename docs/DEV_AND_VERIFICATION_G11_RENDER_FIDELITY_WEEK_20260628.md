@@ -31,7 +31,7 @@ This ledger tracks the one-week render-fidelity goal:
 
 ### Slice 0 — One-Week Plan
 
-Status: in progress in this PR.
+Status: merged in PR #167 (`73ad85f`).
 
 Deliverables:
 
@@ -45,11 +45,47 @@ Verification:
   - `VEMCAD_G11_VIEWSPACE_CONTRACT_20260628.md`
   - `VEMCAD_G11_TEXT_LAYOUT_DIAGNOSTICS_20260628.md`
 
+### Slice 1 — AutoCAD Reference Manifest Gate
+
+Status: in progress in this PR.
+
+Deliverables:
+
+- `tools/render_regression/acad_reference_manifest.py`
+- `tools/render_regression/tests/test_acad_reference_manifest.py`
+
+Behavior:
+
+- Accepts only gate-grade AutoCAD references (`plot-export`, `exportpng`,
+  `publish`, `plot-raster`) with a matched-view contract (`model-extents` or
+  `explicit-window`).
+- Fails closed for screenshot/viewport captures, missing files, invalid schema,
+  missing `drawing_id`, invalid/mismatched expected image size, or unmatched
+  view contract.
+- Emits a validation report plus a gate-trusted case stub for the Day 2 harness.
+
+Verification:
+
+- `python3 -m pytest tools/render_regression/tests/test_acad_reference_manifest.py -q`
+  - `8 passed`
+- `python3 -m pytest tools/render_regression/tests/test_compare_vs_acad.py tools/render_regression/tests/test_autocad_batch_compare.py -q`
+  - `20 passed`
+- `python3 -m pytest tools/render_regression/tests -q`
+  - `75 passed`
+
+Boundary:
+
+- No private drawing or AutoCAD image committed.
+- No rendering, no comparison, no equivalence claim.
+- This slice only decides whether supplied AutoCAD references are eligible for
+  the matched-view X3 path.
+
 ## Verification Matrix
 
 | Slice | Local tests | CI | Runtime / artifact proof | Result |
 | --- | --- | --- | --- | --- |
-| Slice 0 plan | docs-only | pending | n/a | pending |
+| Slice 0 plan | docs-only | docs-only PR #167, no checks | n/a | merged |
+| Slice 1 AutoCAD reference manifest | `test_acad_reference_manifest.py`; adjacent compare tests; full `tools/render_regression/tests` | pending | synthetic PNG/DXF fixtures only | local green |
 
 ## Evidence To Fill During The Week
 
