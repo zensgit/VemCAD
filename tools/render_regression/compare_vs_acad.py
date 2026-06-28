@@ -50,6 +50,45 @@ FRAMING_VERDICT = (
 )
 
 
+def _viewspace_report(acad: Path, ours: Path, result: cmp.CompareResult, framing: dict) -> dict:
+    """Machine-readable X3 view-space contract.
+
+    The human CLI text is useful during a review, but G11-style work needs a
+    durable artifact that says whether a pair may be interpreted as renderer
+    fidelity or must first be recaptured/re-windowed. This report intentionally
+    does not invent AutoCAD semantics; it only records the observable capture
+    contract signals that the X3 comparator can see from the two PNGs.
+    """
+    status = "match"
+    reason = "page-fill/aspect within tolerance"
+    recommended_action = "score-render-fidelity"
+    if not framing.get("comparable", True):
+        status = "unavailable"
+        reason = framing.get("reason") or "blank-side"
+        recommended_action = "fix-blank-or-missing-render-before-viewspace-check"
+    elif framing.get("framing_mismatch"):
+        status = "mismatch"
+        reason = "page-fill/aspect divergence exceeds tolerance"
+        recommended_action = (
+            "recapture AutoCAD at model EXTENTS with matching aspect, or render "
+            "the candidate with an explicit matching --window before interpreting X3"
+        )
+    return {
+        "schema": "vemcad.x3_viewspace_contract/v1",
+        "reference": str(acad),
+        "candidate": str(ours),
+        "status": status,
+        "reason": reason,
+        "recommended_action": recommended_action,
+        "framing": framing,
+        "thresholds": {
+            "framing_tol": cmp.FRAMING_TOL,
+            "aspect_tol": cmp.ASPECT_TOL,
+        },
+        "x3_summary": result.to_dict(),
+    }
+
+
 def _verdict(band: str, comparable: bool, skip_reason: str) -> str:
     if not comparable:
         return "NOT COMPARABLE (%s) — re-export the AutoCAD PNG at the same extents/bg/aspect." % (
@@ -103,6 +142,10 @@ def main(argv=None) -> int:
                     help="write candidate semantic class diagnostic JSON")
     ap.add_argument("--print-semantic-classes", action="store_true",
                     help="print candidate semantic class diagnostic scores")
+    ap.add_argument("--viewspace-report", type=Path, default=None,
+                    help="write machine-readable AutoCAD/render_cli view-space contract JSON")
+    ap.add_argument("--require-viewspace-match", action="store_true",
+                    help="exit non-zero when the view-space contract is unavailable or mismatched")
     args = ap.parse_args(argv)
     if (args.semantic_class_report is not None or args.print_semantic_classes
             or args.semantic_mask is not None or args.semantic_render_report is not None):
@@ -138,6 +181,14 @@ def main(argv=None) -> int:
         framing["cand_fill_x"], framing["cand_fill_y"]))
     print("  framing div  : Δx=%-6s Δy=%-6s [mismatch if either >%.2f]  视图空间一致性" % (
         framing["fill_divergence_x"], framing["fill_divergence_y"], cmp.FRAMING_TOL))
+    viewspace_payload = None
+    if args.viewspace_report is not None or args.require_viewspace_match:
+        viewspace_payload = _viewspace_report(args.acad, args.ours, res, framing)
+        if args.viewspace_report is not None:
+            args.viewspace_report.parent.mkdir(parents=True, exist_ok=True)
+            args.viewspace_report.write_text(
+                json.dumps(viewspace_payload, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8")
     if overlay_note:
         print(overlay_note)
     if args.class_report is not None or args.print_classes:
@@ -178,6 +229,9 @@ def main(argv=None) -> int:
         print("verdict: %s" % FRAMING_VERDICT)
     else:
         print("verdict: %s" % _verdict(res.band, res.comparable, res.skip_reason))
+    if args.require_viewspace_match and viewspace_payload is not None:
+        if viewspace_payload["status"] != "match":
+            return 2
     return 0
 
 
