@@ -120,7 +120,7 @@ Boundary:
 
 ### Slice 3 — Triage Summary and Artifact Index
 
-Status: in progress in this PR.
+Status: merged in PR #170 (`f2afea3`).
 
 Deliverables:
 
@@ -150,6 +150,101 @@ Boundary:
 - Text provenance is not a gate; unreadable text diagnostics are recorded as
   diagnostic errors without turning the X3 view-space gate into a text gate.
 
+### Slice 4 — First Real G11 Run
+
+Status: in progress in this PR.
+
+Inputs:
+
+- AutoCAD reference PNG:
+  `/tmp/vemcadautocadplot/batch/png/G11-1.png`
+  - `2339x1653`, RGB, from the prior local AutoCAD plot/export batch.
+- Source DXF:
+  `/tmp/vacadbatchinputs/B11.dxf`
+- VemCAD render image:
+  `ghcr.io/zensgit/vemcad-render:main`
+
+Commands:
+
+```bash
+OUT=/tmp/vemcad-fidelity-out/g11_week_real_20260628T133732Z
+
+docker run --rm \
+  -v /tmp/vacadbatchinputs:/in:ro \
+  -v "$OUT":/out \
+  --entrypoint render_cli ghcr.io/zensgit/vemcad-render:main \
+  --input /in/B11.dxf \
+  --out /out/G11_ours.png \
+  --bg white \
+  --width 2339 --height 1653 \
+  --report /out/G11_report.json \
+  --class-mask-out /out/G11_semantic_mask.png
+
+python3 tools/render_regression/acad_manifest_compare.py \
+  --manifest "$OUT/acad_manifest.json" \
+  --candidate-cases "$OUT/candidate_cases.json" \
+  --out-dir "$OUT/compare"
+```
+
+Harness result:
+
+- Exit code: `2`
+- Status: `viewspace_mismatch`
+- View-space reason: `page-fill/aspect divergence exceeds tolerance`
+- Recommended action: recapture AutoCAD at model EXTENTS with matching aspect,
+  or render the candidate with an explicit matching `--window` before
+  interpreting X3.
+
+X3 summary (recorded but **not** treated as fidelity because view-space is
+`mismatch`):
+
+- `ink_iou`: `0.8021`
+- `ssim`: `0.4959`
+- `color_dist`: `134.1`
+- `aspect_delta`: `0.0035`
+- `band`: `fallback`
+
+Text provenance from `G11_report.json`:
+
+- `text_placement_schema`: `vemcad.render_text_placement`
+- `text_placement_schema_version`: `0.4`
+- `all_text_records`: `39`
+- `flag_counts`: `{}`
+- `note_counts`: `{"rotated_bbox_is_approximate": 7}`
+
+Semantic diagnostic rows (candidate-side semantics, AutoCAD semantics unknown):
+
+| Class | Candidate precision | Reference coverage | Candidate pixels | Band |
+| --- | ---: | ---: | ---: | --- |
+| geometry | 0.9360 | 0.6094 | 25269 | review |
+| text | 0.0000 | 0.0000 | 332 | fallback |
+| dimension | 0.5035 | 0.1205 | 11816 | fallback |
+| hatch | 1.0000 | 0.0229 | 662 | pass |
+| insert_text | 0.6093 | 0.0849 | 5941 | fallback |
+| other | 1.0000 | 0.0013 | 11 | pass |
+
+Artifacts (local only, not committed):
+
+- `$OUT/G11_ours.png`
+- `$OUT/G11_report.json`
+- `$OUT/G11_semantic_mask.png`
+- `$OUT/compare/summary.json`
+- `$OUT/compare/summary.tsv`
+- `$OUT/compare/artifact_index.json`
+- `$OUT/compare/overlays/G11_overlay.png`
+- `$OUT/compare/viewspace/G11_viewspace.json`
+- `$OUT/compare/semantic/G11_semantic_classes.json`
+- `$OUT/compare/text/G11_text_provenance.json`
+
+Conclusion:
+
+- This is a valid real G11 run, but it is **not** an AutoCAD-equivalence result.
+- The hard blocker is now precise: the available AutoCAD reference and the
+  VemCAD render are still not in a matched view-space.
+- Renderer work should stay closed until either:
+  - AutoCAD is recaptured at model EXTENTS with matching aspect; or
+  - an explicit world `--window` matching the AutoCAD plot is supplied.
+
 ## Verification Matrix
 
 | Slice | Local tests | CI | Runtime / artifact proof | Result |
@@ -157,7 +252,8 @@ Boundary:
 | Slice 0 plan | docs-only | docs-only PR #167, no checks | n/a | merged |
 | Slice 1 AutoCAD reference manifest | `test_acad_reference_manifest.py`; adjacent compare tests; full `tools/render_regression/tests` | PR #168: `pytest`, `build-and-smoke` | synthetic PNG/DXF fixtures only | merged |
 | Slice 2 manifest compare harness | `test_acad_manifest_compare.py`; adjacent manifest/compare tests; full `tools/render_regression/tests` | PR #169: `pytest`, `build-and-smoke` | synthetic PNG pairs only; no renderer | merged |
-| Slice 3 triage summary / artifact index | `test_acad_manifest_compare.py`; full `tools/render_regression/tests` | pending | synthetic PNG + synthetic render report only; no renderer | local green |
+| Slice 3 triage summary / artifact index | `test_acad_manifest_compare.py`; full `tools/render_regression/tests` | PR #170: `pytest`, `build-and-smoke` | synthetic PNG + synthetic render report only; no renderer | merged |
+| Slice 4 first real G11 run | docs-only evidence | pending | local Docker render + manifest harness; artifacts under `/tmp/vemcad-fidelity-out/g11_week_real_20260628T133732Z` | viewspace_mismatch |
 
 ## Evidence To Fill During The Week
 
