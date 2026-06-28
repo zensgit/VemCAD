@@ -47,7 +47,7 @@ Verification:
 
 ### Slice 1 — AutoCAD Reference Manifest Gate
 
-Status: in progress in this PR.
+Status: merged in PR #168 (`5436247`).
 
 Deliverables:
 
@@ -80,12 +80,51 @@ Boundary:
 - This slice only decides whether supplied AutoCAD references are eligible for
   the matched-view X3 path.
 
+### Slice 2 — Manifest-Driven Matched-View Harness
+
+Status: in progress in this PR.
+
+Deliverables:
+
+- `tools/render_regression/acad_manifest_compare.py`
+- `tools/render_regression/tests/test_acad_manifest_compare.py`
+
+Behavior:
+
+- Joins a validated AutoCAD reference manifest with already-rendered VemCAD
+  candidate PNG artifacts.
+- Calls the existing `compare_vs_acad.py --viewspace-report
+  --require-viewspace-match` path for each case.
+- Writes `summary.json`, `summary.tsv`, per-case view-space reports, and
+  overlays when the underlying diff engine considers the pair comparable.
+- Carries candidate provenance fields such as render report path, semantic mask
+  path, render image digest, and diagnostic metadata.
+- Returns non-zero for blocked manifests, missing candidate artifacts, or
+  `viewspace_mismatch`.
+
+Verification:
+
+- `python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q`
+  - `4 passed`
+- `python3 -m pytest tools/render_regression/tests/test_acad_reference_manifest.py tools/render_regression/tests/test_compare_vs_acad.py tools/render_regression/tests/test_autocad_batch_compare.py -q`
+  - `28 passed`
+- `python3 -m pytest tools/render_regression/tests -q`
+  - `79 passed`
+
+Boundary:
+
+- No DXF rendering; candidate PNGs are inputs.
+- No private drawing or AutoCAD image committed.
+- No AutoCAD-equivalence claim; even matched view-space only means X3 is
+  eligible to be interpreted.
+
 ## Verification Matrix
 
 | Slice | Local tests | CI | Runtime / artifact proof | Result |
 | --- | --- | --- | --- | --- |
 | Slice 0 plan | docs-only | docs-only PR #167, no checks | n/a | merged |
-| Slice 1 AutoCAD reference manifest | `test_acad_reference_manifest.py`; adjacent compare tests; full `tools/render_regression/tests` | pending | synthetic PNG/DXF fixtures only | local green |
+| Slice 1 AutoCAD reference manifest | `test_acad_reference_manifest.py`; adjacent compare tests; full `tools/render_regression/tests` | PR #168: `pytest`, `build-and-smoke` | synthetic PNG/DXF fixtures only | merged |
+| Slice 2 manifest compare harness | `test_acad_manifest_compare.py`; adjacent manifest/compare tests; full `tools/render_regression/tests` | pending | synthetic PNG pairs only; no renderer | local green |
 
 ## Evidence To Fill During The Week
 
