@@ -28,7 +28,7 @@ This ledger tracks the two-week VemCAD render-fidelity goal:
 
 ### Slice 0 — Two-Week Plan And Ledger
 
-Status: in progress in this branch.
+Status: merged in PR #179 (`a0ba846`).
 
 Deliverables:
 
@@ -91,7 +91,7 @@ Boundary:
 
 ### Slice 2 — Complete Evidence Bundle Index
 
-Status: in progress in this branch.
+Status: merged in PR #180 (`ea535dc`).
 
 Deliverables:
 
@@ -126,3 +126,77 @@ Boundary:
 - Evidence/reporting only.
 - No renderer change.
 - No private drawing or AutoCAD PNG committed.
+
+### Slice 3 — Existing AutoCAD Batch Evidence Re-Run
+
+Status: local/private evidence run complete; ledger update in this branch.
+
+Inputs:
+
+- Manifest:
+  `/private/tmp/vemcad-autocad-batch-current/input/acad_manifest.json`
+- Candidate cases:
+  `/private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json`
+- Harness source:
+  VemCAD `origin/main=ea535dc`
+
+Command:
+
+```bash
+python3 tools/render_regression/acad_manifest_compare.py \
+  --manifest /private/tmp/vemcad-autocad-batch-current/input/acad_manifest.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --out-dir /private/tmp/vemcad-autocad-batch-current-rerun-20260629/compare
+# AutoCAD manifest compare: viewspace_mismatch (12/12 compared, 0 issues)
+# exit code: 2
+```
+
+Outputs:
+
+- `/private/tmp/vemcad-autocad-batch-current-rerun-20260629/compare/summary.json`
+- `/private/tmp/vemcad-autocad-batch-current-rerun-20260629/compare/summary.md`
+- `/private/tmp/vemcad-autocad-batch-current-rerun-20260629/compare/summary.tsv`
+- `/private/tmp/vemcad-autocad-batch-current-rerun-20260629/compare/artifact_index.json`
+- `/private/tmp/vemcad-autocad-batch-current-rerun-20260629/compare/contact_sheet.png`
+- per-case overlays and view-space reports under the same directory
+
+Result:
+
+- status: `viewspace_mismatch`
+- compared: `12/12`
+- issues: `0`
+- artifact index entries: `52`
+- all 12 rows report `page-fill/aspect divergence exceeds tolerance`
+
+Triage table, sorted by lowest Ink IoU first:
+
+| Case | View-space | X3 band | Ink IoU | Color dist | Interpretation |
+| --- | --- | --- | ---: | ---: | --- |
+| G11 | mismatch | fallback | 0.3393 | 130.2 | Worst diagnostic case; needs fresh matched AutoCAD export before renderer work. |
+| G04 | mismatch | fallback | 0.6323 | 90.1 | Diagnostic-only; likely useful after matched recapture because content is dense. |
+| G10 | mismatch | fallback | 0.7706 | 88.8 | Recapture before interpreting. |
+| G08 | mismatch | fallback | 0.7738 | 131.5 | Recapture before interpreting. |
+| G02 | mismatch | fallback | 0.7915 | 126.3 | Recapture before interpreting. |
+| G05 | mismatch | fallback | 0.8178 | 164.8 | Recapture before interpreting. |
+| G01 | mismatch | fallback | 0.8212 | 125.7 | Recapture before interpreting. |
+| G12 | mismatch | fallback | 0.8332 | 111.6 | Recapture before interpreting. |
+| G09 | mismatch | fallback | 0.8349 | 121.0 | Recapture before interpreting. |
+| G07 | mismatch | fallback | 0.8631 | 124.2 | Recapture before interpreting. |
+| G06 | mismatch | fallback | 0.8775 | 94.3 | Recapture before interpreting. |
+| G03 | mismatch | fallback | 0.8946 | 91.1 | Best diagnostic case, still not an equivalence result. |
+
+Conclusion:
+
+- The existing AutoCAD batch is usable as a private review and prioritization
+  artifact, especially via `contact_sheet.png`.
+- It is not usable as an AutoCAD-equivalence gate because every row fails the
+  view-space contract.
+- No renderer work should be opened from this batch alone.
+- The next valid external input remains a fresh AutoCAD model-extents export or
+  explicit AutoCAD world plot/window rectangle for at least one drawing.
+
+Boundary:
+
+- Local/private evidence run only.
+- No private drawing, AutoCAD PNG, overlay, or contact sheet committed.
+- No renderer change.
