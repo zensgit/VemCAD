@@ -131,6 +131,12 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path):
     assert Path(row["viewspace_report"]).is_file()
     assert Path(row["overlay"]).is_file()
     assert (out / "summary.tsv").is_file()
+    summary_md = (out / "summary.md").read_text(encoding="utf-8")
+    assert "AutoCAD Manifest Compare Summary" in summary_md
+    assert "status: `pass`" in summary_md
+    assert "autocad_equivalence_claim: `False`" in summary_md
+    assert "| `G11` | G11/B11 | `match` | `pass` |" in summary_md
+    assert "viewspace_mismatch" in summary_md
     assert (out / "contact_sheet.png").stat().st_size > 1000
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["schema"] == "vemcad.acad_manifest_compare_artifact_index/v1"
@@ -192,6 +198,10 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert row["compare_exit_code"] == 2
     assert row["recommended_action"].startswith("recapture AutoCAD")
     assert summary["boundary"]["autocad_equivalence_claim"] is False
+    summary_md = (out / "summary.md").read_text(encoding="utf-8")
+    assert "status: `viewspace_mismatch`" in summary_md
+    assert "It is not an AutoCAD-equivalence result" in summary_md
+    assert "| `G11` | G11/B11 | `mismatch` | `fallback` |" in summary_md
     assert (out / "contact_sheet.png").stat().st_size > 1000
 
 
@@ -212,3 +222,6 @@ def test_manifest_harness_stops_on_blocked_manifest(tmp_path):
     summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
     assert summary["status"] == "blocked"
     assert summary["issues"][0]["code"] == "diagnostic_capture_method"
+    summary_md = (out / "summary.md").read_text(encoding="utf-8")
+    assert "status: `blocked`" in summary_md
+    assert "`diagnostic_capture_method`" in summary_md
