@@ -128,9 +128,14 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path):
     assert row["x3_summary"]["band"] == "pass"
     assert row["render_image_digest"] == "sha256:test"
     assert row["diagnostics"]["X-Diff-Window-Source"] == "content_bbox"
+    assert row["triage_rank"] == 1
+    assert row["triage_bucket"] == "matched-pass"
     assert Path(row["viewspace_report"]).is_file()
     assert Path(row["overlay"]).is_file()
     assert (out / "summary.tsv").is_file()
+    tsv_lines = (out / "summary.tsv").read_text(encoding="utf-8").splitlines()
+    assert "triage_rank\ttriage_bucket" in tsv_lines[0]
+    assert "\t1\tmatched-pass\t" in tsv_lines[1]
     summary_md = (out / "summary.md").read_text(encoding="utf-8")
     assert "AutoCAD Manifest Compare Summary" in summary_md
     assert "status: `pass`" in summary_md
@@ -201,6 +206,8 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert summary["status"] == "viewspace_mismatch"
     assert row["viewspace_status"] == "mismatch"
     assert row["compare_exit_code"] == 2
+    assert row["triage_rank"] == 1
+    assert row["triage_bucket"] == "recapture-required"
     assert row["recommended_action"].startswith("recapture AutoCAD")
     assert summary["boundary"]["autocad_equivalence_claim"] is False
     summary_md = (out / "summary.md").read_text(encoding="utf-8")

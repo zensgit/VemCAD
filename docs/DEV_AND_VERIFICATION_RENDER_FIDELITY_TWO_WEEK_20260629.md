@@ -270,3 +270,39 @@ Remaining gate:
   model-extents export PNG or an explicit AutoCAD world plot/window rectangle.
 - Until that input exists, the next valid state is `blocked_on_reference_input`;
   renderer tuning remains out of scope.
+
+### Slice 5 — Machine-Readable Triage Fields
+
+Status: in progress in this branch.
+
+Deliverables:
+
+- `tools/render_regression/acad_manifest_compare.py`
+- `tools/render_regression/tests/test_acad_manifest_compare.py`
+
+Behavior:
+
+- Each comparison row in `summary.json` now carries:
+  - `triage_rank`
+  - `triage_bucket`
+- `summary.tsv` includes the same two fields so downstream scripts can consume
+  the triage ordering without parsing Markdown.
+- The Markdown `Triage Priority` section now displays the persisted rank/bucket
+  values.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 6 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 85 passed
+```
+
+Boundary:
+
+- Evidence/reporting only.
+- No scoring threshold change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
