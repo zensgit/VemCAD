@@ -273,7 +273,7 @@ Remaining gate:
 
 ### Slice 5 — Machine-Readable Triage Fields
 
-Status: in progress in this branch.
+Status: merged in PR #184 (`6737448`).
 
 Deliverables:
 
@@ -306,3 +306,73 @@ Boundary:
 - No scoring threshold change.
 - No renderer change.
 - No private drawing or AutoCAD PNG committed.
+
+### Slice 6 — Machine Triage Batch Re-Run
+
+Status: local/private evidence run complete; ledger update in this branch.
+
+Inputs:
+
+- Manifest:
+  `/private/tmp/vemcad-autocad-batch-current/input/acad_manifest.json`
+- Candidate cases:
+  `/private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json`
+- Harness source:
+  VemCAD `origin/main=6737448`
+
+Command:
+
+```bash
+python3 tools/render_regression/acad_manifest_compare.py \
+  --manifest /private/tmp/vemcad-autocad-batch-current/input/acad_manifest.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --out-dir /private/tmp/vemcad-autocad-batch-current-rerun-20260629-machine/compare
+# AutoCAD manifest compare: viewspace_mismatch (12/12 compared, 0 issues)
+# exit code: 2
+```
+
+Result:
+
+- status: `viewspace_mismatch`
+- compared: `12/12`
+- issues: `0`
+- `summary.json` rows now include `triage_rank` and `triage_bucket`
+- `summary.tsv` now includes `triage_rank` and `triage_bucket`
+- all 12 rows are `recapture-required`
+
+Machine-readable triage order:
+
+| Rank | Case | Bucket | View-space | X3 band | Ink IoU | Color dist |
+| ---: | --- | --- | --- | --- | ---: | ---: |
+| 1 | G11 | recapture-required | mismatch | fallback | 0.3393 | 130.2 |
+| 2 | G04 | recapture-required | mismatch | fallback | 0.6323 | 90.1 |
+| 3 | G10 | recapture-required | mismatch | fallback | 0.7706 | 88.8 |
+| 4 | G08 | recapture-required | mismatch | fallback | 0.7738 | 131.5 |
+| 5 | G02 | recapture-required | mismatch | fallback | 0.7915 | 126.3 |
+| 6 | G05 | recapture-required | mismatch | fallback | 0.8178 | 164.8 |
+| 7 | G01 | recapture-required | mismatch | fallback | 0.8212 | 125.7 |
+| 8 | G12 | recapture-required | mismatch | fallback | 0.8332 | 111.6 |
+| 9 | G09 | recapture-required | mismatch | fallback | 0.8349 | 121.0 |
+| 10 | G07 | recapture-required | mismatch | fallback | 0.8631 | 124.2 |
+| 11 | G06 | recapture-required | mismatch | fallback | 0.8775 | 94.3 |
+| 12 | G03 | recapture-required | mismatch | fallback | 0.8946 | 91.1 |
+
+Artifacts:
+
+- `/private/tmp/vemcad-autocad-batch-current-rerun-20260629-machine/compare/summary.json`
+- `/private/tmp/vemcad-autocad-batch-current-rerun-20260629-machine/compare/summary.tsv`
+- `/private/tmp/vemcad-autocad-batch-current-rerun-20260629-machine/compare/summary.md`
+- `/private/tmp/vemcad-autocad-batch-current-rerun-20260629-machine/compare/contact_sheet.png`
+
+Conclusion:
+
+- The triage fields work and are available to downstream automation.
+- The current batch still cannot justify renderer tuning: every row remains a
+  view-space mismatch and therefore `recapture-required`.
+- The highest-priority fresh AutoCAD recaptures remain G11 first, then G04.
+
+Boundary:
+
+- Local/private evidence run only.
+- No private drawing, AutoCAD PNG, overlay, or contact sheet committed.
+- No renderer change.
