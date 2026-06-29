@@ -137,6 +137,8 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path):
     assert "autocad_equivalence_claim: `False`" in summary_md
     assert "| `G11` | G11/B11 | `match` | `pass` |" in summary_md
     assert "viewspace_mismatch" in summary_md
+    assert "## Triage Priority" in summary_md
+    assert "| 1 | `G11` | `matched-pass` | `match` | `pass` |" in summary_md
     assert (out / "contact_sheet.png").stat().st_size > 1000
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["schema"] == "vemcad.acad_manifest_compare_artifact_index/v1"
@@ -205,6 +207,7 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert "status: `viewspace_mismatch`" in summary_md
     assert "It is not an AutoCAD-equivalence result" in summary_md
     assert "| `G11` | G11/B11 | `mismatch` | `fallback` |" in summary_md
+    assert "| 1 | `G11` | `recapture-required` | `mismatch` | `fallback` |" in summary_md
     assert (out / "contact_sheet.png").stat().st_size > 1000
 
 
@@ -233,3 +236,32 @@ def test_manifest_harness_stops_on_blocked_manifest(tmp_path):
         "summary_json",
         "summary_markdown",
     }
+
+
+def test_triage_rows_prioritize_matched_fail_then_recapture_then_pass():
+    rows = [
+        {
+            "id": "C",
+            "viewspace_status": "match",
+            "x3_summary": {"band": "pass", "ink_iou": 0.99},
+        },
+        {
+            "id": "B",
+            "viewspace_status": "mismatch",
+            "x3_summary": {"band": "fallback", "ink_iou": 0.10},
+        },
+        {
+            "id": "A",
+            "viewspace_status": "match",
+            "x3_summary": {"band": "fallback", "ink_iou": 0.40},
+        },
+    ]
+
+    ordered = harness._triage_rows(rows)
+
+    assert [row["id"] for row in ordered] == ["A", "B", "C"]
+    assert [harness._triage_bucket(row) for row in ordered] == [
+        "renderer-candidate",
+        "recapture-required",
+        "matched-pass",
+    ]
