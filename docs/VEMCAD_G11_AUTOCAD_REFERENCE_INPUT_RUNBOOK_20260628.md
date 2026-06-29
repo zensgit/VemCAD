@@ -1,0 +1,141 @@
+# VemCAD G11 AutoCAD Reference Input Runbook (2026-06-28)
+
+## Purpose
+
+This runbook is the executable handoff for the current G11 render-fidelity
+blocker.
+
+The renderer comparison tooling is ready, but the current AutoCAD reference PNG
+is not in the same view-space as the VemCAD render. The next valid step is not
+renderer tuning. It is to provide a trustworthy AutoCAD reference input and run
+the matched-view harness.
+
+## Required Inputs
+
+For each comparison case, provide:
+
+| Input | Requirement |
+| --- | --- |
+| `source_dxf` | The DXF that VemCAD renders. |
+| `acad_png` | AutoCAD-generated PNG for the same drawing. |
+| `ours` | VemCAD/render_cli PNG for the same drawing. |
+| `capture_method` | One of `plot-export`, `exportpng`, `publish`, `plot-raster`. |
+| `view_contract` | `model-extents` or `explicit-window`. |
+
+Do not use:
+
+- viewport screenshots;
+- window screenshots;
+- thumbnails;
+- images with toolbars/chrome;
+- images post-scaled by Preview/Photoshop/etc.;
+- reference-envelope or hand-shrunk VemCAD renders as gate evidence.
+
+## AutoCAD Export Contract
+
+Preferred contract: `model-extents`.
+
+Export from AutoCAD with:
+
+- model space, not a layout viewport screenshot;
+- white background;
+- monochrome off, so color information is preserved;
+- extents / fit-to-drawing view;
+- same aspect ratio as the VemCAD render;
+- long edge at least `1600px`;
+- preferably `2339x1653` for the existing G11/B11 flow, to keep the current
+  evidence comparable.
+
+If AutoCAD must use a custom plot window, record the actual world rectangle and
+use `view_contract=explicit-window`. The world rectangle, not the screenshot
+crop, is the contract.
+
+## Create Manifest And Candidate Files
+
+Use the helper so JSON is generated consistently:
+
+```bash
+CASE_DIR=/tmp/vemcad-g11-case-$(date -u +%Y%m%dT%H%M%SZ)
+
+python3 tools/render_regression/acad_reference_case.py \
+  --case-id G11 \
+  --drawing-id G11/B11 \
+  --source-dxf /tmp/vacadbatchinputs/B11.dxf \
+  --acad-png /path/to/autocad_model_extents.png \
+  --ours /path/to/G11_ours.png \
+  --render-report /path/to/G11_report.json \
+  --semantic-mask /path/to/G11_semantic_mask.png \
+  --semantic-report /path/to/G11_report.json \
+  --render-image ghcr.io/zensgit/vemcad-render:main \
+  --diagnostic window_source=model-extents \
+  --out-dir "$CASE_DIR"
+```
+
+The helper writes:
+
+- `$CASE_DIR/acad_manifest.json`
+- `$CASE_DIR/candidate_cases.json`
+
+It also validates the AutoCAD PNG and records the actual PNG size as
+`expected_size`. If the PNG is unreadable, missing, or not gate-grade, it returns
+non-zero.
+
+## Run The Matched-View Harness
+
+```bash
+python3 tools/render_regression/acad_manifest_compare.py \
+  --manifest "$CASE_DIR/acad_manifest.json" \
+  --candidate-cases "$CASE_DIR/candidate_cases.json" \
+  --out-dir "$CASE_DIR/compare"
+```
+
+Expected outputs:
+
+- `$CASE_DIR/compare/summary.json`
+- `$CASE_DIR/compare/summary.tsv`
+- `$CASE_DIR/compare/artifact_index.json`
+- `$CASE_DIR/compare/viewspace/G11_viewspace.json`
+- `$CASE_DIR/compare/overlays/G11_overlay.png` when comparable
+- `$CASE_DIR/compare/text/G11_text_provenance.json` when a render report is
+  supplied
+- `$CASE_DIR/compare/semantic/G11_semantic_classes.json` when semantic mask and
+  report are supplied
+
+## Interpret The Result
+
+First inspect:
+
+```bash
+jq '.status, .rows[0].viewspace_status, .rows[0].viewspace_reason' \
+  "$CASE_DIR/compare/summary.json"
+```
+
+Decision table:
+
+| Harness status | Meaning | Next action |
+| --- | --- | --- |
+| `pass` with `viewspace_status=match` | X3 is eligible to interpret. | Review X3, semantic rows, text flags/notes. Open renderer work only if a concrete class/entity defect is isolated. |
+| `viewspace_mismatch` | AutoCAD and VemCAD are still not in the same view-space. | Recapture AutoCAD or provide the real world `--window`; do not tune renderer. |
+| `blocked` | Manifest/candidate input failed validation. | Fix missing paths, capture method, expected size, or unreadable PNG. |
+| `compare_failed` | `compare_vs_acad.py` failed after valid inputs. | Inspect per-case stdout and view-space report. |
+
+Never claim AutoCAD equivalence unless the harness reaches
+`viewspace_status=match`.
+
+## Current G11 State
+
+The existing AutoCAD reference:
+
+- `/tmp/vemcadautocadplot/batch/png/G11-1.png`
+
+has already been tested. It remains blocked:
+
+- baseline: `viewspace_mismatch`, `ink_iou=0.8021`;
+- `content_bbox` world window: still `viewspace_mismatch`, `ink_iou=0.8081`;
+- hand-shrunk window: still `viewspace_mismatch`, `ink_iou=0.2471`;
+- diagnostic reference-envelope: removes framing mismatch as a raster
+  diagnostic, but is not a world-space contract and remains fallback
+  (`ink_iou=0.8277`).
+
+Therefore the next valid input is a fresh AutoCAD model-extents export or the
+actual AutoCAD world plot/window rectangle.

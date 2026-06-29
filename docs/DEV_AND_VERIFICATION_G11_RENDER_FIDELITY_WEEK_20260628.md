@@ -152,7 +152,7 @@ Boundary:
 
 ### Slice 4 — First Real G11 Run
 
-Status: in progress in this PR.
+Status: merged in PR #171 (`1c88801`).
 
 Inputs:
 
@@ -245,6 +245,41 @@ Conclusion:
   - AutoCAD is recaptured at model EXTENTS with matching aspect; or
   - an explicit world `--window` matching the AutoCAD plot is supplied.
 
+### Post-Closeout Slice — AutoCAD Reference Input Kit
+
+Status: in progress in this PR.
+
+Deliverables:
+
+- `tools/render_regression/acad_reference_case.py`
+- `tools/render_regression/tests/test_acad_reference_case.py`
+- `docs/VEMCAD_G11_AUTOCAD_REFERENCE_INPUT_RUNBOOK_20260628.md`
+
+Behavior:
+
+- Creates `acad_manifest.json` and `candidate_cases.json` from explicit paths.
+- Reads the AutoCAD PNG dimensions and writes them into `expected_size`.
+- Reuses the existing AutoCAD manifest validator immediately after writing the
+  files.
+- Leaves rendering and comparison to the existing `render_cli` and
+  `acad_manifest_compare.py` paths.
+
+Verification:
+
+- `python3 -m pytest tools/render_regression/tests/test_acad_reference_case.py -q`
+  - `2 passed`
+- `python3 -m pytest tools/render_regression/tests/test_acad_reference_case.py tools/render_regression/tests/test_acad_reference_manifest.py tools/render_regression/tests/test_acad_manifest_compare.py -q`
+  - `15 passed`
+- `python3 -m pytest tools/render_regression/tests -q`
+  - `82 passed`
+
+Boundary:
+
+- No AutoCAD image or drawing committed.
+- No renderer changes.
+- The helper does not claim equivalence; it only removes hand-written JSON from
+  the next reference-input handoff.
+
 ## Verification Matrix
 
 | Slice | Local tests | CI | Runtime / artifact proof | Result |
@@ -254,6 +289,7 @@ Conclusion:
 | Slice 2 manifest compare harness | `test_acad_manifest_compare.py`; adjacent manifest/compare tests; full `tools/render_regression/tests` | PR #169: `pytest`, `build-and-smoke` | synthetic PNG pairs only; no renderer | merged |
 | Slice 3 triage summary / artifact index | `test_acad_manifest_compare.py`; full `tools/render_regression/tests` | PR #170: `pytest`, `build-and-smoke` | synthetic PNG + synthetic render report only; no renderer | merged |
 | Slice 4 first real G11 run | docs-only evidence | pending | local Docker render + manifest harness; artifacts under `/tmp/vemcad-fidelity-out/g11_week_real_20260628T133732Z` | viewspace_mismatch |
+| Post-closeout AutoCAD input kit | `test_acad_reference_case.py`; manifest/harness tests; full `tools/render_regression/tests` | pending | synthetic PNG/DXF only; no renderer | local green |
 
 ## Evidence To Fill During The Week
 
@@ -349,6 +385,9 @@ Next action:
 - Post-closeout follow-up `VEMCAD_G11_MATCHED_WINDOW_DERIVATION_20260628.md`
   attempted to derive that window from the existing PNG/report pair. It did not
   find a trustworthy world window; the input/view contract remains the blocker.
+- Use `VEMCAD_G11_AUTOCAD_REFERENCE_INPUT_RUNBOOK_20260628.md` and
+  `tools/render_regression/acad_reference_case.py` to create the manifest and
+  candidate files for the next AutoCAD reference, rather than hand-writing JSON.
 - Then rerun:
   `tools/render_regression/acad_manifest_compare.py --manifest ... --candidate-cases ... --out-dir ...`
 - Only if that rerun reports `viewspace_status=match` should X3 and semantic
