@@ -292,6 +292,116 @@ def _artifact_index(rows: list[dict[str, Any]], *, contact_sheet: str = "") -> d
     }
 
 
+def _md(value: Any) -> str:
+    text = _str(value)
+    if not text:
+        return ""
+    return text.replace("|", "\\|").replace("\n", " ")
+
+
+def _write_markdown_summary(path: Path, report: dict[str, Any], *, contact_sheet: str = "") -> None:
+    """Write a human-readable review summary beside the machine JSON/TSV.
+
+    The JSON remains authoritative; this report is for unattended batch review
+    and for pasting into development/verification ledgers without losing the
+    view-space boundary.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    boundary = report.get("boundary") or {}
+    lines = [
+        "# AutoCAD Manifest Compare Summary",
+        "",
+        "## Result",
+        "",
+        f"- status: `{_md(report.get('status'))}`",
+        f"- cases: `{report.get('compared_count', 0)}/{report.get('case_count', 0)}` compared",
+        f"- issues: `{len(report.get('issues') or [])}`",
+        f"- dry_run: `{bool(report.get('dry_run'))}`",
+        "",
+        "## Boundary",
+        "",
+        f"- renders_dxf: `{bool(boundary.get('renders_dxf'))}`",
+        f"- requires_viewspace_match: `{bool(boundary.get('requires_viewspace_match'))}`",
+        f"- autocad_equivalence_claim: `{bool(boundary.get('autocad_equivalence_claim'))}`",
+        "",
+        (
+            "**Important:** `viewspace_mismatch` means the AutoCAD reference and "
+            "VemCAD candidate are not in the same view-space. It is not an "
+            "AutoCAD-equivalence result and must not trigger renderer tuning by itself."
+        ),
+        "",
+    ]
+    if contact_sheet:
+        lines.extend([
+            "## Quick Review Artifact",
+            "",
+            f"- contact_sheet: `{_md(contact_sheet)}`",
+            "",
+        ])
+    issues = report.get("issues") or []
+    if issues:
+        lines.extend([
+            "## Issues",
+            "",
+            "| Case | Severity | Code | Message |",
+            "| --- | --- | --- | --- |",
+        ])
+        for issue in issues:
+            lines.append(
+                f"| {_md(issue.get('case_id'))} | {_md(issue.get('severity'))} | "
+                f"`{_md(issue.get('code'))}` | {_md(issue.get('message'))} |"
+            )
+        lines.append("")
+    rows = report.get("rows") or []
+    if rows:
+        lines.extend([
+            "## Cases",
+            "",
+            (
+                "| Case | Drawing | View-space | X3 band | Ink IoU | Color dist | "
+                "Text flags | Text notes | Recommended action |"
+            ),
+            "| --- | --- | --- | --- | ---: | ---: | --- | --- | --- |",
+        ])
+        for row in rows:
+            summary = row.get("x3_summary") or {}
+            text_counts = (row.get("text_provenance") or {}).get("counts") or {}
+            flag_counts = text_counts.get("flag_counts") or {}
+            note_counts = text_counts.get("note_counts") or {}
+            text_flags = ", ".join(
+                f"{key}:{value}" for key, value in sorted(flag_counts.items())
+            ) or "-"
+            text_notes = ", ".join(
+                f"{key}:{value}" for key, value in sorted(note_counts.items())
+            ) or "-"
+            lines.append(
+                f"| `{_md(row.get('id'))}` | {_md(row.get('drawing_id'))} | "
+                f"`{_md(row.get('viewspace_status'))}` | `{_md(summary.get('band'))}` | "
+                f"{_md(summary.get('ink_iou'))} | {_md(summary.get('color_dist'))} | "
+                f"{_md(text_flags)} | {_md(text_notes)} | {_md(row.get('recommended_action'))} |"
+            )
+        lines.extend(["", "## Artifact Paths", ""])
+        for row in rows:
+            lines.append(f"### `{_md(row.get('id'))}`")
+            for label, key in (
+                ("AutoCAD reference", "acad_png"),
+                ("VemCAD candidate", "ours"),
+                ("overlay", "overlay"),
+                ("view-space report", "viewspace_report"),
+                ("render report", "render_report"),
+                ("semantic mask", "semantic_mask"),
+                ("semantic class report", "semantic_class_report"),
+            ):
+                value = _str(row.get(key))
+                if value:
+                    lines.append(f"- {label}: `{_md(value)}`")
+            text_summary = (row.get("text_provenance") or {}).get("summary")
+            if text_summary:
+                lines.append(f"- text provenance summary: `{_md(text_summary)}`")
+            lines.append("")
+    path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
 def _compare_case(case: dict[str, Any], candidate: dict[str, Any], out_dir: Path) -> dict[str, Any]:
     case_id = case["id"]
     safe = _safe_case_name(case_id)
@@ -438,6 +548,7 @@ def main(argv: list[str] | None = None) -> int:
         dry_run=args.dry_run,
     )
     _write_json(args.out_dir / "summary.json", report)
+    contact_sheet = ""
     if report["rows"] and not args.dry_run:
         _write_tsv(args.out_dir / "summary.tsv", report["rows"])
         contact_sheet = _write_contact_sheet(args.out_dir / "contact_sheet.png", report["rows"])
@@ -445,6 +556,7 @@ def main(argv: list[str] | None = None) -> int:
             report["rows"],
             contact_sheet=contact_sheet,
         ))
+    _write_markdown_summary(args.out_dir / "summary.md", report, contact_sheet=contact_sheet)
 
     print(
         f"AutoCAD manifest compare: {report['status']} "
