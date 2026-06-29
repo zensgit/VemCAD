@@ -52,7 +52,7 @@ crop, is the contract.
 
 ## Create Manifest And Candidate Files
 
-Use the helper so JSON is generated consistently:
+For a single case, use the helper so JSON is generated consistently:
 
 ```bash
 CASE_DIR=/tmp/vemcad-g11-case-$(date -u +%Y%m%dT%H%M%SZ)
@@ -80,6 +80,45 @@ It also validates the AutoCAD PNG and records the actual PNG size as
 `expected_size`. If the PNG is unreadable, missing, or not gate-grade, it returns
 non-zero.
 
+For an unattended or multi-drawing run, write a cases JSON list and use the batch
+helper:
+
+```json
+[
+  {
+    "id": "G11",
+    "drawing_id": "G11/B11",
+    "source_dxf": "/tmp/vacadbatchinputs/B11.dxf",
+    "acad_png": "/path/to/autocad_model_extents_G11.png",
+    "ours": "/path/to/G11_ours.png",
+    "render_report": "/path/to/G11_report.json",
+    "semantic_mask": "/path/to/G11_semantic_mask.png",
+    "semantic_report": "/path/to/G11_report.json",
+    "render_image": "ghcr.io/zensgit/vemcad-render:main",
+    "diagnostics": {
+      "window_source": "model-extents"
+    }
+  }
+]
+```
+
+```bash
+BATCH_DIR=/tmp/vemcad-autocad-batch-$(date -u +%Y%m%dT%H%M%SZ)
+
+python3 tools/render_regression/acad_reference_batch.py \
+  --cases /path/to/cases.json \
+  --out-dir "$BATCH_DIR"
+```
+
+The batch helper writes the same two harness inputs:
+
+- `$BATCH_DIR/acad_manifest.json`
+- `$BATCH_DIR/candidate_cases.json`
+
+Relative paths inside `cases.json` resolve relative to the JSON file. Each
+AutoCAD PNG is opened to record `expected_size`; unreadable images or missing
+required fields fail closed before the comparison step.
+
 ## Run The Matched-View Harness
 
 ```bash
@@ -94,12 +133,18 @@ Expected outputs:
 - `$CASE_DIR/compare/summary.json`
 - `$CASE_DIR/compare/summary.tsv`
 - `$CASE_DIR/compare/artifact_index.json`
+- `$CASE_DIR/compare/contact_sheet.png`
 - `$CASE_DIR/compare/viewspace/G11_viewspace.json`
 - `$CASE_DIR/compare/overlays/G11_overlay.png` when comparable
 - `$CASE_DIR/compare/text/G11_text_provenance.json` when a render report is
   supplied
 - `$CASE_DIR/compare/semantic/G11_semantic_classes.json` when semantic mask and
   report are supplied
+
+`contact_sheet.png` is a quick-review artifact: per row it shows AutoCAD
+reference, VemCAD candidate, and overlay, with the view-space status and X3 band
+printed above the row. It is useful for unattended runs, but the JSON/TSV remain
+authoritative.
 
 ## Interpret The Result
 
