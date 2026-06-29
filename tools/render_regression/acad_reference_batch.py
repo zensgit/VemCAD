@@ -189,6 +189,57 @@ def _fulfilled_cases(
     return fulfilled
 
 
+def _write_missing_references_report(
+    out_dir: Path,
+    request_json: Path,
+    *,
+    reference_dir: Path,
+) -> int:
+    request_cases = _load_request_cases(request_json)
+    missing: list[dict[str, str]] = []
+    for index, request in enumerate(request_cases, start=1):
+        case_id = _required(request, "id", index)
+        output_name = _required(request, "recommended_output_name", index)
+        expected_path = (reference_dir / output_name).resolve()
+        if not expected_path.is_file():
+            missing.append({
+                "id": case_id,
+                "drawing_id": _str(request.get("drawing_id")),
+                "recommended_output_name": output_name,
+                "expected_path": str(expected_path),
+            })
+    if not missing:
+        return 0
+    out_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema": "vemcad.acad_reference_missing/v1",
+        "request": str(request_json.resolve()),
+        "reference_dir": str(reference_dir.resolve()),
+        "missing_count": len(missing),
+        "missing": missing,
+    }
+    json_path = out_dir / "missing_references.json"
+    md_path = out_dir / "missing_references.md"
+    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    lines = [
+        "# Missing AutoCAD Reference PNGs",
+        "",
+        f"- request: `{request_json.resolve()}`",
+        f"- reference_dir: `{reference_dir.resolve()}`",
+        f"- missing_count: `{len(missing)}`",
+        "",
+        "| Case | Drawing | Expected PNG | Expected path |",
+        "| --- | --- | --- | --- |",
+    ]
+    for item in missing:
+        lines.append(
+            f"| `{item['id']}` | {_str(item.get('drawing_id'))} | "
+            f"`{item['recommended_output_name']}` | `{item['expected_path']}` |"
+        )
+    md_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return len(missing)
+
+
 def build_files_from_request(
     request_json: Path,
     *,
@@ -196,6 +247,13 @@ def build_files_from_request(
     reference_dir: Path,
     out_dir: Path,
 ) -> tuple[Path, Path, dict[str, Any]]:
+    missing_count = _write_missing_references_report(
+        out_dir,
+        request_json,
+        reference_dir=reference_dir,
+    )
+    if missing_count:
+        raise ValueError(f"missing {missing_count} returned AutoCAD PNG(s); see {out_dir / 'missing_references.md'}")
     return _build_files(
         _fulfilled_cases(request_json, candidate_cases=candidate_cases, reference_dir=reference_dir),
         Path.cwd(),

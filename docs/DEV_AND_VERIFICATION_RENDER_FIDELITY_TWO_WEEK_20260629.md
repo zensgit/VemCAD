@@ -508,3 +508,37 @@ Boundary:
 - Input-prep automation only.
 - No renderer change.
 - No private drawing or AutoCAD PNG committed.
+
+### Slice 10 — Missing Returned Reference Report
+
+Status: in progress in this branch.
+
+Deliverables:
+
+- `tools/render_regression/acad_reference_batch.py`
+- `tools/render_regression/tests/test_acad_reference_batch.py`
+
+Behavior:
+
+- In `--from-request` mode, when returned AutoCAD PNGs are missing, the helper
+  still fails closed but writes:
+  - `missing_references.json`
+  - `missing_references.md`
+- The missing report lists all expected output filenames and paths instead of
+  stopping at the first missing file.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 4 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 87 passed
+```
+
+Boundary:
+
+- Input-prep diagnostics only.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
