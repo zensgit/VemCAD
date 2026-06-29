@@ -379,7 +379,7 @@ Boundary:
 
 ### Slice 7 — AutoCAD Recapture Request Artifacts
 
-Status: in progress in this branch.
+Status: merged in PR #186 (`4cdfeb2`).
 
 Deliverables:
 
@@ -412,3 +412,62 @@ Boundary:
 - Evidence/request generation only.
 - No renderer change.
 - No private drawing or AutoCAD PNG committed.
+
+### Slice 8 — AutoCAD Recapture Request Batch Re-Run
+
+Status: local/private evidence run complete; ledger update in this branch.
+
+Inputs:
+
+- Manifest:
+  `/private/tmp/vemcad-autocad-batch-current/input/acad_manifest.json`
+- Candidate cases:
+  `/private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json`
+- Harness source:
+  VemCAD `origin/main=4cdfeb2`
+
+Command:
+
+```bash
+python3 tools/render_regression/acad_manifest_compare.py \
+  --manifest /private/tmp/vemcad-autocad-batch-current/input/acad_manifest.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --out-dir /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare
+# AutoCAD manifest compare: viewspace_mismatch (12/12 compared, 0 issues)
+# exit code: 2
+```
+
+Result:
+
+- `reference_request.json` schema:
+  `vemcad.acad_reference_request/v1`
+- reason: `recapture-required`
+- case count: `12`
+- artifact index entries: `54`
+- artifact index includes `reference_request_json` and
+  `reference_request_markdown`
+
+Request artifact paths:
+
+- `/private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json`
+- `/private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.md`
+
+Top recapture requests:
+
+| Rank | Case | Requested PNG | Source DXF |
+| ---: | --- | --- | --- |
+| 1 | G11 | `G11_autocad_model_extents.png` | `/private/tmp/vacadbatchinputs/B11.dxf` |
+| 2 | G04 | `G04_autocad_model_extents.png` | `/private/tmp/vacadbatchinputs/B04.dxf` |
+| 3 | G10 | `G10_autocad_model_extents.png` | `/private/tmp/vacadbatchinputs/B10.dxf` |
+
+Conclusion:
+
+- The harness now produces a direct handoff packet for the human/AutoCAD side.
+- The formal parity path remains blocked until at least one requested PNG is
+  produced or an explicit AutoCAD world window is supplied.
+
+Boundary:
+
+- Local/private evidence run only.
+- No private drawing, AutoCAD PNG, overlay, or contact sheet committed.
+- No renderer change.
