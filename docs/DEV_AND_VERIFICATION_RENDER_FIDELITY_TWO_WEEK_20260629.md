@@ -545,7 +545,7 @@ Boundary:
 
 ### Slice 11 — Partial Recapture Fulfillment
 
-Status: in progress in this branch.
+Status: merged in PR #190 (`0c1aee1`).
 
 Deliverables:
 
@@ -577,3 +577,56 @@ Boundary:
 - Input-prep automation only.
 - No renderer change.
 - No private drawing or AutoCAD PNG committed.
+
+### Slice 12 — Single-Case Fulfillment Smoke
+
+Status: local/private evidence run complete; ledger update in this branch.
+
+Purpose:
+
+- Verify that a partial `--case-id G11` fulfilment run works end to end.
+- This uses the existing old G11 AutoCAD PNG copied to the requested filename
+  as a workflow smoke only. It is not a fresh model-extents reference and does
+  not create an AutoCAD-equivalence claim.
+
+Command:
+
+```bash
+mkdir -p /private/tmp/vemcad-reference-subset-smoke-out-20260629/returned
+cp /private/tmp/vemcadautocadplot/batch/png/G11-1.png \
+  /private/tmp/vemcad-reference-subset-smoke-out-20260629/returned/G11_autocad_model_extents.png
+
+python3 tools/render_regression/acad_reference_batch.py \
+  --from-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir /private/tmp/vemcad-reference-subset-smoke-out-20260629/returned \
+  --case-id G11 \
+  --out-dir /private/tmp/vemcad-reference-subset-smoke-out-20260629/input
+# AutoCAD reference batch: pass (1 cases)
+
+python3 tools/render_regression/acad_manifest_compare.py \
+  --manifest /private/tmp/vemcad-reference-subset-smoke-out-20260629/input/acad_manifest.json \
+  --candidate-cases /private/tmp/vemcad-reference-subset-smoke-out-20260629/input/candidate_cases.json \
+  --out-dir /private/tmp/vemcad-reference-subset-smoke-out-20260629/compare
+# AutoCAD manifest compare: viewspace_mismatch (1/1 compared, 0 issues)
+# exit code: 2
+```
+
+Artifacts:
+
+- `/private/tmp/vemcad-reference-subset-smoke-out-20260629/input/acad_manifest.json`
+- `/private/tmp/vemcad-reference-subset-smoke-out-20260629/input/candidate_cases.json`
+- `/private/tmp/vemcad-reference-subset-smoke-out-20260629/compare/summary.json`
+- `/private/tmp/vemcad-reference-subset-smoke-out-20260629/compare/summary.md`
+
+Conclusion:
+
+- Partial fulfilment mechanics work.
+- The old G11 PNG remains `viewspace_mismatch`; fresh AutoCAD export is still
+  required for a formal fidelity result.
+
+Boundary:
+
+- Local/private workflow smoke only.
+- No private drawing, AutoCAD PNG, overlay, or contact sheet committed.
+- No renderer change.
