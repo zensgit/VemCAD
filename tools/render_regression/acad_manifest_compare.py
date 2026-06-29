@@ -383,6 +383,24 @@ def _write_markdown_summary(path: Path, report: dict[str, Any], *, contact_sheet
                 f"{_md(summary.get('ink_iou'))} | {_md(summary.get('color_dist'))} | "
                 f"{_md(text_flags)} | {_md(text_notes)} | {_md(row.get('recommended_action'))} |"
             )
+        lines.extend([
+            "",
+            "## Triage Priority",
+            "",
+            (
+                "| Rank | Case | Bucket | View-space | X3 band | Ink IoU | "
+                "Recommended next action |"
+            ),
+            "| ---: | --- | --- | --- | --- | ---: | --- |",
+        ])
+        for rank, row in enumerate(_triage_rows(rows), start=1):
+            summary = row.get("x3_summary") or {}
+            bucket = _triage_bucket(row)
+            lines.append(
+                f"| {rank} | `{_md(row.get('id'))}` | `{bucket}` | "
+                f"`{_md(row.get('viewspace_status'))}` | `{_md(summary.get('band'))}` | "
+                f"{_md(summary.get('ink_iou'))} | {_md(row.get('recommended_action'))} |"
+            )
         lines.extend(["", "## Artifact Paths", ""])
         for row in rows:
             lines.append(f"### `{_md(row.get('id'))}`")
@@ -403,6 +421,37 @@ def _write_markdown_summary(path: Path, report: dict[str, Any], *, contact_sheet
                 lines.append(f"- text provenance summary: `{_md(text_summary)}`")
             lines.append("")
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+
+
+def _triage_bucket(row: dict[str, Any]) -> str:
+    status = _str(row.get("viewspace_status"))
+    band = _str((row.get("x3_summary") or {}).get("band"))
+    if status == "match" and band != "pass":
+        return "renderer-candidate"
+    if status == "mismatch":
+        return "recapture-required"
+    if status == "match":
+        return "matched-pass"
+    return "input-review"
+
+
+def _triage_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    bucket_order = {
+        "renderer-candidate": 0,
+        "recapture-required": 1,
+        "input-review": 2,
+        "matched-pass": 3,
+    }
+
+    def key(row: dict[str, Any]) -> tuple[int, float, str]:
+        summary = row.get("x3_summary") or {}
+        try:
+            ink_iou = float(summary.get("ink_iou"))
+        except (TypeError, ValueError):
+            ink_iou = 1.0
+        return (bucket_order.get(_triage_bucket(row), 99), ink_iou, _str(row.get("id")))
+
+    return sorted(rows, key=key)
 
 
 def _compare_case(case: dict[str, Any], candidate: dict[str, Any], out_dir: Path) -> dict[str, Any]:

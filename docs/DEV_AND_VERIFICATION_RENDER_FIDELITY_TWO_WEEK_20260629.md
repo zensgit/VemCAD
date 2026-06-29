@@ -200,3 +200,42 @@ Boundary:
 - Local/private evidence run only.
 - No private drawing, AutoCAD PNG, overlay, or contact sheet committed.
 - No renderer change.
+
+### Slice 4 — Markdown Triage Priority Table
+
+Status: in progress in this branch.
+
+Deliverables:
+
+- `tools/render_regression/acad_manifest_compare.py`
+- `tools/render_regression/tests/test_acad_manifest_compare.py`
+
+Behavior:
+
+- `summary.md` now includes a `Triage Priority` section.
+- Rows are bucketed and sorted so unattended batch output points to the right
+  next action:
+  - `renderer-candidate`: matched view-space but non-pass X3 band; only this
+    bucket can justify renderer investigation.
+  - `recapture-required`: view-space mismatch; requires a fresh AutoCAD export
+    or explicit world window before interpreting fidelity.
+  - `input-review`: unavailable or unusual view-space status.
+  - `matched-pass`: lowest priority; no renderer work.
+- Within a bucket, lower Ink IoU sorts first.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 6 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 85 passed
+```
+
+Boundary:
+
+- Evidence/reporting only.
+- No scoring threshold change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
