@@ -471,3 +471,40 @@ Boundary:
 - Local/private evidence run only.
 - No private drawing, AutoCAD PNG, overlay, or contact sheet committed.
 - No renderer change.
+
+### Slice 9 — Recapture Request Fulfillment Helper
+
+Status: in progress in this branch.
+
+Deliverables:
+
+- `tools/render_regression/acad_reference_batch.py`
+- `tools/render_regression/tests/test_acad_reference_batch.py`
+- `docs/VEMCAD_G11_AUTOCAD_REFERENCE_INPUT_RUNBOOK_20260628.md`
+
+Behavior:
+
+- `acad_reference_batch.py` now supports:
+  - `--from-request <reference_request.json>`
+  - `--candidate-cases <original candidate_cases.json>`
+  - `--reference-dir <directory with returned AutoCAD PNGs>`
+- The helper maps each requested case to its returned PNG, preserves the
+  original VemCAD candidate artifacts, records each returned PNG size, and
+  writes the next `acad_manifest.json` plus `candidate_cases.json`.
+- Missing or unreadable returned PNGs fail closed.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 4 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 87 passed
+```
+
+Boundary:
+
+- Input-prep automation only.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.

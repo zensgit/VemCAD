@@ -119,6 +119,35 @@ Relative paths inside `cases.json` resolve relative to the JSON file. Each
 AutoCAD PNG is opened to record `expected_size`; unreadable images or missing
 required fields fail closed before the comparison step.
 
+## Fulfill A Recapture Request
+
+When `acad_manifest_compare.py` produces `reference_request.json`, place the
+fresh AutoCAD PNGs in one directory using the requested filenames, then generate
+the next manifest/candidate files from the request:
+
+```bash
+REQUEST_DIR=/private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare
+RETURNED_DIR=/path/to/fresh-autocad-model-extents-pngs
+NEXT_DIR=/tmp/vemcad-autocad-batch-fulfilled-$(date -u +%Y%m%dT%H%M%SZ)
+
+python3 tools/render_regression/acad_reference_batch.py \
+  --from-request "$REQUEST_DIR/reference_request.json" \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir "$RETURNED_DIR" \
+  --out-dir "$NEXT_DIR/input"
+```
+
+The helper resolves the original candidate artifacts, opens every returned PNG
+to record `expected_size`, and fails closed if any requested PNG is missing or
+unreadable. Then run the matched-view harness with:
+
+```bash
+python3 tools/render_regression/acad_manifest_compare.py \
+  --manifest "$NEXT_DIR/input/acad_manifest.json" \
+  --candidate-cases "$NEXT_DIR/input/candidate_cases.json" \
+  --out-dir "$NEXT_DIR/compare"
+```
+
 ## Run The Matched-View Harness
 
 ```bash
