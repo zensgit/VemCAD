@@ -100,10 +100,8 @@ def _load_cases(path: Path) -> list[dict[str, Any]]:
     return cases
 
 
-def build_files(cases_json: Path, out_dir: Path) -> tuple[Path, Path, dict[str, Any]]:
+def _build_files(cases: list[dict[str, Any]], base: Path, out_dir: Path) -> tuple[Path, Path, dict[str, Any]]:
     out_dir.mkdir(parents=True, exist_ok=True)
-    base = cases_json.parent
-    cases = _load_cases(cases_json)
     manifest = {
         "schema": arm.SCHEMA,
         "cases": [
@@ -123,17 +121,117 @@ def build_files(cases_json: Path, out_dir: Path) -> tuple[Path, Path, dict[str, 
     return manifest_path, candidates_path, validation
 
 
+def build_files(cases_json: Path, out_dir: Path) -> tuple[Path, Path, dict[str, Any]]:
+    return _build_files(_load_cases(cases_json), cases_json.parent, out_dir)
+
+
+def _load_candidate_map(path: Path) -> dict[str, dict[str, Any]]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, list):
+        raise ValueError("candidate cases JSON must be a list")
+    candidates: dict[str, dict[str, Any]] = {}
+    for index, item in enumerate(data, start=1):
+        if not isinstance(item, dict):
+            raise ValueError(f"candidate case {index}: must be an object")
+        case_id = _str(item.get("id"))
+        if not case_id:
+            raise ValueError(f"candidate case {index}: missing id")
+        candidates[case_id] = item
+    return candidates
+
+
+def _load_request_cases(path: Path) -> list[dict[str, Any]]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError("reference request JSON must be an object")
+    if data.get("schema") != "vemcad.acad_reference_request/v1":
+        raise ValueError("reference request schema must be vemcad.acad_reference_request/v1")
+    cases = data.get("cases")
+    if not isinstance(cases, list) or not cases:
+        raise ValueError("reference request must contain a non-empty cases list")
+    for index, item in enumerate(cases, start=1):
+        if not isinstance(item, dict):
+            raise ValueError(f"request case {index}: must be an object")
+    return cases
+
+
+def _fulfilled_cases(
+    request_json: Path,
+    *,
+    candidate_cases: Path,
+    reference_dir: Path,
+) -> list[dict[str, Any]]:
+    request_cases = _load_request_cases(request_json)
+    candidates = _load_candidate_map(candidate_cases)
+    fulfilled: list[dict[str, Any]] = []
+    for index, request in enumerate(request_cases, start=1):
+        case_id = _required(request, "id", index)
+        candidate = candidates.get(case_id)
+        if candidate is None:
+            raise ValueError(f"request case {case_id}: missing candidate case")
+        output_name = _required(request, "recommended_output_name", index)
+        item: dict[str, Any] = {
+            "id": case_id,
+            "drawing_id": _required(request, "drawing_id", index),
+            "source_dxf": _resolve(request_json.parent, _required(request, "source_dxf", index)),
+            "acad_png": str((reference_dir / output_name).resolve()),
+            "ours": _resolve(candidate_cases.parent, _required(candidate, "ours", index)),
+            "capture_method": _str(request.get("requested_capture_method") or "plot-export"),
+            "view_contract": _str(request.get("requested_view_contract") or "model-extents"),
+        }
+        for key in ("render_report", "semantic_mask", "semantic_report"):
+            if key in candidate:
+                item[key] = _resolve(candidate_cases.parent, candidate[key])
+        for key in ("render_image", "render_image_digest", "diagnostics"):
+            if key in candidate:
+                item[key] = candidate[key]
+        fulfilled.append(item)
+    return fulfilled
+
+
+def build_files_from_request(
+    request_json: Path,
+    *,
+    candidate_cases: Path,
+    reference_dir: Path,
+    out_dir: Path,
+) -> tuple[Path, Path, dict[str, Any]]:
+    return _build_files(
+        _fulfilled_cases(request_json, candidate_cases=candidate_cases, reference_dir=reference_dir),
+        Path.cwd(),
+        out_dir,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="acad_reference_batch",
         description="Create validated AutoCAD manifest + candidate case files from a cases JSON list.")
-    parser.add_argument("--cases", type=Path, required=True,
+    parser.add_argument("--cases", type=Path, default=None,
                         help="JSON list of AutoCAD reference cases")
+    parser.add_argument("--from-request", type=Path, default=None,
+                        help="reference_request.json produced by acad_manifest_compare.py")
+    parser.add_argument("--candidate-cases", type=Path, default=None,
+                        help="original candidate_cases.json, required with --from-request")
+    parser.add_argument("--reference-dir", type=Path, default=None,
+                        help="directory containing returned AutoCAD PNGs, required with --from-request")
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args(argv)
 
     try:
-        manifest_path, candidates_path, validation = build_files(args.cases, args.out_dir)
+        if args.from_request is not None:
+            if args.candidate_cases is None or args.reference_dir is None:
+                raise ValueError("--candidate-cases and --reference-dir are required with --from-request")
+            manifest_path, candidates_path, validation = build_files_from_request(
+                args.from_request,
+                candidate_cases=args.candidate_cases,
+                reference_dir=args.reference_dir,
+                out_dir=args.out_dir,
+            )
+        else:
+            if args.cases is None:
+                raise ValueError("--cases is required unless --from-request is set")
+            manifest_path, candidates_path, validation = build_files(args.cases, args.out_dir)
     except Exception as exc:
         print(f"AutoCAD reference batch: blocked ({exc})", file=sys.stderr)
         return 2

@@ -77,3 +77,79 @@ def test_batch_generator_blocks_bad_cases_json(tmp_path):
     cases.write_text(json.dumps([{"id": "G01"}]), encoding="utf-8")
 
     assert batch.main(["--cases", str(cases), "--out-dir", str(tmp_path / "out")]) == 2
+
+
+def test_batch_generator_fulfills_reference_request(tmp_path):
+    _dxf(tmp_path / "dxf" / "G11.dxf")
+    _png(tmp_path / "ours" / "G11.png", (760, 570))
+    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1600, 1131))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "reason": "recapture-required",
+        "case_count": 1,
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_capture_method": "plot-export",
+            "requested_view_contract": "model-extents",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{
+        "id": "G11",
+        "ours": "ours/G11.png",
+        "diagnostics": {"window_source": "content_bbox"},
+    }]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--out-dir", str(out),
+    ]) == 0
+
+    manifest = json.loads((out / "acad_manifest.json").read_text(encoding="utf-8"))
+    generated_candidates = json.loads((out / "candidate_cases.json").read_text(encoding="utf-8"))
+    case = manifest["cases"][0]
+    assert case["id"] == "G11"
+    assert case["acad_png"].endswith("G11_autocad_model_extents.png")
+    assert case["capture_method"] == "plot-export"
+    assert case["view_contract"] == "model-extents"
+    assert case["expected_size"] == {"width": 1600, "height": 1131}
+    assert generated_candidates[0]["ours"].endswith("ours/G11.png")
+    assert generated_candidates[0]["diagnostics"] == {"window_source": "content_bbox"}
+
+    dry_run = tmp_path / "dry-run-request"
+    assert harness.main([
+        "--manifest", str(out / "acad_manifest.json"),
+        "--out-dir", str(dry_run),
+        "--dry-run",
+    ]) == 0
+
+
+def test_batch_generator_blocks_request_without_returned_png(tmp_path):
+    _dxf(tmp_path / "dxf" / "G11.dxf")
+    _png(tmp_path / "ours" / "G11.png", (760, 570))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "recommended_output_name": "G11_autocad_model_extents.png",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+
+    assert batch.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--out-dir", str(tmp_path / "out"),
+    ]) == 2
