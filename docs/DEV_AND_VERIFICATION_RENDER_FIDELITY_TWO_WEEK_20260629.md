@@ -49,7 +49,7 @@ Boundary:
 
 ### Slice 1 — Markdown Evidence Report
 
-Status: in progress in this branch.
+Status: merged in PR #179 (`a0ba846`).
 
 Deliverables:
 
@@ -88,3 +88,41 @@ Boundary:
 - No private drawing or AutoCAD PNG committed.
 - JSON/TSV remain the authoritative machine-readable outputs; `summary.md` is
   the human-review layer.
+
+### Slice 2 — Complete Evidence Bundle Index
+
+Status: in progress in this branch.
+
+Deliverables:
+
+- `tools/render_regression/acad_manifest_compare.py`
+- `tools/render_regression/tests/test_acad_manifest_compare.py`
+
+Behavior:
+
+- `artifact_index.json` is now written for every harness run, including blocked
+  manifests and dry runs.
+- The index includes run-level entry artifacts:
+  - `summary_json`
+  - `summary_markdown`
+  - `summary_tsv` when a comparison table exists
+  - `contact_sheet` when comparison rows exist
+- Per-case artifacts remain listed as before: AutoCAD reference, VemCAD
+  candidate, overlay, view-space report, render report, semantic mask/report,
+  and text provenance summary.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 5 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 84 passed
+```
+
+Boundary:
+
+- Evidence/reporting only.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
