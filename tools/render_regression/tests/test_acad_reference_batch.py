@@ -163,3 +163,56 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path):
     missing_md = (out / "missing_references.md").read_text(encoding="utf-8")
     assert "Missing AutoCAD Reference PNGs" in missing_md
     assert "G11_autocad_model_extents.png" in missing_md
+
+
+def test_batch_generator_fulfills_subset_of_reference_request(tmp_path):
+    _dxf(tmp_path / "dxf" / "G11.dxf")
+    _dxf(tmp_path / "dxf" / "G04.dxf")
+    _png(tmp_path / "ours" / "G11.png", (760, 570))
+    _png(tmp_path / "ours" / "G04.png", (760, 570))
+    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1600, 1131))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [
+            {
+                "id": "G11",
+                "drawing_id": "G11/B11",
+                "source_dxf": "dxf/G11.dxf",
+                "recommended_output_name": "G11_autocad_model_extents.png",
+            },
+            {
+                "id": "G04",
+                "drawing_id": "G04/B04",
+                "source_dxf": "dxf/G04.dxf",
+                "recommended_output_name": "G04_autocad_model_extents.png",
+            },
+        ],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([
+        {"id": "G11", "ours": "ours/G11.png"},
+        {"id": "G04", "ours": "ours/G04.png"},
+    ]), encoding="utf-8")
+
+    assert batch.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--case-id", "G11",
+        "--out-dir", str(tmp_path / "subset"),
+    ]) == 0
+    manifest = json.loads((tmp_path / "subset" / "acad_manifest.json").read_text(encoding="utf-8"))
+    generated_candidates = json.loads((tmp_path / "subset" / "candidate_cases.json").read_text(encoding="utf-8"))
+    assert [case["id"] for case in manifest["cases"]] == ["G11"]
+    assert [case["id"] for case in generated_candidates] == ["G11"]
+
+    assert batch.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--out-dir", str(tmp_path / "all"),
+    ]) == 2
+    missing = json.loads((tmp_path / "all" / "missing_references.json").read_text(encoding="utf-8"))
+    assert missing["missing_count"] == 1
+    assert missing["missing"][0]["id"] == "G04"

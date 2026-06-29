@@ -155,13 +155,25 @@ def _load_request_cases(path: Path) -> list[dict[str, Any]]:
     return cases
 
 
+def _filter_request_cases(cases: list[dict[str, Any]], case_ids: set[str] | None) -> list[dict[str, Any]]:
+    if not case_ids:
+        return cases
+    selected = [case for case in cases if _str(case.get("id")) in case_ids]
+    found = {_str(case.get("id")) for case in selected}
+    missing = sorted(case_ids - found)
+    if missing:
+        raise ValueError(f"requested case id(s) not found in reference request: {', '.join(missing)}")
+    return selected
+
+
 def _fulfilled_cases(
     request_json: Path,
     *,
     candidate_cases: Path,
     reference_dir: Path,
+    case_ids: set[str] | None = None,
 ) -> list[dict[str, Any]]:
-    request_cases = _load_request_cases(request_json)
+    request_cases = _filter_request_cases(_load_request_cases(request_json), case_ids)
     candidates = _load_candidate_map(candidate_cases)
     fulfilled: list[dict[str, Any]] = []
     for index, request in enumerate(request_cases, start=1):
@@ -194,8 +206,9 @@ def _write_missing_references_report(
     request_json: Path,
     *,
     reference_dir: Path,
+    case_ids: set[str] | None = None,
 ) -> int:
-    request_cases = _load_request_cases(request_json)
+    request_cases = _filter_request_cases(_load_request_cases(request_json), case_ids)
     missing: list[dict[str, str]] = []
     for index, request in enumerate(request_cases, start=1):
         case_id = _required(request, "id", index)
@@ -246,16 +259,23 @@ def build_files_from_request(
     candidate_cases: Path,
     reference_dir: Path,
     out_dir: Path,
+    case_ids: set[str] | None = None,
 ) -> tuple[Path, Path, dict[str, Any]]:
     missing_count = _write_missing_references_report(
         out_dir,
         request_json,
         reference_dir=reference_dir,
+        case_ids=case_ids,
     )
     if missing_count:
         raise ValueError(f"missing {missing_count} returned AutoCAD PNG(s); see {out_dir / 'missing_references.md'}")
     return _build_files(
-        _fulfilled_cases(request_json, candidate_cases=candidate_cases, reference_dir=reference_dir),
+        _fulfilled_cases(
+            request_json,
+            candidate_cases=candidate_cases,
+            reference_dir=reference_dir,
+            case_ids=case_ids,
+        ),
         Path.cwd(),
         out_dir,
     )
@@ -273,6 +293,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="original candidate_cases.json, required with --from-request")
     parser.add_argument("--reference-dir", type=Path, default=None,
                         help="directory containing returned AutoCAD PNGs, required with --from-request")
+    parser.add_argument("--case-id", action="append", default=None,
+                        help="with --from-request, fulfill only this case id; may repeat")
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args(argv)
 
@@ -285,6 +307,7 @@ def main(argv: list[str] | None = None) -> int:
                 candidate_cases=args.candidate_cases,
                 reference_dir=args.reference_dir,
                 out_dir=args.out_dir,
+                case_ids=set(args.case_id or []) or None,
             )
         else:
             if args.cases is None:

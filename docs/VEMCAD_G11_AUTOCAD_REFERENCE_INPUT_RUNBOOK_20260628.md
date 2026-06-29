@@ -141,6 +141,19 @@ The helper resolves the original candidate artifacts, opens every returned PNG
 to record `expected_size`, and fails closed if any requested PNG is missing or
 unreadable. Then run the matched-view harness with:
 
+To process only the first returned case, repeat `--case-id`:
+
+```bash
+python3 tools/render_regression/acad_reference_batch.py \
+  --from-request "$REQUEST_DIR/reference_request.json" \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir "$RETURNED_DIR" \
+  --case-id G11 \
+  --out-dir "$NEXT_DIR/input"
+```
+
+Without `--case-id`, all requested PNGs must be present.
+
 ```bash
 python3 tools/render_regression/acad_manifest_compare.py \
   --manifest "$NEXT_DIR/input/acad_manifest.json" \
