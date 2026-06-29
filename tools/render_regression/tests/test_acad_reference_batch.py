@@ -147,9 +147,19 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path):
     candidates = tmp_path / "candidate_cases.json"
     candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
 
+    out = tmp_path / "out"
+
     assert batch.main([
         "--from-request", str(request),
         "--candidate-cases", str(candidates),
         "--reference-dir", str(tmp_path / "returned"),
-        "--out-dir", str(tmp_path / "out"),
+        "--out-dir", str(out),
     ]) == 2
+    missing = json.loads((out / "missing_references.json").read_text(encoding="utf-8"))
+    assert missing["schema"] == "vemcad.acad_reference_missing/v1"
+    assert missing["missing_count"] == 1
+    assert missing["missing"][0]["id"] == "G11"
+    assert missing["missing"][0]["recommended_output_name"] == "G11_autocad_model_extents.png"
+    missing_md = (out / "missing_references.md").read_text(encoding="utf-8")
+    assert "Missing AutoCAD Reference PNGs" in missing_md
+    assert "G11_autocad_model_extents.png" in missing_md
