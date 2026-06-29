@@ -542,3 +542,38 @@ Boundary:
 - Input-prep diagnostics only.
 - No renderer change.
 - No private drawing or AutoCAD PNG committed.
+
+### Slice 11 — Partial Recapture Fulfillment
+
+Status: in progress in this branch.
+
+Deliverables:
+
+- `tools/render_regression/acad_reference_batch.py`
+- `tools/render_regression/tests/test_acad_reference_batch.py`
+- `docs/VEMCAD_G11_AUTOCAD_REFERENCE_INPUT_RUNBOOK_20260628.md`
+
+Behavior:
+
+- `acad_reference_batch.py --from-request` now accepts repeated `--case-id`
+  filters.
+- This allows a partial returned set, for example processing only `G11` while
+  the full request still contains all 12 cases.
+- Without `--case-id`, the helper still requires every requested PNG and writes
+  the missing-reference report when any are absent.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 5 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 88 passed
+```
+
+Boundary:
+
+- Input-prep automation only.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
