@@ -141,6 +141,9 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path):
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["schema"] == "vemcad.acad_manifest_compare_artifact_index/v1"
     assert {item["kind"] for item in artifact_index["artifacts"]} >= {
+        "summary_json",
+        "summary_markdown",
+        "summary_tsv",
         "contact_sheet",
         "autocad_reference",
         "vemcad_candidate",
@@ -225,3 +228,8 @@ def test_manifest_harness_stops_on_blocked_manifest(tmp_path):
     summary_md = (out / "summary.md").read_text(encoding="utf-8")
     assert "status: `blocked`" in summary_md
     assert "`diagnostic_capture_method`" in summary_md
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert {item["kind"] for item in artifact_index["artifacts"]} == {
+        "summary_json",
+        "summary_markdown",
+    }

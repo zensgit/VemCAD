@@ -265,10 +265,13 @@ def _text_provenance_summary(render_report: str, out_path: Path) -> dict[str, An
         }
 
 
-def _artifact_index(rows: list[dict[str, Any]], *, contact_sheet: str = "") -> dict[str, Any]:
+def _artifact_index(
+    rows: list[dict[str, Any]],
+    *,
+    run_artifacts: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
     artifacts: list[dict[str, str]] = []
-    if contact_sheet:
-        artifacts.append({"id": "", "kind": "contact_sheet", "path": contact_sheet})
+    artifacts.extend(run_artifacts or [])
     for row in rows:
         for key, kind in (
             ("acad_png", "autocad_reference"),
@@ -547,16 +550,28 @@ def main(argv: list[str] | None = None) -> int:
         out_dir=args.out_dir,
         dry_run=args.dry_run,
     )
-    _write_json(args.out_dir / "summary.json", report)
+    summary_json = args.out_dir / "summary.json"
+    summary_md = args.out_dir / "summary.md"
+    summary_tsv = args.out_dir / "summary.tsv"
+    artifact_index = args.out_dir / "artifact_index.json"
+    _write_json(summary_json, report)
     contact_sheet = ""
     if report["rows"] and not args.dry_run:
-        _write_tsv(args.out_dir / "summary.tsv", report["rows"])
+        _write_tsv(summary_tsv, report["rows"])
         contact_sheet = _write_contact_sheet(args.out_dir / "contact_sheet.png", report["rows"])
-        _write_json(args.out_dir / "artifact_index.json", _artifact_index(
-            report["rows"],
-            contact_sheet=contact_sheet,
-        ))
-    _write_markdown_summary(args.out_dir / "summary.md", report, contact_sheet=contact_sheet)
+    _write_markdown_summary(summary_md, report, contact_sheet=contact_sheet)
+    run_artifacts = [
+        {"id": "", "kind": "summary_json", "path": str(summary_json)},
+        {"id": "", "kind": "summary_markdown", "path": str(summary_md)},
+    ]
+    if summary_tsv.is_file():
+        run_artifacts.append({"id": "", "kind": "summary_tsv", "path": str(summary_tsv)})
+    if contact_sheet:
+        run_artifacts.append({"id": "", "kind": "contact_sheet", "path": contact_sheet})
+    _write_json(artifact_index, _artifact_index(
+        report["rows"],
+        run_artifacts=run_artifacts,
+    ))
 
     print(
         f"AutoCAD manifest compare: {report['status']} "
