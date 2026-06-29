@@ -376,3 +376,39 @@ Boundary:
 - Local/private evidence run only.
 - No private drawing, AutoCAD PNG, overlay, or contact sheet committed.
 - No renderer change.
+
+### Slice 7 — AutoCAD Recapture Request Artifacts
+
+Status: in progress in this branch.
+
+Deliverables:
+
+- `tools/render_regression/acad_manifest_compare.py`
+- `tools/render_regression/tests/test_acad_manifest_compare.py`
+
+Behavior:
+
+- When a comparison run contains `recapture-required` rows, the harness writes:
+  - `reference_request.json`
+  - `reference_request.md`
+- The request lists each case in triage order, with source DXF path, current
+  AutoCAD reference path, requested capture method, requested view contract,
+  recommended output filename, and capture instructions.
+- The request artifacts are included in `artifact_index.json`.
+- Matched/pass-only runs do not create a recapture request.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 6 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 85 passed
+```
+
+Boundary:
+
+- Evidence/request generation only.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
