@@ -64,9 +64,29 @@ def test_blank_returns_none(tmp_path):
     assert detect_sheet_rect_px(_img(tmp_path, "blank.png", 800, 600, frames=[])) is None
 
 
+def test_detects_narrow_portrait_sheet_with_large_side_margins(tmp_path):
+    # A portrait/A4 sheet can occupy a narrow band in the extents render when
+    # stale/large extents add side margins. The original single 40% span
+    # threshold missed its horizontal frame lines; the relaxed per-axis pass
+    # should still detect the sheet while preserving the tiny-frame fail-safe.
+    p = _img(tmp_path, "narrow_portrait.png", 1600, 1131, frames=[(588, 448, 940, 1028)])
+    r = detect_sheet_rect_px(p)
+    assert r is not None
+    x0, y0, x1, y1 = r
+    assert abs(x0 - 588) < 8 and abs(x1 - 940) < 8
+    assert abs(y0 - 448) < 8 and abs(y1 - 1028) < 8
+
+
 def test_tiny_frame_returns_none(tmp_path):
     # a frame far below min_frac of the canvas -> low confidence -> None.
     assert detect_sheet_rect_px(_img(tmp_path, "tiny.png", 1000, 700, frames=[(460, 320, 540, 390)])) is None
+
+
+def test_relaxed_detector_still_rejects_narrow_detail_box(tmp_path):
+    # The relaxed path is for narrow sheets, not arbitrary detail boxes. This
+    # frame spans enough height to be tempting, but its area is too small.
+    p = _img(tmp_path, "narrow_detail.png", 1600, 1131, frames=[(730, 240, 1020, 690)])
+    assert detect_sheet_rect_px(p) is None
 
 
 def test_px_rect_to_world_uses_report_mapping():

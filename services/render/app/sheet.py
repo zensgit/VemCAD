@@ -71,8 +71,51 @@ def _inner_edge_clusters(
     return left, right
 
 
+def _span_steps(span_frac: float, relaxed_span_frac: float) -> list[float]:
+    """Return conservative-to-relaxed span thresholds.
+
+    The shipping detector started with a single global span threshold. That is
+    safe for landscape sheets but too strict for portrait/narrow sheets rendered
+    with large side margins: their vertical frame edges are obvious, while the
+    horizontal frame lines may span only ~25-35% of the canvas. Relax per axis
+    so one weak axis does not make the whole detector fall back.
+    """
+    hi = max(span_frac, relaxed_span_frac)
+    lo = min(span_frac, relaxed_span_frac)
+    steps: list[float] = []
+    value = hi
+    while value >= lo - 1e-9:
+        steps.append(round(value, 3))
+        value -= 0.05
+    if steps[-1] != round(lo, 3):
+        steps.append(round(lo, 3))
+    return steps
+
+
+def _axis_edges(
+    counts: np.ndarray,
+    *,
+    count_span: int,
+    cluster_span: int,
+    span_frac: float,
+    relaxed_span_frac: float,
+) -> Optional[tuple[tuple[int, int], tuple[int, int]]]:
+    for frac in _span_steps(span_frac, relaxed_span_frac):
+        indices = np.where(counts > frac * count_span)[0]
+        edges = _inner_edge_clusters(_clusters(indices), cluster_span)
+        if edges is not None:
+            return edges
+    return None
+
+
 def detect_sheet_rect_px(
-    png_path: str, span_frac: float = 0.4, ink_thr: int = 30, min_frac: float = 0.25
+    png_path: str,
+    span_frac: float = 0.4,
+    ink_thr: int = 30,
+    min_frac: float = 0.25,
+    relaxed_span_frac: float = 0.20,
+    relaxed_min_frac: float = 0.18,
+    min_area_frac: float = 0.09,
 ) -> Optional[PixelRect]:
     """Pixel rect (x0,y0,x1,y1) of the 图框 via full-span-ink projection, or None.
 
@@ -80,19 +123,42 @@ def detect_sheet_rect_px(
     height/width; the outermost such columns/rows bound the sheet. Strays are
     isolated (not full-span) and fall outside. Returns None (fail-safe) when there
     is no confident frame: fewer than two spanning columns/rows, or the bounding
-    rect covers < min_frac of the canvas (a sliver/inner box, not the sheet)."""
+    rect covers too little of the canvas (a sliver/inner box, not the sheet)."""
     gray = np.asarray(Image.open(png_path).convert("L"), dtype=float)
     H, W = gray.shape
     ink = _ink_mask(gray, ink_thr)
-    vcols = np.where(ink.sum(axis=0) > span_frac * H)[0]
-    hrows = np.where(ink.sum(axis=1) > span_frac * W)[0]
-    v_edges = _inner_edge_clusters(_clusters(vcols), W)
-    h_edges = _inner_edge_clusters(_clusters(hrows), H)
+    v_edges = _axis_edges(
+        ink.sum(axis=0),
+        count_span=H,
+        cluster_span=W,
+        span_frac=span_frac,
+        relaxed_span_frac=relaxed_span_frac,
+    )
+    h_edges = _axis_edges(
+        ink.sum(axis=1),
+        count_span=W,
+        cluster_span=H,
+        span_frac=span_frac,
+        relaxed_span_frac=relaxed_span_frac,
+    )
     if v_edges is None or h_edges is None:
         return None
     x0, x1 = int(v_edges[0][0]), int(v_edges[1][1])
     y0, y1 = int(h_edges[0][0]), int(h_edges[1][1])
-    if (x1 - x0) < min_frac * W or (y1 - y0) < min_frac * H:
+    width_frac = (x1 - x0) / max(W, 1)
+    height_frac = (y1 - y0) / max(H, 1)
+    if width_frac < min_frac or height_frac < min_frac:
+        # Narrow portrait/A4 sheets can legitimately be <25% of the extents
+        # canvas width after a stale/large extents fit. Accept only if both axes
+        # still have meaningful span and the rectangle has enough area; otherwise
+        # keep the existing fail-safe for detail boxes and tiny inner frames.
+        if (
+            width_frac < relaxed_min_frac
+            or height_frac < relaxed_min_frac
+            or width_frac * height_frac < min_area_frac
+        ):
+            return None
+    if x1 <= x0 or y1 <= y0:
         return None
     return (x0, y0, x1, y1)
 
