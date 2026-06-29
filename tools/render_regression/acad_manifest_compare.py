@@ -18,6 +18,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+from PIL import Image, ImageDraw, ImageOps
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import acad_reference_manifest as arm  # noqa: E402
@@ -145,6 +147,91 @@ def _write_tsv(path: Path, rows: list[dict[str, Any]]) -> None:
             )
 
 
+def _thumb(path: str, size: tuple[int, int]) -> Image.Image:
+    image = Image.open(path).convert("RGB")
+    thumb = ImageOps.contain(image, size)
+    out = Image.new("RGB", size, "white")
+    out.paste(thumb, ((size[0] - thumb.width) // 2, (size[1] - thumb.height) // 2))
+    return out
+
+
+def _placeholder(size: tuple[int, int], text: str) -> Image.Image:
+    out = Image.new("RGB", size, "white")
+    draw = ImageDraw.Draw(out)
+    draw.rectangle([0, 0, size[0] - 1, size[1] - 1], outline=(190, 190, 190))
+    y = 12
+    for line in text.splitlines()[:8]:
+        draw.text((12, y), line[:64], fill=(70, 70, 70))
+        y += 18
+    return out
+
+
+def _contact_cell(path: str, size: tuple[int, int], *, missing: str) -> Image.Image:
+    if path and Path(path).is_file():
+        return _thumb(path, size)
+    return _placeholder(size, missing)
+
+
+def _write_contact_sheet(path: Path, rows: list[dict[str, Any]]) -> str:
+    """Write a quick-review AutoCAD / VemCAD / overlay contact sheet.
+
+    The JSON/TSV files remain authoritative. This PNG is deliberately only a
+    review affordance for unattended runs: after a batch finishes, the operator
+    can scan one artifact before drilling into per-case overlays.
+    """
+    if not rows:
+        return ""
+    tile_w, tile_h = 360, 255
+    label_h = 54
+    pad = 12
+    cols = 3
+    row_h = label_h + tile_h + pad
+    width = pad * (cols + 1) + tile_w * cols
+    height = pad + row_h * len(rows)
+    canvas = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(canvas)
+    status_colors = {
+        "match": (45, 140, 70),
+        "mismatch": (195, 120, 0),
+        "unavailable": (160, 70, 70),
+    }
+    y = pad
+    for row in rows:
+        status = str(row.get("viewspace_status") or "")
+        color = status_colors.get(status, (90, 90, 90))
+        summary = row.get("x3_summary") or {}
+        title = (
+            f"{row.get('id', '')}  view={status or '?'}  "
+            f"IoU={summary.get('ink_iou', '')}  band={summary.get('band', '')}"
+        )
+        draw.text((pad, y), title, fill=color)
+        reason = str(row.get("viewspace_reason") or row.get("recommended_action") or "")
+        if reason:
+            draw.text((pad, y + 18), reason[:150], fill=(55, 55, 55))
+        for col, (label, key) in enumerate((
+            ("AutoCAD", "acad_png"),
+            ("VemCAD", "ours"),
+            ("overlay", "overlay"),
+        )):
+            x = pad + col * (tile_w + pad)
+            image = _contact_cell(
+                str(row.get(key) or ""),
+                (tile_w, tile_h),
+                missing=f"no {label} image",
+            )
+            canvas.paste(image, (x, y + label_h))
+            draw.rectangle(
+                [x, y + label_h, x + tile_w - 1, y + label_h + tile_h - 1],
+                outline=color,
+                width=3,
+            )
+            draw.text((x + 6, y + label_h + 6), label, fill=color)
+        y += row_h
+    path.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(path)
+    return str(path)
+
+
 def _text_provenance_summary(render_report: str, out_path: Path) -> dict[str, Any]:
     if not render_report:
         return {"status": "unavailable", "reason": "no_render_report"}
@@ -178,8 +265,10 @@ def _text_provenance_summary(render_report: str, out_path: Path) -> dict[str, An
         }
 
 
-def _artifact_index(rows: list[dict[str, Any]]) -> dict[str, Any]:
+def _artifact_index(rows: list[dict[str, Any]], *, contact_sheet: str = "") -> dict[str, Any]:
     artifacts: list[dict[str, str]] = []
+    if contact_sheet:
+        artifacts.append({"id": "", "kind": "contact_sheet", "path": contact_sheet})
     for row in rows:
         for key, kind in (
             ("acad_png", "autocad_reference"),
@@ -351,7 +440,11 @@ def main(argv: list[str] | None = None) -> int:
     _write_json(args.out_dir / "summary.json", report)
     if report["rows"] and not args.dry_run:
         _write_tsv(args.out_dir / "summary.tsv", report["rows"])
-        _write_json(args.out_dir / "artifact_index.json", _artifact_index(report["rows"]))
+        contact_sheet = _write_contact_sheet(args.out_dir / "contact_sheet.png", report["rows"])
+        _write_json(args.out_dir / "artifact_index.json", _artifact_index(
+            report["rows"],
+            contact_sheet=contact_sheet,
+        ))
 
     print(
         f"AutoCAD manifest compare: {report['status']} "

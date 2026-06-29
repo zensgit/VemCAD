@@ -131,9 +131,11 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path):
     assert Path(row["viewspace_report"]).is_file()
     assert Path(row["overlay"]).is_file()
     assert (out / "summary.tsv").is_file()
+    assert (out / "contact_sheet.png").stat().st_size > 1000
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["schema"] == "vemcad.acad_manifest_compare_artifact_index/v1"
     assert {item["kind"] for item in artifact_index["artifacts"]} >= {
+        "contact_sheet",
         "autocad_reference",
         "vemcad_candidate",
         "x3_overlay",
@@ -190,6 +192,7 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert row["compare_exit_code"] == 2
     assert row["recommended_action"].startswith("recapture AutoCAD")
     assert summary["boundary"]["autocad_equivalence_claim"] is False
+    assert (out / "contact_sheet.png").stat().st_size > 1000
 
 
 def test_manifest_harness_stops_on_blocked_manifest(tmp_path):
