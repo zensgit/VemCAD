@@ -126,7 +126,7 @@ def _write_tsv(path: Path, rows: list[dict[str, Any]]) -> None:
         handle.write(
             "id\tdrawing_id\tviewspace_status\tx3_band\tink_iou\tcolor_dist\t"
             "aspect_delta\tcompare_exit_code\ttext_flags\ttext_notes\t"
-            "acad_png\tours\toverlay\tviewspace_report\n"
+            "triage_rank\ttriage_bucket\tacad_png\tours\toverlay\tviewspace_report\n"
         )
         for row in rows:
             summary = row.get("x3_summary") or {}
@@ -141,7 +141,8 @@ def _write_tsv(path: Path, rows: list[dict[str, Any]]) -> None:
                 f"{row['id']}\t{row.get('drawing_id', '')}\t{row.get('viewspace_status', '')}\t"
                 f"{summary.get('band', '')}\t{summary.get('ink_iou', '')}\t"
                 f"{summary.get('color_dist', '')}\t{summary.get('aspect_delta', '')}\t"
-                f"{row.get('compare_exit_code', '')}\t{text_flags}\t{text_notes}\t{row.get('acad_png', '')}\t"
+                f"{row.get('compare_exit_code', '')}\t{text_flags}\t{text_notes}\t"
+                f"{row.get('triage_rank', '')}\t{row.get('triage_bucket', '')}\t{row.get('acad_png', '')}\t"
                 f"{row.get('ours', '')}\t{row.get('overlay', '')}\t"
                 f"{row.get('viewspace_report', '')}\n"
             )
@@ -395,9 +396,10 @@ def _write_markdown_summary(path: Path, report: dict[str, Any], *, contact_sheet
         ])
         for rank, row in enumerate(_triage_rows(rows), start=1):
             summary = row.get("x3_summary") or {}
-            bucket = _triage_bucket(row)
+            bucket = _str(row.get("triage_bucket")) or _triage_bucket(row)
+            display_rank = row.get("triage_rank") or rank
             lines.append(
-                f"| {rank} | `{_md(row.get('id'))}` | `{bucket}` | "
+                f"| {display_rank} | `{_md(row.get('id'))}` | `{bucket}` | "
                 f"`{_md(row.get('viewspace_status'))}` | `{_md(summary.get('band'))}` | "
                 f"{_md(summary.get('ink_iou'))} | {_md(row.get('recommended_action'))} |"
             )
@@ -452,6 +454,12 @@ def _triage_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return (bucket_order.get(_triage_bucket(row), 99), ink_iou, _str(row.get("id")))
 
     return sorted(rows, key=key)
+
+
+def _annotate_triage(rows: list[dict[str, Any]]) -> None:
+    for rank, row in enumerate(_triage_rows(rows), start=1):
+        row["triage_rank"] = rank
+        row["triage_bucket"] = _triage_bucket(row)
 
 
 def _compare_case(case: dict[str, Any], candidate: dict[str, Any], out_dir: Path) -> dict[str, Any]:
@@ -558,6 +566,9 @@ def build_report(
                     status = "viewspace_mismatch"
             if status == "pass" and any(row["compare_exit_code"] != 0 for row in rows):
                 status = "compare_failed"
+
+    if rows:
+        _annotate_triage(rows)
 
     report = {
         "schema": SCHEMA,
