@@ -346,6 +346,9 @@ Next action:
 
 - Get a clean AutoCAD export at model EXTENTS with matching aspect, or provide
   the explicit world `--window` for the AutoCAD plot.
+- Post-closeout follow-up `VEMCAD_G11_MATCHED_WINDOW_DERIVATION_20260628.md`
+  attempted to derive that window from the existing PNG/report pair. It did not
+  find a trustworthy world window; the input/view contract remains the blocker.
 - Then rerun:
   `tools/render_regression/acad_manifest_compare.py --manifest ... --candidate-cases ... --out-dir ...`
 - Only if that rerun reports `viewspace_status=match` should X3 and semantic
