@@ -203,7 +203,7 @@ Boundary:
 
 ### Slice 4 — Markdown Triage Priority Table
 
-Status: in progress in this branch.
+Status: merged in PR #182 (`b5c0428`).
 
 Deliverables:
 
@@ -239,3 +239,34 @@ Boundary:
 - No scoring threshold change.
 - No renderer change.
 - No private drawing or AutoCAD PNG committed.
+
+## Current Closeout (2026-06-29)
+
+Landed in this goal so far:
+
+| Slice | PR | Result |
+| --- | --- | --- |
+| 0-1 | #179 (`a0ba846`) | Two-week plan + DEV/V ledger + `summary.md` evidence report. |
+| 2 | #180 (`ea535dc`) | Complete `artifact_index.json` for all harness runs, including blocked/dry-run cases. |
+| 3 | #181 (`38182cb`) | Private 12-case AutoCAD batch rerun recorded; all rows remain view-space mismatch. |
+| 4 | #182 (`b5c0428`) | Markdown triage priority table added to unattended comparison reports. |
+
+Latest known VemCAD main after these slices: `b5c0428`.
+
+Autonomous engineering status:
+
+- The comparison harness now leaves a self-contained evidence bundle:
+  `summary.json`, `summary.md`, optional `summary.tsv`, `artifact_index.json`,
+  `contact_sheet.png`, overlays, and per-case view-space reports.
+- The report now tells a reviewer which cases are `renderer-candidate` versus
+  `recapture-required`, so mismatched AutoCAD captures do not accidentally
+  become renderer work.
+- The existing local AutoCAD batch has been rerun with the new tooling:
+  `12/12` compared, `0` input issues, all `viewspace_mismatch`.
+
+Remaining gate:
+
+- A formal AutoCAD parity claim still requires at least one fresh AutoCAD
+  model-extents export PNG or an explicit AutoCAD world plot/window rectangle.
+- Until that input exists, the next valid state is `blocked_on_reference_input`;
+  renderer tuning remains out of scope.
