@@ -157,6 +157,8 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path):
         "x3_overlay",
         "viewspace_report",
     }
+    assert not (out / "reference_request.json").exists()
+    assert not (out / "reference_request.md").exists()
 
 
 def test_manifest_harness_surfaces_text_provenance_notes(tmp_path):
@@ -216,6 +218,21 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert "| `G11` | G11/B11 | `mismatch` | `fallback` |" in summary_md
     assert "| 1 | `G11` | `recapture-required` | `mismatch` | `fallback` |" in summary_md
     assert (out / "contact_sheet.png").stat().st_size > 1000
+    request = json.loads((out / "reference_request.json").read_text(encoding="utf-8"))
+    assert request["schema"] == "vemcad.acad_reference_request/v1"
+    assert request["reason"] == "recapture-required"
+    assert request["case_count"] == 1
+    assert request["cases"][0]["id"] == "G11"
+    assert request["cases"][0]["requested_view_contract"] == "model-extents"
+    assert request["cases"][0]["recommended_output_name"] == "G11_autocad_model_extents.png"
+    request_md = (out / "reference_request.md").read_text(encoding="utf-8")
+    assert "AutoCAD Reference Recapture Request" in request_md
+    assert "G11_autocad_model_extents.png" in request_md
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert {item["kind"] for item in artifact_index["artifacts"]} >= {
+        "reference_request_json",
+        "reference_request_markdown",
+    }
 
 
 def test_manifest_harness_stops_on_blocked_manifest(tmp_path):

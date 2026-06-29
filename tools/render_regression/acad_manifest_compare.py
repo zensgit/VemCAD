@@ -425,6 +425,75 @@ def _write_markdown_summary(path: Path, report: dict[str, Any], *, contact_sheet
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
 
+def _recapture_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [row for row in _triage_rows(rows) if _triage_bucket(row) == "recapture-required"]
+
+
+def _write_reference_request(out_dir: Path, rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    recaptures = _recapture_rows(rows)
+    if not recaptures:
+        return []
+    json_path = out_dir / "reference_request.json"
+    md_path = out_dir / "reference_request.md"
+    cases: list[dict[str, Any]] = []
+    for row in recaptures:
+        case_id = _str(row.get("id"))
+        cases.append({
+            "id": case_id,
+            "drawing_id": row.get("drawing_id", ""),
+            "source_dxf": row.get("source_dxf", ""),
+            "current_acad_png": row.get("acad_png", ""),
+            "current_viewspace_status": row.get("viewspace_status", ""),
+            "current_x3_band": (row.get("x3_summary") or {}).get("band", ""),
+            "current_ink_iou": (row.get("x3_summary") or {}).get("ink_iou", ""),
+            "triage_rank": row.get("triage_rank", ""),
+            "triage_bucket": row.get("triage_bucket", ""),
+            "requested_capture_method": "plot-export",
+            "requested_view_contract": "model-extents",
+            "recommended_output_name": f"{_safe_case_name(case_id)}_autocad_model_extents.png",
+            "instructions": (
+                "Export from AutoCAD model space at drawing extents, white background, "
+                "monochrome off, no toolbar/chrome, long edge >= 1600px."
+            ),
+        })
+    payload = {
+        "schema": "vemcad.acad_reference_request/v1",
+        "reason": "recapture-required",
+        "case_count": len(cases),
+        "cases": cases,
+    }
+    _write_json(json_path, payload)
+    lines = [
+        "# AutoCAD Reference Recapture Request",
+        "",
+        "These cases failed the view-space contract. They need fresh AutoCAD model-extents exports before X3 can be interpreted as render fidelity.",
+        "",
+        "| Rank | Case | Drawing | Requested PNG | Source DXF |",
+        "| ---: | --- | --- | --- | --- |",
+    ]
+    for case in cases:
+        lines.append(
+            f"| {case['triage_rank']} | `{_md(case['id'])}` | {_md(case['drawing_id'])} | "
+            f"`{_md(case['recommended_output_name'])}` | `{_md(case['source_dxf'])}` |"
+        )
+    lines.extend([
+        "",
+        "## Capture Contract",
+        "",
+        "- AutoCAD model space, drawing EXTENTS / fit-to-drawing.",
+        "- White background.",
+        "- Monochrome off; preserve layer colors.",
+        "- No toolbar, viewport chrome, screenshot crop, or post-scaled image.",
+        "- Long edge >= 1600 px.",
+        "- If a custom plot window is used, record the AutoCAD world rectangle and use `explicit-window` instead of this request.",
+    ])
+    md_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return [
+        {"id": "", "kind": "reference_request_json", "path": str(json_path)},
+        {"id": "", "kind": "reference_request_markdown", "path": str(md_path)},
+    ]
+
+
 def _triage_bucket(row: dict[str, Any]) -> str:
     status = _str(row.get("viewspace_status"))
     band = _str((row.get("x3_summary") or {}).get("band"))
@@ -620,6 +689,7 @@ def main(argv: list[str] | None = None) -> int:
         _write_tsv(summary_tsv, report["rows"])
         contact_sheet = _write_contact_sheet(args.out_dir / "contact_sheet.png", report["rows"])
     _write_markdown_summary(summary_md, report, contact_sheet=contact_sheet)
+    reference_request_artifacts = _write_reference_request(args.out_dir, report["rows"])
     run_artifacts = [
         {"id": "", "kind": "summary_json", "path": str(summary_json)},
         {"id": "", "kind": "summary_markdown", "path": str(summary_md)},
@@ -628,6 +698,7 @@ def main(argv: list[str] | None = None) -> int:
         run_artifacts.append({"id": "", "kind": "summary_tsv", "path": str(summary_tsv)})
     if contact_sheet:
         run_artifacts.append({"id": "", "kind": "contact_sheet", "path": contact_sheet})
+    run_artifacts.extend(reference_request_artifacts)
     _write_json(artifact_index, _artifact_index(
         report["rows"],
         run_artifacts=run_artifacts,
