@@ -11,6 +11,7 @@ from typing import Any
 
 
 SCHEMA = "vemcad.acad_artifact_route/v1"
+BATCH_SCHEMA = "vemcad.acad_artifact_route_batch/v1"
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -154,6 +155,17 @@ def route_artifact_index(path: Path) -> dict[str, Any]:
     }
 
 
+def route_artifact_indexes(paths: list[Path]) -> dict[str, Any]:
+    if not paths:
+        raise ValueError("at least one artifact index is required")
+    routes = [route_artifact_index(path) for path in paths]
+    return {
+        "schema": BATCH_SCHEMA,
+        "count": len(routes),
+        "routes": routes,
+    }
+
+
 def _write_text(route: dict[str, Any]) -> str:
     action = route.get("recommended_next_action") or {}
     lines = [
@@ -171,24 +183,41 @@ def _write_text(route: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _write_batch_text(payload: dict[str, Any]) -> str:
+    chunks = []
+    for index, route in enumerate(payload.get("routes") or [], start=1):
+        chunks.append("\n".join([
+            f"route: {index}",
+            f"artifact_index: {route.get('artifact_index', '')}",
+            _write_text(route),
+        ]))
+    return "\n\n".join(chunks)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="acad_artifact_route",
         description="Read an AutoCAD reference artifact index and print the next safe action.")
-    parser.add_argument("artifact_index", type=Path,
-                        help="artifact_index.json, or a directory containing artifact_index.json")
+    parser.add_argument("artifact_index", type=Path, nargs="+",
+                        help="artifact_index.json, or directories containing artifact_index.json")
     parser.add_argument("--text", action="store_true", help="print a human-readable summary instead of JSON")
     args = parser.parse_args(argv)
 
     try:
-        route = route_artifact_index(args.artifact_index)
+        if len(args.artifact_index) == 1:
+            payload = route_artifact_index(args.artifact_index[0])
+        else:
+            payload = route_artifact_indexes(args.artifact_index)
     except Exception as exc:
         print(f"acad_artifact_route: {exc}", file=sys.stderr)
         return 2
     if args.text:
-        print(_write_text(route))
+        if payload.get("schema") == BATCH_SCHEMA:
+            print(_write_batch_text(payload))
+        else:
+            print(_write_text(payload))
     else:
-        print(json.dumps(route, ensure_ascii=False, indent=2))
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
 

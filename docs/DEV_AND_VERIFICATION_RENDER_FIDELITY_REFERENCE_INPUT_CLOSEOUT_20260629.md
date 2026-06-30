@@ -726,6 +726,65 @@ python3 tools/render_regression/acad_artifact_route.py \
 # recommended_next_action: recapture-autocad-or-provide-window
 ```
 
+## Follow-Up Artifact Route Multiple Inputs
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let unattended runs route the input-prep, run-root, and compare artifact
+  indexes in one command after CI artifact extraction.
+- Reduce manual `jq`/path handling while preserving the fail-closed routing
+  discipline.
+
+Changes:
+
+- `acad_artifact_route.py` now accepts one or more artifact index files or
+  directories.
+- Single-input JSON remains the original `vemcad.acad_artifact_route/v1`
+  object for backward compatibility.
+- Multi-input JSON returns `vemcad.acad_artifact_route_batch/v1` with one
+  `routes[]` entry per supplied path.
+- Multi-input `--text` prints one section per route.
+
+Boundary:
+
+- Read-only CLI ergonomics only.
+- No routing-rule change.
+- No renderer change.
+- No AutoCAD PNG equivalence claim.
+- `viewspace_mismatch` still routes to recapture/window input, not renderer
+  tuning.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# 8 passed
+```
+
+Private compatibility smoke:
+
+```bash
+python3 tools/render_regression/acad_reference_request_run.py \
+  --from-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir /private/tmp/vemcad-provenance-compat-smoke-20260629/returned \
+  --case-id G11 \
+  --out-dir /private/tmp/vemcad-artifact-route-multi-smoke-20260629
+
+python3 tools/render_regression/acad_artifact_route.py \
+  /private/tmp/vemcad-artifact-route-multi-smoke-20260629/input \
+  /private/tmp/vemcad-artifact-route-multi-smoke-20260629 \
+  /private/tmp/vemcad-artifact-route-multi-smoke-20260629/compare --text
+# route: 1
+# recommended_next_action: continue-to-request-run
+# route: 2
+# recommended_next_action: recapture-autocad-or-provide-window
+# route: 3
+# recommended_next_action: recapture-autocad-or-provide-window
+```
+
 Private compatibility smoke:
 
 ```bash

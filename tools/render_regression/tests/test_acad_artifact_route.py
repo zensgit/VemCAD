@@ -72,6 +72,70 @@ def test_routes_run_case_actions(tmp_path):
     assert "case_action_counts: recapture-autocad-or-provide-window=1" in text
 
 
+def test_routes_multiple_directories_as_batch(tmp_path):
+    input_dir = tmp_path / "input"
+    compare_dir = tmp_path / "compare"
+    input_dir.mkdir()
+    compare_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "pass",
+        "case_count": 1,
+        "artifacts": [],
+    })
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"recapture-required": 1},
+        "viewspace_status_counts": {"mismatch": 1},
+        "x3_band_counts": {"fallback": 1},
+        "artifacts": [],
+    })
+
+    payload = route.route_artifact_indexes([input_dir, compare_dir])
+
+    assert payload["schema"] == "vemcad.acad_artifact_route_batch/v1"
+    assert payload["count"] == 2
+    assert [item["kind"] for item in payload["routes"]] == ["batch", "compare"]
+    assert payload["routes"][0]["recommended_next_action"]["code"] == "continue-to-request-run"
+    assert payload["routes"][1]["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
+
+
+def test_cli_multiple_directories_text(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    compare_dir = tmp_path / "compare"
+    input_dir.mkdir()
+    compare_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "pass",
+        "case_count": 1,
+        "artifacts": [],
+    })
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"recapture-required": 1},
+        "viewspace_status_counts": {"mismatch": 1},
+        "x3_band_counts": {"fallback": 1},
+        "artifacts": [],
+    })
+
+    assert route.main([str(input_dir), str(compare_dir), "--text"]) == 0
+    output = capsys.readouterr().out
+
+    assert "route: 1" in output
+    assert "route: 2" in output
+    assert "recommended_next_action: continue-to-request-run" in output
+    assert "recommended_next_action: recapture-autocad-or-provide-window" in output
+
+
 def test_routes_compare_renderer_candidate_before_recapture(tmp_path):
     index = _write(tmp_path / "artifact_index.json", {
         "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
