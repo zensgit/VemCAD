@@ -1335,6 +1335,45 @@ python3 -m pytest tools/render_regression/tests -q
 # 192 passed
 ```
 
+## Follow-Up Request Validation Provenance Markdown
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make request-package validation Markdown show the exact source DXF and
+  candidate PNG provenance that was checked.
+- Let reviewers confirm the bound file identities from the human-readable
+  validation artifact instead of opening `reference_request_validation.json`.
+
+Changes:
+
+- `reference_request_validation.md` now adds `Source provenance` and
+  `Candidate provenance` columns.
+- Each provenance cell prints `sha256=<digest> size=<bytes>` when the file is
+  present and validated.
+- The README documents that request validation Markdown surfaces this
+  provenance beside the resolved file paths.
+
+Boundary:
+
+- Request-validation evidence surface only.
+- No request validation rule change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 22 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 192 passed
+```
+
 ## Follow-Up Batch Input-Review Fail Flag
 
 Status: implemented in this branch.

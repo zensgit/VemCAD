@@ -95,6 +95,19 @@ def _expected_size_dimensions(expected_size: Any) -> tuple[int, int] | None:
     return width_int, height_int
 
 
+def _provenance_text(provenance: Any) -> str:
+    if not isinstance(provenance, dict):
+        return ""
+    parts: list[str] = []
+    sha = _str(provenance.get("sha256"))
+    size = provenance.get("size_bytes")
+    if sha:
+        parts.append(f"sha256={sha}")
+    if size is not None:
+        parts.append(f"size={size}")
+    return " ".join(parts)
+
+
 def _image_size(path: Path) -> tuple[int, int]:
     with Image.open(path) as image:
         return image.size
@@ -885,8 +898,11 @@ def _write_reference_request_validation_report(
         "This validates request-package identity and provenance before AutoCAD PNG fulfilment. "
         "It does not compare renders and does not claim AutoCAD equivalence.",
         "",
-        "| Case | Drawing | Output PNG | Capture | View | Expected size | Source | Candidate | Issues |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        (
+            "| Case | Drawing | Output PNG | Capture | View | Expected size | "
+            "Source | Source provenance | Candidate | Candidate provenance | Issues |"
+        ),
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in rows:
         issue_text = ", ".join(f"{item['severity']}:{item['code']}" for item in row["issues"]) or "-"
@@ -896,7 +912,10 @@ def _write_reference_request_validation_report(
             f"{_md_code_cell(row.get('requested_view_contract'))} | "
             f"{_md_code_cell(row.get('requested_expected_size'))} | "
             f"{_md_code_cell(row.get('source_dxf'))} | "
-            f"{_md_code_cell(row.get('candidate_png'))} | {_md_table_cell(issue_text)} |"
+            f"{_md_code_cell(_provenance_text(row.get('source_dxf_provenance')))} | "
+            f"{_md_code_cell(row.get('candidate_png'))} | "
+            f"{_md_code_cell(_provenance_text(row.get('candidate_png_provenance')))} | "
+            f"{_md_table_cell(issue_text)} |"
         )
     if global_issues:
         lines.extend(["", "## Candidate File Issues", ""])

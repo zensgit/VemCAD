@@ -231,7 +231,9 @@ wrapper also surfaces that TSV in its run summary and artifact index when the
 request is input-blocked.
 The request validation report itself also records the requested expected size
 per row, so operators can verify the capture-size contract before any returned
-AutoCAD PNG exists.
+AutoCAD PNG exists. Its Markdown table also prints source DXF and candidate PNG
+provenance (`sha256` and size) beside the resolved paths, so reviewers can
+confirm which files were bound without opening JSON.
 Request validation, returned-reference intake, and compare reports print
 `issue_code_counts` at the top, so operators can see the issue classes without
 scanning per-case tables. Returned-reference intake also prints the requested

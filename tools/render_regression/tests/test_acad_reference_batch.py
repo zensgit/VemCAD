@@ -202,6 +202,8 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
     assert "issue_code_counts: `none`" in validation_md
     assert "source_request_boundary: `autocad_equivalence_claim=False" in validation_md
     assert "requires_returned_autocad_png=True" in validation_md
+    assert f"sha256={_sha256(source)} size={source.stat().st_size}" in validation_md
+    assert f"sha256={_sha256(ours)} size={ours.stat().st_size}" in validation_md
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["stage"] == "request_validation"
     assert artifact_index["status"] == "pass"
@@ -262,7 +264,7 @@ def test_batch_generator_escapes_reference_request_validation_markdown_table_cel
     assert "G11\\|bearing cap" in row
     assert "`G11\\|acad_model_extents.png`" in row
     assert "G11\\|ours.png" in row
-    assert _unescaped_pipe_count(row) == 10
+    assert _unescaped_pipe_count(row) == 12
 
 
 def test_batch_generator_can_require_reference_request_boundary(tmp_path):
