@@ -674,6 +674,58 @@ python3 tools/render_regression/acad_artifact_route.py \
 # triage_bucket_counts: recapture-required=1
 ```
 
+## Follow-Up Artifact Route Directory Input
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make the artifact route helper easier to use after CI artifact extraction.
+- Allow operators to pass the batch/run/compare directory directly instead of
+  manually appending `artifact_index.json`.
+
+Changes:
+
+- `acad_artifact_route.py` now accepts either:
+  - an `artifact_index.json` file; or
+  - a directory containing `artifact_index.json`.
+- Directories without `artifact_index.json` fail closed with exit code `2`.
+
+Boundary:
+
+- Read-only CLI ergonomics only.
+- No routing-rule change.
+- No renderer change.
+- No AutoCAD PNG equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# 6 passed
+```
+
+Private compatibility smoke:
+
+```bash
+python3 tools/render_regression/acad_reference_request_run.py \
+  --from-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir /private/tmp/vemcad-provenance-compat-smoke-20260629/returned \
+  --case-id G11 \
+  --out-dir /private/tmp/vemcad-artifact-route-dir-smoke-20260629
+
+python3 tools/render_regression/acad_artifact_route.py \
+  /private/tmp/vemcad-artifact-route-dir-smoke-20260629 --text
+# kind: request_run
+# recommended_next_action: recapture-autocad-or-provide-window
+
+python3 tools/render_regression/acad_artifact_route.py \
+  /private/tmp/vemcad-artifact-route-dir-smoke-20260629/compare --text
+# kind: compare
+# recommended_next_action: recapture-autocad-or-provide-window
+```
+
 Private compatibility smoke:
 
 ```bash
