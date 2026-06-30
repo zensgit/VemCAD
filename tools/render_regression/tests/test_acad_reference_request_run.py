@@ -191,6 +191,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
         "request_run": 1,
     }
     assert summary["route_status_counts"] == {"pass": 3}
+    assert summary["route_final_exit_code_counts"] == {"0": 2}
     assert summary["route_recommended_action_counts"] == {
         "continue-to-request-run": 1,
         "review-x3-pass": 2,
@@ -232,6 +233,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
         "request_run": 1,
     }
     assert artifact_index["route_status_counts"] == {"pass": 3}
+    assert artifact_index["route_final_exit_code_counts"] == {"0": 2}
     assert artifact_index["route_recommended_action_counts"] == {
         "continue-to-request-run": 1,
         "review-x3-pass": 2,
@@ -250,6 +252,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert routed_run["route_compared_count"] == 1
     assert routed_run["route_triage_bucket_counts"] == {"matched-pass": 1}
     assert routed_run["route_viewspace_status_counts"] == {"match": 1}
+    assert routed_run["route_final_exit_code_counts"] == {"0": 2}
     assert routed_run["route_x3_band_counts"] == {"pass": 1}
     assert "recommended next action: review-x3-pass" in stdout
     assert "final exit code: 0" in stdout
@@ -261,6 +264,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert "route compared cases: 1" in stdout
     assert "route triage buckets: matched-pass=1" in stdout
     assert "route viewspace statuses: match=1" in stdout
+    assert "route final exit codes: 0=2" in stdout
     assert "route x3 bands: pass=1" in stdout
     assert f"route summary  : {out / 'route_summary.md'}" in stdout
     assert compare_summary["status"] == "pass"
@@ -278,6 +282,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert "route_count: `3`" in summary_md
     assert "route_kind_counts: `batch=1, compare=1, request_run=1`" in summary_md
     assert "route_status_counts: `pass=3`" in summary_md
+    assert "route_final_exit_code_counts: `0=2`" in summary_md
     assert "route_recommended_action_counts: `continue-to-request-run=1, review-x3-pass=2`" in summary_md
     assert "route_recommended_action_domain_counts: `continue=1, pass-review=2`" in summary_md
     assert "route_compare_case_count: `1`" in summary_md
@@ -440,6 +445,7 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
         "pass": 1,
         "viewspace_mismatch": 2,
     }
+    assert summary["route_final_exit_code_counts"] == {"0": 1, "2": 1}
     assert summary["route_recommended_action_counts"] == {
         "continue-to-request-run": 1,
         "recapture-autocad-or-provide-window": 2,
@@ -469,6 +475,7 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
         "match": 1,
         "mismatch": 1,
     }
+    assert artifact_index["route_final_exit_code_counts"] == {"0": 1, "2": 1}
     assert artifact_index["route_x3_band_counts"] == {"pass": 2}
     assert artifact_index["recommended_next_action_artifact_resolved"] == str(
         (out / "compare" / "reference_request.md").resolve()
@@ -489,6 +496,7 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert "route compared cases: 2" in stdout
     assert "route triage buckets: matched-pass=1, recapture-required=1" in stdout
     assert "route viewspace statuses: match=1, mismatch=1" in stdout
+    assert "route final exit codes: 0=1, 2=1" in stdout
     assert "route x3 bands: pass=2" in stdout
     assert f"route summary  : {out / 'route_summary.md'}" in stdout
     assert artifact_index["case_actions"] == summary["case_actions"]
@@ -522,6 +530,7 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert f"compare reference request: `{out / 'compare' / 'reference_request.md'}`" in summary_md
     assert f"compare reference request json: `{out / 'compare' / 'reference_request.json'}`" in summary_md
     assert "route_status_counts: `pass=1, viewspace_mismatch=2`" in summary_md
+    assert "route_final_exit_code_counts: `0=1, 2=1`" in summary_md
     assert (
         "route_recommended_action_counts: "
         "`continue-to-request-run=1, recapture-autocad-or-provide-window=2`"
@@ -707,9 +716,12 @@ def test_reference_request_run_can_fail_closed_on_input_review_warnings(tmp_path
     fail_artifact_index = _run_artifact_index(fail_out)
     assert fail_artifact_index["final_exit_code"] == 2
     assert fail_artifact_index["fail_on_input_review"] is True
+    assert fail_summary["route_final_exit_code_counts"] == {"0": 1, "2": 1}
+    assert fail_artifact_index["route_final_exit_code_counts"] == {"0": 1, "2": 1}
     fail_summary_md = (fail_out / "run_summary.md").read_text(encoding="utf-8")
     assert "final_exit_code: `2`" in fail_summary_md
     assert "fail_on_input_review: `True`" in fail_summary_md
+    assert "route_final_exit_code_counts: `0=1, 2=1`" in fail_summary_md
 
 
 def test_reference_request_run_routes_intake_blocked_to_fix_returned_input(tmp_path, capsys):

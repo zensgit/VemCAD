@@ -218,6 +218,7 @@ def test_routes_run_case_actions(tmp_path):
     index = _write(tmp_path / "artifact_index.json", {
         "schema": "vemcad.acad_reference_request_run_artifact_index/v1",
         "status": "viewspace_mismatch",
+        "final_exit_code": 2,
         "recommended_next_action": {
             "code": "recapture-autocad-or-provide-window",
             "message": "recapture",
@@ -228,6 +229,7 @@ def test_routes_run_case_actions(tmp_path):
         "route_count": 3,
         "route_kind_counts": {"batch": 1, "compare": 1, "request_run": 1},
         "route_status_counts": {"pass": 1, "viewspace_mismatch": 2},
+        "route_final_exit_code_counts": {"0": 2, "2": 1},
         "route_recommended_action_counts": {
             "continue-to-request-run": 1,
             "recapture-autocad-or-provide-window": 2,
@@ -281,11 +283,13 @@ def test_routes_run_case_actions(tmp_path):
     assert payload["kind"] == "request_run"
     assert payload["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
     assert payload["recommended_next_action"]["domain"] == "input"
+    assert payload["final_exit_code"] == 2
     assert payload["case_action_counts"] == {"recapture-autocad-or-provide-window": 1}
     assert payload["case_action_domain_counts"] == {"input": 1}
     assert payload["route_count"] == 3
     assert payload["route_kind_counts"] == {"batch": 1, "compare": 1, "request_run": 1}
     assert payload["route_status_counts"] == {"pass": 1, "viewspace_mismatch": 2}
+    assert payload["route_final_exit_code_counts"] == {"0": 2, "2": 1}
     assert payload["route_recommended_action_counts"] == {
         "continue-to-request-run": 1,
         "recapture-autocad-or-provide-window": 2,
@@ -327,8 +331,10 @@ def test_routes_run_case_actions(tmp_path):
     }
     assert "case_action_counts: recapture-autocad-or-provide-window=1" in text
     assert "case_action_domain_counts: input=1" in text
+    assert "final_exit_code: 2" in text
     assert "route_count: 3" in text
     assert "route_kind_counts: batch=1, compare=1, request_run=1" in text
+    assert "route_final_exit_code_counts: 0=2, 2=1" in text
     assert "route_compare_case_count: 2" in text
     assert "route_triage_bucket_counts: matched-pass=1, recapture-required=1" in text
     assert "route_viewspace_status_counts: match=1, mismatch=1" in text
@@ -347,7 +353,9 @@ def test_routes_run_case_actions(tmp_path):
         "returned_reference_blank=1"
     ) in text
     assert "- reference_request_validation_status: `blocked`" in markdown
+    assert "- final_exit_code: `2`" in markdown
     assert "- route_count: `3`" in markdown
+    assert "- route_final_exit_code_counts: `0=2, 2=1`" in markdown
     assert "- route_triage_bucket_counts: `matched-pass=1, recapture-required=1`" in markdown
     assert "- reference_request_validation_errors: `1`" in markdown
     assert "- reference_request_validation_warnings: `0`" in markdown
@@ -373,6 +381,7 @@ def test_routes_multiple_directories_as_batch(tmp_path):
         "boundary": {"compares_renders": False, "autocad_equivalence_claim": False},
         "stage": "reference_intake",
         "status": "pass",
+        "final_exit_code": 0,
         "case_count": 1,
         "reference_request_validation_issue_code_counts": {
             "source_dxf_sha256_mismatch": 1,
@@ -403,6 +412,7 @@ def test_routes_multiple_directories_as_batch(tmp_path):
     assert payload["count"] == 2
     assert payload["kind_counts"] == {"batch": 1, "compare": 1}
     assert payload["status_counts"] == {"pass": 1, "viewspace_mismatch": 1}
+    assert payload["final_exit_code_counts"] == {"0": 1}
     assert payload["recommended_action_counts"] == {
         "continue-to-request-run": 1,
         "recapture-autocad-or-provide-window": 1,
@@ -421,6 +431,7 @@ def test_routes_multiple_directories_as_batch(tmp_path):
     assert payload["recommended_next_action"]["domain"] == "input"
     assert payload["recommended_next_action"]["artifact"].endswith("compare/artifact_index.json")
     assert [item["kind"] for item in payload["routes"]] == ["batch", "compare"]
+    assert payload["routes"][0]["final_exit_code"] == 0
     assert payload["routes"][0]["recommended_next_action"]["code"] == "continue-to-request-run"
     assert payload["routes"][0]["recommended_next_action"]["domain"] == "continue"
     assert payload["routes"][1]["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
@@ -439,6 +450,7 @@ def test_cli_multiple_directories_text(tmp_path, capsys):
         "boundary": {"compares_renders": False, "autocad_equivalence_claim": False},
         "stage": "reference_intake",
         "status": "pass",
+        "final_exit_code": 0,
         "case_count": 1,
         "reference_intake_issue_code_counts": {
             "corner_background_not_white": 2,
@@ -463,6 +475,7 @@ def test_cli_multiple_directories_text(tmp_path, capsys):
     assert "route_count: 2" in output
     assert "kind_counts: batch=1, compare=1" in output
     assert "status_counts: pass=1, viewspace_mismatch=1" in output
+    assert "final_exit_code_counts: 0=1" in output
     assert (
         "recommended_action_counts: continue-to-request-run=1, "
         "recapture-autocad-or-provide-window=1"
@@ -473,6 +486,7 @@ def test_cli_multiple_directories_text(tmp_path, capsys):
     assert "recommended_action_domain: input" in output
     assert "autocad_equivalence_claim: false" in output
     assert "source_artifact_boundary: autocad_equivalence_claim=false,compares_renders=true" in output
+    assert "final_exit_code: 0" in output
     assert "route: 1" in output
     assert "route: 2" in output
     assert "recommended_next_action: continue-to-request-run" in output
@@ -489,6 +503,7 @@ def test_cli_recursive_discovers_nested_artifact_indexes(tmp_path, capsys):
         "schema": "vemcad.acad_reference_batch_artifact_index/v1",
         "stage": "reference_intake",
         "status": "pass",
+        "final_exit_code": 0,
         "case_count": 1,
         "reference_request_validation_issue_code_counts": {
             "source_dxf_sha256_mismatch": 1,
@@ -532,6 +547,7 @@ def test_cli_writes_json_and_markdown_reports(tmp_path):
         "schema": "vemcad.acad_reference_batch_artifact_index/v1",
         "stage": "reference_intake",
         "status": "pass",
+        "final_exit_code": 0,
         "case_count": 1,
         "reference_request_validation_issue_code_counts": {
             "source_dxf_sha256_mismatch": 1,
@@ -571,6 +587,7 @@ def test_cli_writes_json_and_markdown_reports(tmp_path):
         "continue-to-request-run": 1,
         "recapture-autocad-or-provide-window": 1,
     }
+    assert payload["final_exit_code_counts"] == {"0": 1}
     assert payload["recommended_action_domain_counts"] == {"continue": 1, "input": 1}
     assert payload["reference_request_validation_issue_code_counts"] == {
         "source_dxf_sha256_mismatch": 1,
@@ -583,6 +600,7 @@ def test_cli_writes_json_and_markdown_reports(tmp_path):
     assert "# AutoCAD Artifact Route Report" in markdown
     assert "does not compare renders" in markdown
     assert "- route_count: `2`" in markdown
+    assert "- final_exit_code_counts: `0=1`" in markdown
     assert "recommended_action_counts" in markdown
     assert "recommended_action_domain_counts" in markdown
     assert "- reference_request_validation_issue_code_counts: `source_dxf_sha256_mismatch=1`" in markdown

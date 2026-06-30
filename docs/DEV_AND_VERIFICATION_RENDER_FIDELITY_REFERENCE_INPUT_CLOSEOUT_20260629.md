@@ -5109,3 +5109,52 @@ Verification:
 python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
 # passed
 ```
+
+## Follow-Up Route Final Exit Code Counts
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Surface request-run and batch `final_exit_code` evidence at the route-summary
+  level, so uploaded directory reports show which directly routed artifact
+  returned `0` versus an opt-in operator hard failure such as `2`.
+- Keep the evidence aligned across `route_summary.json/md`,
+  `run_summary.json/md`, the run-level `artifact_index.json`, and stdout.
+- Preserve the no-guess discipline: exit-code aggregation is operator evidence,
+  not a renderer-fidelity claim and not a new default gate.
+
+Changes:
+
+- `acad_artifact_route.py` now preserves `final_exit_code` on routed
+  batch/request-run artifacts.
+- Multi-route summaries now include `final_exit_code_counts` for directly
+  routed artifacts that expose a final exit code.
+- Request-run artifacts preserve nested `route_final_exit_code_counts`, and
+  request-run summaries print that distribution in Markdown and stdout.
+- Route text/Markdown reports print both per-route `final_exit_code` and
+  nested `route_final_exit_code_counts` when present.
+- `tools/render_regression/README.md` documents the route-level exit-code
+  distribution.
+
+Boundary:
+
+- Evidence and operator-routing hardening only.
+- No route priority change.
+- No default exit-code behavior change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_reference_request_run.py \
+  tools/render_regression/tests/test_acad_artifact_route.py -q
+# 75 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 183 passed
+```
