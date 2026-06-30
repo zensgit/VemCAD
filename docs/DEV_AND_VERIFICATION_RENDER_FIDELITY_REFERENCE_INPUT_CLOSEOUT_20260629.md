@@ -4317,3 +4317,51 @@ python3 -m pytest \
 python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
+
+## Follow-Up Reference Markdown Table Cell Escaping
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep operator-facing Markdown handoff tables structurally reliable when
+  drawing IDs, returned PNG names, paths, or diagnostic text contain Markdown
+  table metacharacters.
+- Prevent `|` or newline characters in request/package fields from silently
+  shifting columns in `missing_references.md` or `reference_intake.md`.
+
+Changes:
+
+- `acad_reference_batch.py` now formats Markdown table cells through shared
+  helpers:
+  - plain cells collapse newlines and escape Markdown table pipes/backticks;
+  - code cells collapse newlines, escape table pipes, and choose a safe
+    code-span delimiter when values themselves contain backticks.
+- `missing_references.md` now escapes case IDs, drawing IDs, source DXF paths,
+  recommended output names, capture/view/size cells, and expected paths.
+- `reference_intake.md` now escapes case IDs, drawing IDs, recommended output
+  names, size/expected-size cells, identity-advisory text, and issue summaries.
+- Regression tests cover both reports with a drawing ID containing `|` plus a
+  newline and an AutoCAD output filename containing `|`; the tests assert the
+  rendered table rows keep the expected number of unescaped Markdown
+  delimiters.
+
+Boundary:
+
+- Operator report formatting only.
+- JSON and TSV payloads remain unchanged structured sources of truth.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```

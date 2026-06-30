@@ -210,6 +210,9 @@ manifest. The intake Markdown table also prints a compact diagnostic-only
 identity advisory (`returned=...`, `candidate=...`, optional
 `aspect_delta=...`) so operators can spot likely wrong-file, blank-export, or
 capture-window issues without opening `reference_intake.json`.
+The missing-reference and intake Markdown tables escape operator-supplied cells
+(`|`, newlines, and code-span edge cases), so drawing IDs and output filenames
+cannot silently corrupt the table shape.
 The batch, compare, and request-run CLIs also print the recommended action
 domain next to the action code, so CI logs can show the route class without
 opening JSON artifacts.
