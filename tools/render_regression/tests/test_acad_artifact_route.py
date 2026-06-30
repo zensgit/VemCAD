@@ -26,6 +26,11 @@ def test_routes_batch_missing_references(tmp_path):
         "reference_request_validation_issue_code_counts": {
             "source_dxf_sha256_mismatch": 1,
         },
+        "source_request_boundary": {
+            "requires_returned_autocad_png": True,
+            "requires_viewspace_match": True,
+            "autocad_equivalence_claim": False,
+        },
         "reference_intake_issue_code_counts": {
             "returned_reference_blank": 2,
         },
@@ -52,13 +57,22 @@ def test_routes_batch_missing_references(tmp_path):
     assert payload["reference_request_validation_issue_code_counts"] == {
         "source_dxf_sha256_mismatch": 1,
     }
+    assert payload["source_request_boundary"] == {
+        "requires_returned_autocad_png": True,
+        "requires_viewspace_match": True,
+        "autocad_equivalence_claim": False,
+    }
     assert payload["reference_intake_issue_code_counts"] == {
         "returned_reference_blank": 2,
     }
     assert "action_artifact: input/missing_references.md" in text
     assert "reference_request_validation_issue_code_counts: source_dxf_sha256_mismatch=1" in text
+    assert "source_request_boundary: autocad_equivalence_claim=False" in text
+    assert "requires_returned_autocad_png=True" in text
     assert "reference_intake_issue_code_counts: returned_reference_blank=2" in text
     assert "- reference_request_validation_issue_code_counts: `source_dxf_sha256_mismatch=1`" in markdown
+    assert "- source_request_boundary: `autocad_equivalence_claim=False" in markdown
+    assert "requires_returned_autocad_png=True" in markdown
     assert "- reference_intake_issue_code_counts: `returned_reference_blank=2`" in markdown
 
 
@@ -92,6 +106,10 @@ def test_routes_run_case_actions(tmp_path):
         "reference_request_validation_issue_code_counts": {
             "source_dxf_sha256_mismatch": 1,
         },
+        "source_request_boundary": {
+            "requires_returned_autocad_png": True,
+            "autocad_equivalence_claim": False,
+        },
         "reference_intake_issue_code_counts": {
             "candidate_render_blank": 1,
             "returned_reference_blank": 1,
@@ -115,6 +133,10 @@ def test_routes_run_case_actions(tmp_path):
     assert payload["reference_request_validation_issue_code_counts"] == {
         "source_dxf_sha256_mismatch": 1,
     }
+    assert payload["source_request_boundary"] == {
+        "requires_returned_autocad_png": True,
+        "autocad_equivalence_claim": False,
+    }
     assert payload["reference_intake_issue_code_counts"] == {
         "candidate_render_blank": 1,
         "returned_reference_blank": 1,
@@ -122,11 +144,15 @@ def test_routes_run_case_actions(tmp_path):
     assert "case_action_counts: recapture-autocad-or-provide-window=1" in text
     assert "case_action_domain_counts: input=1" in text
     assert "reference_request_validation_issue_code_counts: source_dxf_sha256_mismatch=1" in text
+    assert "source_request_boundary: autocad_equivalence_claim=False" in text
+    assert "requires_returned_autocad_png=True" in text
     assert (
         "reference_intake_issue_code_counts: candidate_render_blank=1, "
         "returned_reference_blank=1"
     ) in text
     assert "- reference_request_validation_issue_code_counts: `source_dxf_sha256_mismatch=1`" in markdown
+    assert "- source_request_boundary: `autocad_equivalence_claim=False" in markdown
+    assert "requires_returned_autocad_png=True" in markdown
     assert (
         "- reference_intake_issue_code_counts: `candidate_render_blank=1, "
         "returned_reference_blank=1`"

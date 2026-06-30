@@ -9,6 +9,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import acad_reference_request_run as runner  # noqa: E402
 
 
+REQUEST_BOUNDARY = {
+    "renders_dxf": False,
+    "compares_renders": False,
+    "changes_x3_scoring": False,
+    "changes_renderer": False,
+    "requires_returned_autocad_png": True,
+    "requires_viewspace_match": True,
+    "autocad_equivalence_claim": False,
+}
+
+
 def _run_artifact_index(out: Path) -> dict:
     payload = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert payload["schema"] == "vemcad.acad_reference_request_run_artifact_index/v1"
@@ -40,6 +51,7 @@ def _request(path: Path, *, case_id="G11") -> Path:
     path.write_text(json.dumps({
         "schema": "vemcad.acad_reference_request/v1",
         "reason": "recapture-required",
+        "boundary": dict(REQUEST_BOUNDARY),
         "cases": [{
             "id": case_id,
             "drawing_id": f"{case_id}/B11",
@@ -65,6 +77,7 @@ def _batch_request(path: Path) -> Path:
     path.write_text(json.dumps({
         "schema": "vemcad.acad_reference_request/v1",
         "reason": "recapture-required",
+        "boundary": dict(REQUEST_BOUNDARY),
         "cases": [
             {
                 "id": "G11",
@@ -133,6 +146,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert summary["batch_exit_code"] == 0
     assert summary["compare_exit_code"] == 0
     assert summary["boundary"]["autocad_equivalence_claim"] is False
+    assert summary["source_request_boundary"] == REQUEST_BOUNDARY
     assert summary["reference_request_validation_status"] == "pass"
     assert summary["reference_request_validation_error_count"] == 0
     assert summary["reference_request_validation_markdown"].endswith("reference_request_validation.md")
@@ -174,6 +188,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert artifact_index["recommended_next_action"]["code"] == "review-x3-pass"
     assert artifact_index["recommended_next_action"]["domain"] == "pass-review"
     assert artifact_index["case_action_domain_counts"] == {"pass-review": 1}
+    assert artifact_index["source_request_boundary"] == REQUEST_BOUNDARY
     assert "recommended next action: review-x3-pass" in stdout
     assert "recommended next action domain: pass-review" in stdout
     assert "case action domain counts: pass-review=1" in stdout
@@ -182,6 +197,8 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert "recommended_next_action: `review-x3-pass`" in summary_md
     assert "recommended_next_action_domain: `pass-review`" in summary_md
     assert "case_action_domain_counts: `pass-review=1`" in summary_md
+    assert "source_request_boundary: `autocad_equivalence_claim=False" in summary_md
+    assert "requires_returned_autocad_png=True" in summary_md
     assert "route_count: `3`" in summary_md
     assert "route_kind_counts: `batch=1, compare=1, request_run=1`" in summary_md
     assert "route_status_counts: `pass=3`" in summary_md

@@ -162,6 +162,7 @@ def _route_batch(payload: dict[str, Any]) -> dict[str, Any]:
         "reference_request_validation_issue_code_counts": (
             payload.get("reference_request_validation_issue_code_counts") or {}
         ),
+        "source_request_boundary": payload.get("source_request_boundary") or {},
         "reference_intake_issue_code_counts": payload.get("reference_intake_issue_code_counts") or {},
         "recommended_next_action": action,
     }
@@ -176,6 +177,7 @@ def _route_run(payload: dict[str, Any]) -> dict[str, Any]:
         "reference_request_validation_issue_code_counts": (
             payload.get("reference_request_validation_issue_code_counts") or {}
         ),
+        "source_request_boundary": payload.get("source_request_boundary") or {},
         "reference_intake_issue_code_counts": payload.get("reference_intake_issue_code_counts") or {},
         "case_actions": payload.get("case_actions") or [],
         "recommended_next_action": _normalize_recommended_action(
@@ -438,6 +440,11 @@ def _write_text(route: dict[str, Any]) -> str:
             "reference_request_validation_issue_code_counts: "
             + _format_counts(route["reference_request_validation_issue_code_counts"])
         )
+    if route.get("source_request_boundary"):
+        lines.append(
+            "source_request_boundary: "
+            + _format_counts(route["source_request_boundary"])
+        )
     if route.get("reference_intake_issue_code_counts"):
         lines.append(
             "reference_intake_issue_code_counts: "
@@ -528,6 +535,10 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         lines.append(
             "- reference_request_validation_issue_code_counts: "
             f"`{_format_counts(route['reference_request_validation_issue_code_counts'])}`"
+        )
+    if route.get("source_request_boundary"):
+        lines.append(
+            f"- source_request_boundary: `{_format_counts(route['source_request_boundary'])}`"
         )
     if route.get("reference_intake_issue_code_counts"):
         lines.append(

@@ -1037,6 +1037,7 @@ def _batch_index_metadata(out_dir: Path, batch_validation: dict[str, Any] | None
         "warning_count": None,
     }
     if request_validation:
+        source_request_boundary = request_validation.get("source_request_boundary")
         metadata.update({
             "stage": "request_validation",
             "status": str(request_validation.get("status") or ""),
@@ -1046,6 +1047,8 @@ def _batch_index_metadata(out_dir: Path, batch_validation: dict[str, Any] | None
             "reference_request_validation_status": str(request_validation.get("status") or ""),
             "reference_request_validation_issue_code_counts": _issue_code_counts(request_validation),
         })
+        if isinstance(source_request_boundary, dict):
+            metadata["source_request_boundary"] = dict(source_request_boundary)
     if missing:
         metadata.update({
             "stage": "missing_references",
