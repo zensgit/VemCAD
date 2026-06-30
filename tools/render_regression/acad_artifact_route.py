@@ -181,10 +181,16 @@ def _route_run(payload: dict[str, Any]) -> dict[str, Any]:
         "status": str(payload.get("status") or ""),
         "case_action_counts": payload.get("case_action_counts") or {},
         "case_action_domain_counts": payload.get("case_action_domain_counts") or {},
+        "reference_request_validation_status": str(payload.get("reference_request_validation_status") or ""),
+        "reference_request_validation_error_count": payload.get("reference_request_validation_error_count"),
+        "reference_request_validation_warning_count": payload.get("reference_request_validation_warning_count"),
         "reference_request_validation_issue_code_counts": (
             payload.get("reference_request_validation_issue_code_counts") or {}
         ),
         "source_request_boundary": payload.get("source_request_boundary") or {},
+        "reference_intake_status": str(payload.get("reference_intake_status") or ""),
+        "reference_intake_error_count": payload.get("reference_intake_error_count"),
+        "reference_intake_warning_count": payload.get("reference_intake_warning_count"),
         "reference_intake_issue_code_counts": payload.get("reference_intake_issue_code_counts") or {},
         "case_actions": payload.get("case_actions") or [],
         "recommended_next_action": _normalize_recommended_action(
@@ -443,6 +449,16 @@ def _write_text(route: dict[str, Any]) -> str:
         lines.append(f"case_action_counts: {_format_counts(route['case_action_counts'])}")
     if route.get("case_action_domain_counts"):
         lines.append(f"case_action_domain_counts: {_format_counts(route['case_action_domain_counts'])}")
+    if route.get("reference_request_validation_status"):
+        lines.append(f"reference_request_validation_status: {route['reference_request_validation_status']}")
+        lines.append(
+            "reference_request_validation_errors: "
+            f"{route.get('reference_request_validation_error_count')}"
+        )
+        lines.append(
+            "reference_request_validation_warnings: "
+            f"{route.get('reference_request_validation_warning_count')}"
+        )
     if route.get("reference_request_validation_issue_code_counts"):
         lines.append(
             "reference_request_validation_issue_code_counts: "
@@ -453,6 +469,10 @@ def _write_text(route: dict[str, Any]) -> str:
             "source_request_boundary: "
             + _format_counts(route["source_request_boundary"])
         )
+    if route.get("reference_intake_status"):
+        lines.append(f"reference_intake_status: {route['reference_intake_status']}")
+        lines.append(f"reference_intake_errors: {route.get('reference_intake_error_count')}")
+        lines.append(f"reference_intake_warnings: {route.get('reference_intake_warning_count')}")
     if route.get("reference_intake_issue_code_counts"):
         lines.append(
             "reference_intake_issue_code_counts: "
@@ -539,6 +559,14 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         lines.append(f"- case_action_counts: `{_format_counts(route['case_action_counts'])}`")
     if route.get("case_action_domain_counts"):
         lines.append(f"- case_action_domain_counts: `{_format_counts(route['case_action_domain_counts'])}`")
+    if route.get("reference_request_validation_status"):
+        lines.extend([
+            f"- reference_request_validation_status: `{route['reference_request_validation_status']}`",
+            "- reference_request_validation_errors: "
+            f"`{route.get('reference_request_validation_error_count')}`",
+            "- reference_request_validation_warnings: "
+            f"`{route.get('reference_request_validation_warning_count')}`",
+        ])
     if route.get("reference_request_validation_issue_code_counts"):
         lines.append(
             "- reference_request_validation_issue_code_counts: "
@@ -548,6 +576,12 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         lines.append(
             f"- source_request_boundary: `{_format_counts(route['source_request_boundary'])}`"
         )
+    if route.get("reference_intake_status"):
+        lines.extend([
+            f"- reference_intake_status: `{route['reference_intake_status']}`",
+            f"- reference_intake_errors: `{route.get('reference_intake_error_count')}`",
+            f"- reference_intake_warnings: `{route.get('reference_intake_warning_count')}`",
+        ])
     if route.get("reference_intake_issue_code_counts"):
         lines.append(
             "- reference_intake_issue_code_counts: "
