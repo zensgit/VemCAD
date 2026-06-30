@@ -396,6 +396,7 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- compare_exit_code: `{summary['compare_exit_code']}`",
         f"- reference_request_validation_status: `{summary['reference_request_validation_status']}`",
         f"- reference_request_validation_errors: `{summary['reference_request_validation_error_count']}`",
+        f"- reference_request_validation_warnings: `{summary['reference_request_validation_warning_count']}`",
         "- reference_request_validation_issue_codes: "
         f"`{_format_case_action_counts(summary['reference_request_validation_issue_code_counts'])}`",
         f"- source_request_boundary: `{_format_case_action_counts(summary.get('source_request_boundary') or {})}`",
@@ -636,6 +637,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  recommended next action domain: {summary['recommended_next_action']['domain']}")
         print(f"  case action counts: {_format_case_action_counts(summary['case_action_counts'])}")
         print(f"  case action domain counts: {_format_case_action_counts(summary['case_action_domain_counts'])}")
+        print(f"  reference request validation issue codes: {_format_case_action_counts(summary['reference_request_validation_issue_code_counts'])}")
         print(f"  reference intake issue codes: {_format_case_action_counts(summary['reference_intake_issue_code_counts'])}")
         print(f"  run summary: {args.out_dir / 'run_summary.md'}")
         return batch_rc
@@ -657,6 +659,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  recommended next action domain: {summary['recommended_next_action']['domain']}")
     print(f"  case action counts: {_format_case_action_counts(summary['case_action_counts'])}")
     print(f"  case action domain counts: {_format_case_action_counts(summary['case_action_domain_counts'])}")
+    print(f"  reference request validation issue codes: {_format_case_action_counts(summary['reference_request_validation_issue_code_counts'])}")
     print(f"  reference intake issue codes: {_format_case_action_counts(summary['reference_intake_issue_code_counts'])}")
     print(f"  run summary: {args.out_dir / 'run_summary.md'}")
     return compare_rc
