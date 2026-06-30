@@ -377,6 +377,7 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert request_md.count("--require-request-boundary autocad_equivalence_claim=false") == 3
     assert request_md.count("--require-request-boundary requires_returned_autocad_png=true") == 3
     assert request_md.count("--require-request-boundary requires_viewspace_match=true") == 3
+    assert request_md.count("--require-action-artifact-exists") == 1
     assert f"--candidate-cases {candidates}" in request_md
     assert "viewspace_mismatch` still exits `2`" in request_md
     assert "`mismatch`" in request_md
