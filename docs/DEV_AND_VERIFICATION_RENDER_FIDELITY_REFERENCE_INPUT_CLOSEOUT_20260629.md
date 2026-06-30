@@ -856,6 +856,49 @@ python3 -m pytest tools/render_regression/tests -q
 # 101 passed
 ```
 
+## Follow-Up Compare Harness Stale Artifact Cleanup
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Prevent repeated `acad_manifest_compare.py` executions against the same
+  `--out-dir` from carrying stale compare artifacts into a later dry-run or
+  input-blocked run.
+- Keep compare `artifact_index.json` and route evidence aligned with the
+  current invocation rather than a previous matched-view comparison.
+
+Bug reproduced:
+
+- First run performs a real compare and writes `summary.tsv`, `contact_sheet`,
+  overlays, and viewspace reports.
+- Second run reuses the same `--out-dir` with `--dry-run`.
+- Before this fix, stale compare artifacts remained on disk and `summary.tsv`
+  could be reported in the new dry-run artifact index.
+
+Changes:
+
+- `acad_manifest_compare.py` now clears its own summary, route, request, contact
+  sheet, overlay, viewspace, semantic, and text artifacts before each run.
+- A regression test now proves a pass-to-dry-run rerun leaves only current
+  dry-run/manifest artifacts and no stale case-level compare outputs.
+
+Boundary:
+
+- Compare harness artifact hygiene only.
+- No renderer change.
+- No X3 scoring change.
+- No compare metric behavior change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# passed
+```
+
 ## Follow-Up Request-Run Stale Compare Cleanup
 
 Status: implemented in this branch.
