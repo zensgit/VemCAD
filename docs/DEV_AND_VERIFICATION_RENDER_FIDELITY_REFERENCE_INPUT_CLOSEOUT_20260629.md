@@ -3777,3 +3777,40 @@ python3 -m pytest \
 python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
+
+## Follow-Up Batch Route Error/Warning Count Visibility
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Surface batch/input-prep `error_count` and `warning_count` in route reports.
+- Let operators see whether a routed input-prep artifact is blocked by errors
+  or merely in review without opening the batch artifact index JSON.
+
+Changes:
+
+- `acad_artifact_route.py` now preserves batch artifact `error_count` and
+  `warning_count`.
+- Route text and Markdown print those counts for any routed artifact that
+  exposes them.
+- Regression coverage proves a returned-reference intake block surfaces
+  `errors: 1` and `warnings: 0` in both route text and Markdown.
+
+Boundary:
+
+- Route-report visibility only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
