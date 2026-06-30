@@ -256,6 +256,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert "route triage buckets: matched-pass=1" in stdout
     assert "route viewspace statuses: match=1" in stdout
     assert "route x3 bands: pass=1" in stdout
+    assert f"route summary  : {out / 'route_summary.md'}" in stdout
     assert compare_summary["status"] == "pass"
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
     assert "recommended_next_action: `review-x3-pass`" in summary_md
@@ -481,6 +482,7 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert "route triage buckets: matched-pass=1, recapture-required=1" in stdout
     assert "route viewspace statuses: match=1, mismatch=1" in stdout
     assert "route x3 bands: pass=2" in stdout
+    assert f"route summary  : {out / 'route_summary.md'}" in stdout
     assert artifact_index["case_actions"] == summary["case_actions"]
     assert artifact_index["case_action_counts"] == summary["case_action_counts"]
     assert artifact_index["case_action_domain_counts"] == summary["case_action_domain_counts"]
@@ -738,6 +740,7 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
     assert "recommended next action artifact exists: True" in stdout
     assert "case action counts: provide-returned-autocad-pngs=1" in stdout
     assert "case action domain counts: input=1" in stdout
+    assert f"route summary  : {out / 'route_summary.md'}" in stdout
     assert not (out / "compare" / "summary.json").exists()
     assert _run_artifact_kinds(out) >= {
         "run_summary_json",

@@ -800,6 +800,8 @@ def _print_run_summary(summary: dict[str, Any], out_dir: Path) -> None:
             "  route x3 bands: "
             f"{_format_case_action_counts(summary['route_x3_band_counts'])}"
         )
+    if summary.get("route_summary_markdown"):
+        print(f"  route summary  : {summary['route_summary_markdown']}")
     print(f"  run summary: {out_dir / 'run_summary.md'}")
 
 
