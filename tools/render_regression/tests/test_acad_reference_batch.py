@@ -10,9 +10,9 @@ import acad_manifest_compare as harness  # noqa: E402
 import acad_reference_batch as batch  # noqa: E402
 
 
-def _png(path: Path, size=(320, 240)) -> str:
+def _png(path: Path, size=(320, 240), color=(255, 255, 255)) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
-    Image.new("RGB", size, (255, 255, 255)).save(path)
+    Image.new("RGB", size, color).save(path)
     return str(path)
 
 
@@ -122,6 +122,14 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
     assert case["expected_size"] == {"width": 1600, "height": 1131}
     assert generated_candidates[0]["ours"].endswith("ours/G11.png")
     assert generated_candidates[0]["diagnostics"] == {"window_source": "content_bbox"}
+    intake = json.loads((out / "reference_intake.json").read_text(encoding="utf-8"))
+    assert intake["schema"] == "vemcad.acad_reference_intake/v1"
+    assert intake["status"] == "pass"
+    assert intake["warning_count"] == 0
+    assert intake["boundary"]["autocad_equivalence_claim"] is False
+    intake_md = (out / "reference_intake.md").read_text(encoding="utf-8")
+    assert "AutoCAD Reference Intake Preflight" in intake_md
+    assert "G11_autocad_model_extents.png" in intake_md
 
     dry_run = tmp_path / "dry-run-request"
     assert harness.main([
@@ -216,3 +224,38 @@ def test_batch_generator_fulfills_subset_of_reference_request(tmp_path):
     missing = json.loads((tmp_path / "all" / "missing_references.json").read_text(encoding="utf-8"))
     assert missing["missing_count"] == 1
     assert missing["missing"][0]["id"] == "G04"
+
+
+def test_batch_generator_intake_warns_on_low_resolution_or_non_white_png(tmp_path):
+    _dxf(tmp_path / "dxf" / "G11.dxf")
+    _png(tmp_path / "ours" / "G11.png", (760, 570))
+    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (900, 600), color=(12, 12, 12))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "recommended_output_name": "G11_autocad_model_extents.png",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--out-dir", str(out),
+    ]) == 0
+
+    intake = json.loads((out / "reference_intake.json").read_text(encoding="utf-8"))
+    assert intake["status"] == "review"
+    assert intake["warning_count"] == 2
+    issue_codes = {issue["code"] for issue in intake["cases"][0]["issues"]}
+    assert issue_codes == {"long_edge_below_requested", "corner_background_not_white"}
+    intake_md = (out / "reference_intake.md").read_text(encoding="utf-8")
+    assert "warning:long_edge_below_requested" in intake_md
+    assert "warning:corner_background_not_white" in intake_md

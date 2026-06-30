@@ -15,6 +15,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import acad_reference_manifest as arm  # noqa: E402
 
+INTAKE_SCHEMA = "vemcad.acad_reference_intake/v1"
+
 
 def _str(value: Any) -> str:
     if value is None:
@@ -25,6 +27,77 @@ def _str(value: Any) -> str:
 def _image_size(path: Path) -> tuple[int, int]:
     with Image.open(path) as image:
         return image.size
+
+
+def _near_white(rgb: tuple[int, int, int]) -> bool:
+    return min(rgb) >= 245 and (max(rgb) - min(rgb)) <= 10
+
+
+def _corner_white_ratio(image: Image.Image, *, sample_px: int = 12) -> float:
+    rgb = image.convert("RGB")
+    width, height = rgb.size
+    sample_w = min(sample_px, width)
+    sample_h = min(sample_px, height)
+    if sample_w <= 0 or sample_h <= 0:
+        return 0.0
+    boxes = [
+        (0, 0, sample_w, sample_h),
+        (width - sample_w, 0, width, sample_h),
+        (0, height - sample_h, sample_w, height),
+        (width - sample_w, height - sample_h, width, height),
+    ]
+    total = 0
+    near_white = 0
+    for box in boxes:
+        for pixel in rgb.crop(box).getdata():
+            total += 1
+            if _near_white(pixel):
+                near_white += 1
+    return near_white / total if total else 0.0
+
+
+def _has_alpha(image: Image.Image) -> bool:
+    if image.mode in ("RGBA", "LA"):
+        return True
+    return "transparency" in image.info
+
+
+def _inspect_reference_png(path: Path) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    issues: list[dict[str, str]] = []
+    with Image.open(path) as image:
+        width, height = image.size
+        long_edge = max(width, height)
+        ratio = _corner_white_ratio(image)
+        alpha = _has_alpha(image)
+        inspection = {
+            "path": str(path),
+            "width": width,
+            "height": height,
+            "long_edge": long_edge,
+            "aspect_ratio": round(width / height, 6) if height else None,
+            "mode": image.mode,
+            "has_alpha": alpha,
+            "corner_white_ratio": round(ratio, 4),
+        }
+        if long_edge < 1600:
+            issues.append({
+                "severity": "warning",
+                "code": "long_edge_below_requested",
+                "message": f"long edge {long_edge}px is below the requested >=1600px capture contract",
+            })
+        if alpha:
+            issues.append({
+                "severity": "warning",
+                "code": "alpha_channel_present",
+                "message": "PNG has an alpha/transparency channel; export on a solid white background when possible",
+            })
+        if ratio < 0.95:
+            issues.append({
+                "severity": "warning",
+                "code": "corner_background_not_white",
+                "message": f"corner white ratio {ratio:.3f} is below 0.95; check for dark background, toolbar/chrome, or crop",
+            })
+    return inspection, issues
 
 
 def _resolve(base: Path, value: Any) -> str:
@@ -253,6 +326,101 @@ def _write_missing_references_report(
     return len(missing)
 
 
+def _write_reference_intake_report(
+    out_dir: Path,
+    request_json: Path,
+    *,
+    reference_dir: Path,
+    case_ids: set[str] | None = None,
+) -> dict[str, Any]:
+    request_cases = _filter_request_cases(_load_request_cases(request_json), case_ids)
+    rows: list[dict[str, Any]] = []
+    error_count = 0
+    warning_count = 0
+    for index, request in enumerate(request_cases, start=1):
+        case_id = _required(request, "id", index)
+        output_name = _required(request, "recommended_output_name", index)
+        expected_path = (reference_dir / output_name).resolve()
+        row_issues: list[dict[str, str]] = []
+        inspection: dict[str, Any] = {"path": str(expected_path)}
+        try:
+            inspection, row_issues = _inspect_reference_png(expected_path)
+        except Exception as exc:
+            row_issues = [{
+                "severity": "error",
+                "code": "reference_png_unreadable",
+                "message": str(exc),
+            }]
+        for issue in row_issues:
+            if issue["severity"] == "error":
+                error_count += 1
+            elif issue["severity"] == "warning":
+                warning_count += 1
+        rows.append({
+            "id": case_id,
+            "drawing_id": _str(request.get("drawing_id")),
+            "recommended_output_name": output_name,
+            "inspection": inspection,
+            "issues": row_issues,
+        })
+    status = "blocked" if error_count else ("review" if warning_count else "pass")
+    payload = {
+        "schema": INTAKE_SCHEMA,
+        "request": str(request_json.resolve()),
+        "reference_dir": str(reference_dir.resolve()),
+        "status": status,
+        "case_count": len(rows),
+        "error_count": error_count,
+        "warning_count": warning_count,
+        "checks": {
+            "long_edge_min_px": 1600,
+            "corner_white_ratio_min": 0.95,
+            "alpha_channel": "warning",
+        },
+        "cases": rows,
+        "boundary": {
+            "autocad_equivalence_claim": False,
+            "replaces_x3_compare": False,
+            "purpose": "preflight returned AutoCAD PNGs before matched-view comparison",
+        },
+    }
+    out_dir.mkdir(parents=True, exist_ok=True)
+    json_path = out_dir / "reference_intake.json"
+    md_path = out_dir / "reference_intake.md"
+    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    lines = [
+        "# AutoCAD Reference Intake Preflight",
+        "",
+        f"- status: `{status}`",
+        f"- request: `{request_json.resolve()}`",
+        f"- reference_dir: `{reference_dir.resolve()}`",
+        f"- cases: `{len(rows)}`",
+        f"- errors: `{error_count}`",
+        f"- warnings: `{warning_count}`",
+        "",
+        "This is a capture-quality preflight only. It does not compare against VemCAD and does not claim AutoCAD equivalence.",
+        "",
+        "| Case | Drawing | PNG | Size | Long edge | Corner white | Issues |",
+        "| --- | --- | --- | ---: | ---: | ---: | --- |",
+    ]
+    for row in rows:
+        inspection = row["inspection"]
+        issues = row["issues"]
+        issue_text = ", ".join(f"{item['severity']}:{item['code']}" for item in issues) or "-"
+        size = (
+            f"{inspection.get('width')}x{inspection.get('height')}"
+            if inspection.get("width") and inspection.get("height") else "-"
+        )
+        lines.append(
+            f"| `{row['id']}` | {_str(row.get('drawing_id'))} | "
+            f"`{row['recommended_output_name']}` | {size} | "
+            f"{inspection.get('long_edge', '-')} | {inspection.get('corner_white_ratio', '-')} | "
+            f"{issue_text} |"
+        )
+    md_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return payload
+
+
 def build_files_from_request(
     request_json: Path,
     *,
@@ -269,6 +437,14 @@ def build_files_from_request(
     )
     if missing_count:
         raise ValueError(f"missing {missing_count} returned AutoCAD PNG(s); see {out_dir / 'missing_references.md'}")
+    intake = _write_reference_intake_report(
+        out_dir,
+        request_json,
+        reference_dir=reference_dir,
+        case_ids=case_ids,
+    )
+    if intake["status"] == "blocked":
+        raise ValueError(f"returned AutoCAD PNG intake blocked; see {out_dir / 'reference_intake.md'}")
     return _build_files(
         _fulfilled_cases(
             request_json,

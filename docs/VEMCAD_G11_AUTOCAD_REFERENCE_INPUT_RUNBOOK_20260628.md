@@ -139,7 +139,25 @@ python3 tools/render_regression/acad_reference_batch.py \
 
 The helper resolves the original candidate artifacts, opens every returned PNG
 to record `expected_size`, and fails closed if any requested PNG is missing or
-unreadable. Then run the matched-view harness with:
+unreadable. It also writes a returned-reference preflight beside the generated
+inputs:
+
+- `$NEXT_DIR/input/reference_intake.json`
+- `$NEXT_DIR/input/reference_intake.md`
+
+The intake preflight checks obvious capture-quality signals before X3:
+
+- long edge is at least `1600px`;
+- PNG has no alpha/transparency channel;
+- sampled corners are near white, catching dark-background exports and many
+  toolbar/chrome/crop accidents.
+
+`reference_intake` is a review aid only. A `pass` result does not compare
+against VemCAD and does not claim AutoCAD equivalence. A `review` result means
+the PNG exists and the workflow can continue, but the operator should inspect
+the warning before trusting any visual conclusion.
+
+Then run the matched-view harness with:
 
 To process only the first returned case, repeat `--case-id`:
 
