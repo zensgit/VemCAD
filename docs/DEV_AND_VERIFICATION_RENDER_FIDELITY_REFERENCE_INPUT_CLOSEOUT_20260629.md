@@ -1741,6 +1741,46 @@ python3 tools/render_regression/acad_reference_request_run.py \
 # artifact_index.count=10
 ```
 
+## Follow-Up Route Action Domains
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make route outputs classify the recommended action by machine-readable domain.
+- Let unattended scripts distinguish input/recapture work from renderer-candidate
+  work without parsing action-code strings.
+- Keep the "no guessing" boundary explicit: a `viewspace_mismatch` route is an
+  `input` domain, not a renderer domain.
+
+Changes:
+
+- `recommended_next_action` now includes `domain` on single-route and
+  multi-route payloads.
+- Multi-route payloads include `recommended_action_domain_counts`.
+- Text and Markdown reports print `recommended_action_domain` and, for batches,
+  `recommended_action_domain_counts`.
+- `acad_artifact_route.py` now accepts `--require-action-domain <domain>` and
+  exits `2` when the top-level action domain differs from the expected domain.
+
+Boundary:
+
+- Route/report metadata and assertion only.
+- No routing-rule change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Recommended Next Action
 
 Status: implemented in this branch.

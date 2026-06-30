@@ -21,6 +21,22 @@ BOUNDARY = {
     "autocad_equivalence_claim": False,
 }
 
+ACTION_DOMAINS = {
+    "fix-request-package": "input",
+    "provide-returned-autocad-pngs": "input",
+    "inspect-input-block": "input",
+    "inspect-compare-input-block": "input",
+    "recapture-autocad-or-provide-window": "input",
+    "inspect-returned-reference-warnings": "input-review",
+    "inspect-renderer-candidate": "renderer-candidate",
+    "inspect-compare-failure": "compare-debug",
+    "review-x3-pass": "pass-review",
+    "continue-to-request-run": "continue",
+    "inspect-run-summary": "inspect",
+    "inspect-artifact-index": "inspect",
+    "inspect-compare-summary": "inspect",
+}
+
 
 def _read_json(path: Path) -> dict[str, Any]:
     try:
@@ -61,12 +77,38 @@ def _discover_artifact_indexes(paths: list[Path]) -> list[Path]:
     return discovered
 
 
-def _action(code: str, message: str, *, artifact: str = "") -> dict[str, str]:
+def _action_domain(code: str) -> str:
+    return ACTION_DOMAINS.get(code, "inspect")
+
+
+def _action(code: str, message: str, *, artifact: str = "", domain: str = "") -> dict[str, str]:
     return {
         "code": code,
         "message": message,
         "artifact": artifact,
+        "domain": domain or _action_domain(code),
     }
+
+
+def _route_action(route: dict[str, Any]) -> dict[str, str]:
+    action = route.get("recommended_next_action") or {}
+    if isinstance(action, dict):
+        code = str(action.get("code") or "")
+        return {
+            "code": code,
+            "message": str(action.get("message") or ""),
+            "artifact": str(action.get("artifact") or ""),
+            "domain": str(action.get("domain") or _action_domain(code)),
+        }
+    return {"code": "", "message": "", "artifact": "", "domain": ""}
+
+
+def _normalize_recommended_action(action: Any, fallback: dict[str, str]) -> dict[str, str]:
+    if isinstance(action, dict):
+        code = str(action.get("code") or "")
+        if code:
+            return _route_action({"recommended_next_action": action})
+    return fallback
 
 
 def _route_batch(payload: dict[str, Any]) -> dict[str, Any]:
@@ -117,9 +159,12 @@ def _route_run(payload: dict[str, Any]) -> dict[str, Any]:
         "status": str(payload.get("status") or ""),
         "case_action_counts": payload.get("case_action_counts") or {},
         "case_actions": payload.get("case_actions") or [],
-        "recommended_next_action": payload.get("recommended_next_action") or _action(
-            "inspect-run-summary",
-            "Inspect the run summary before choosing the next action.",
+        "recommended_next_action": _normalize_recommended_action(
+            payload.get("recommended_next_action"),
+            _action(
+                "inspect-run-summary",
+                "Inspect the run summary before choosing the next action.",
+            ),
         ),
     }
 
@@ -206,6 +251,9 @@ def _route_batch_summary(routes: list[dict[str, Any]]) -> dict[str, Any]:
         "recommended_action_counts": _count_values([
             str((route.get("recommended_next_action") or {}).get("code") or "") for route in routes
         ]),
+        "recommended_action_domain_counts": _count_values([
+            _route_action(route)["domain"] for route in routes
+        ]),
     }
 
 
@@ -245,6 +293,7 @@ def _recommended_batch_action(routes: list[dict[str, Any]]) -> dict[str, str]:
         "code": action.get("code") or "inspect-artifact-index",
         "message": message,
         "artifact": artifact,
+        "domain": action.get("domain") or _action_domain(action.get("code") or "inspect-artifact-index"),
     }
 
 
@@ -273,6 +322,7 @@ def _write_text(route: dict[str, Any]) -> str:
         f"kind: {route.get('kind', '')}",
         f"status: {route.get('status', '')}",
         f"recommended_next_action: {action.get('code', '')}",
+        f"recommended_action_domain: {action.get('domain', '')}",
         f"message: {action.get('message', '')}",
     ]
     if source_boundary:
@@ -299,7 +349,10 @@ def _write_batch_text(payload: dict[str, Any]) -> str:
             "kind_counts: " + _format_counts(payload.get("kind_counts") or {}),
             "status_counts: " + _format_counts(payload.get("status_counts") or {}),
             "recommended_action_counts: " + _format_counts(payload.get("recommended_action_counts") or {}),
+            "recommended_action_domain_counts: "
+            + _format_counts(payload.get("recommended_action_domain_counts") or {}),
             f"recommended_next_action: {action.get('code', '')}",
+            f"recommended_action_domain: {action.get('domain', '')}",
             f"message: {action.get('message', '')}",
             f"autocad_equivalence_claim: {str(bool(boundary.get('autocad_equivalence_claim'))).lower()}",
         ])
@@ -313,17 +366,6 @@ def _write_batch_text(payload: dict[str, Any]) -> str:
     return "\n\n".join(chunks)
 
 
-def _route_action(route: dict[str, Any]) -> dict[str, str]:
-    action = route.get("recommended_next_action") or {}
-    if isinstance(action, dict):
-        return {
-            "code": str(action.get("code") or ""),
-            "message": str(action.get("message") or ""),
-            "artifact": str(action.get("artifact") or ""),
-        }
-    return {"code": "", "message": "", "artifact": ""}
-
-
 def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
     action = _route_action(route)
     boundary = route.get("boundary") or {}
@@ -335,6 +377,7 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         f"- kind: `{route.get('kind', '')}`",
         f"- status: `{route.get('status', '')}`",
         f"- recommended_next_action: `{action['code']}`",
+        f"- recommended_action_domain: `{action['domain']}`",
         f"- message: {action['message']}",
     ]
     if boundary:
@@ -375,7 +418,10 @@ def _write_markdown(payload: dict[str, Any]) -> str:
             f"- status_counts: `{_format_counts(payload.get('status_counts') or {})}`",
             "- recommended_action_counts: "
             f"`{_format_counts(payload.get('recommended_action_counts') or {})}`",
+            "- recommended_action_domain_counts: "
+            f"`{_format_counts(payload.get('recommended_action_domain_counts') or {})}`",
             f"- recommended_next_action: `{action['code']}`",
+            f"- recommended_action_domain: `{action['domain']}`",
             f"- message: {action['message']}",
             f"- read_only_routing: `{bool(boundary.get('read_only_routing'))}`",
             f"- autocad_equivalence_claim: `{bool(boundary.get('autocad_equivalence_claim'))}`",
@@ -424,6 +470,10 @@ def _recommended_action_code(payload: dict[str, Any]) -> str:
 
 def _recommended_action_artifact(payload: dict[str, Any]) -> str:
     return str((payload.get("recommended_next_action") or {}).get("artifact") or "")
+
+
+def _recommended_action_domain(payload: dict[str, Any]) -> str:
+    return _route_action(payload)["domain"]
 
 
 def _parse_boundary_expectation(raw: str) -> tuple[str, Any]:
@@ -481,6 +531,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out-md", type=Path, help="also write a Markdown route report to this file")
     parser.add_argument("--require-action", default="",
                         help="exit 2 unless the top-level recommended_next_action.code matches this value")
+    parser.add_argument("--require-action-domain", default="",
+                        help="exit 2 unless the top-level recommended_next_action.domain matches this value")
     parser.add_argument("--require-source-boundary", action="append", default=[],
                         help="exit 2 unless every routed source artifact boundary has key=value; may repeat")
     args = parser.parse_args(argv)
@@ -516,6 +568,19 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"acad_artifact_route: required action {args.require_action!r} "
                 f"but got {actual!r}",
+                file=sys.stderr,
+            )
+            if artifact:
+                print(f"acad_artifact_route: action artifact: {artifact}", file=sys.stderr)
+            return 2
+    if args.require_action_domain:
+        actual = _recommended_action_domain(payload)
+        if actual != args.require_action_domain:
+            action = _recommended_action_code(payload)
+            artifact = _recommended_action_artifact(payload)
+            print(
+                f"acad_artifact_route: required action domain {args.require_action_domain!r} "
+                f"but got {actual!r} for action {action!r}",
                 file=sys.stderr,
             )
             if artifact:

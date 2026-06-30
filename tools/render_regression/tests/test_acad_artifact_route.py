@@ -36,6 +36,7 @@ def test_routes_batch_missing_references(tmp_path):
     assert payload["kind"] == "batch"
     assert payload["status"] == "blocked"
     assert payload["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
+    assert payload["recommended_next_action"]["domain"] == "input"
 
 
 def test_routes_directory_containing_artifact_index(tmp_path):
@@ -76,6 +77,7 @@ def test_routes_run_case_actions(tmp_path):
 
     assert payload["kind"] == "request_run"
     assert payload["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
+    assert payload["recommended_next_action"]["domain"] == "input"
     assert payload["case_action_counts"] == {"recapture-autocad-or-provide-window": 1}
     assert "case_action_counts: recapture-autocad-or-provide-window=1" in text
 
@@ -118,11 +120,18 @@ def test_routes_multiple_directories_as_batch(tmp_path):
         "continue-to-request-run": 1,
         "recapture-autocad-or-provide-window": 1,
     }
+    assert payload["recommended_action_domain_counts"] == {
+        "continue": 1,
+        "input": 1,
+    }
     assert payload["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
+    assert payload["recommended_next_action"]["domain"] == "input"
     assert payload["recommended_next_action"]["artifact"].endswith("compare/artifact_index.json")
     assert [item["kind"] for item in payload["routes"]] == ["batch", "compare"]
     assert payload["routes"][0]["recommended_next_action"]["code"] == "continue-to-request-run"
+    assert payload["routes"][0]["recommended_next_action"]["domain"] == "continue"
     assert payload["routes"][1]["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
+    assert payload["routes"][1]["recommended_next_action"]["domain"] == "input"
     assert payload["routes"][0]["artifact_index_boundary"]["compares_renders"] is False
     assert payload["routes"][1]["artifact_index_boundary"]["compares_renders"] is True
 
@@ -162,7 +171,9 @@ def test_cli_multiple_directories_text(tmp_path, capsys):
         "recommended_action_counts: continue-to-request-run=1, "
         "recapture-autocad-or-provide-window=1"
     ) in output
+    assert "recommended_action_domain_counts: continue=1, input=1" in output
     assert "recommended_next_action: recapture-autocad-or-provide-window" in output
+    assert "recommended_action_domain: input" in output
     assert "autocad_equivalence_claim: false" in output
     assert "source_artifact_boundary: autocad_equivalence_claim=false,compares_renders=true" in output
     assert "route: 1" in output
@@ -251,12 +262,16 @@ def test_cli_writes_json_and_markdown_reports(tmp_path):
         "continue-to-request-run": 1,
         "recapture-autocad-or-provide-window": 1,
     }
+    assert payload["recommended_action_domain_counts"] == {"continue": 1, "input": 1}
     assert payload["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
+    assert payload["recommended_next_action"]["domain"] == "input"
     assert "# AutoCAD Artifact Route Report" in markdown
     assert "does not compare renders" in markdown
     assert "- route_count: `2`" in markdown
     assert "recommended_action_counts" in markdown
+    assert "recommended_action_domain_counts" in markdown
     assert "- recommended_next_action: `recapture-autocad-or-provide-window`" in markdown
+    assert "- recommended_action_domain: `input`" in markdown
     assert "- read_only_routing: `True`" in markdown
     assert "- autocad_equivalence_claim: `False`" in markdown
     assert "- source_compares_renders: `True`" in markdown
@@ -319,6 +334,53 @@ def test_cli_require_action_fails_closed_on_unexpected_top_level_action(tmp_path
     assert "required action 'review-x3-pass'" in stderr
     assert "got 'recapture-autocad-or-provide-window'" in stderr
     assert "action artifact:" in stderr
+
+
+def test_cli_require_action_domain_passes_for_expected_domain(tmp_path):
+    compare_dir = tmp_path / "compare"
+    compare_dir.mkdir()
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"recapture-required": 1},
+        "viewspace_status_counts": {"mismatch": 1},
+        "x3_band_counts": {"fallback": 1},
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(compare_dir),
+        "--require-action-domain",
+        "input",
+    ]) == 0
+
+
+def test_cli_require_action_domain_fails_closed_on_unexpected_domain(tmp_path, capsys):
+    compare_dir = tmp_path / "compare"
+    compare_dir.mkdir()
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "compare_failed",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"renderer-candidate": 1},
+        "viewspace_status_counts": {"match": 1},
+        "x3_band_counts": {"fail": 1},
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(compare_dir),
+        "--require-action-domain",
+        "input",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "required action domain 'input'" in stderr
+    assert "got 'renderer-candidate'" in stderr
+    assert "for action 'inspect-renderer-candidate'" in stderr
 
 
 def test_cli_require_source_boundary_passes_when_all_routes_match(tmp_path):
@@ -425,6 +487,7 @@ def test_routes_compare_renderer_candidate_before_recapture(tmp_path):
 
     assert payload["kind"] == "compare"
     assert payload["recommended_next_action"]["code"] == "inspect-renderer-candidate"
+    assert payload["recommended_next_action"]["domain"] == "renderer-candidate"
     assert payload["triage_bucket_counts"]["renderer-candidate"] == 1
 
 
@@ -457,7 +520,12 @@ def test_batch_route_prioritizes_input_repairs_before_renderer_candidates(tmp_pa
         "fix-request-package": 1,
         "inspect-renderer-candidate": 1,
     }
+    assert payload["recommended_action_domain_counts"] == {
+        "input": 1,
+        "renderer-candidate": 1,
+    }
     assert payload["recommended_next_action"]["code"] == "fix-request-package"
+    assert payload["recommended_next_action"]["domain"] == "input"
     assert payload["recommended_next_action"]["artifact"].endswith("validation/artifact_index.json")
 
 
