@@ -480,6 +480,55 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
     assert "G11\tG11/B11\tprovide-returned-autocad-pngs\tinput\tmissing_references" in case_actions_tsv
 
 
+def test_reference_request_run_clears_stale_compare_artifacts_on_input_blocked_rerun(tmp_path):
+    _dxf(tmp_path / "dxf" / "B11.dxf")
+    _png(tmp_path / "ours" / "G11.png", size=(1600, 1131), box=[40, 30, 1560, 1100])
+    returned = tmp_path / "returned" / "G11_autocad_model_extents.png"
+    _png(returned, size=(1600, 1131), box=[40, 30, 1560, 1100])
+    request = _request(tmp_path / "reference_request.json")
+    candidates = _candidates(tmp_path / "candidate_cases.json")
+    out = tmp_path / "run"
+
+    assert runner.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--case-id", "G11",
+        "--out-dir", str(out),
+    ]) == 0
+    assert (out / "compare" / "summary.json").is_file()
+
+    returned.unlink()
+    assert runner.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--case-id", "G11",
+        "--out-dir", str(out),
+    ]) == 2
+
+    summary = json.loads((out / "run_summary.json").read_text(encoding="utf-8"))
+    artifact_index = _run_artifact_index(out)
+    assert summary["status"] == "input_blocked"
+    assert summary["compare_summary_json"] == ""
+    assert summary["compare_summary_markdown"] == ""
+    assert summary["compare_artifact_index"] == ""
+    assert summary["case_action_counts"] == {"provide-returned-autocad-pngs": 1}
+    assert summary["case_action_domain_counts"] == {"input": 1}
+    assert summary["route_count"] == 2
+    assert summary["route_recommended_action_counts"] == {
+        "provide-returned-autocad-pngs": 2,
+    }
+    assert summary["route_recommended_action_domain_counts"] == {"input": 2}
+    assert artifact_index["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
+    assert "compare_summary_json" not in _run_artifact_kinds(out)
+    assert "compare_summary_markdown" not in _run_artifact_kinds(out)
+    assert "compare_artifact_index" not in _run_artifact_kinds(out)
+    assert not (out / "compare" / "summary.json").exists()
+    case_actions_tsv = (out / "case_actions.tsv").read_text(encoding="utf-8")
+    assert "review-x3-pass" not in case_actions_tsv
+
+
 def test_reference_request_run_surfaces_request_validation_block(tmp_path):
     _dxf(tmp_path / "dxf" / "B11.dxf")
     _png(tmp_path / "ours" / "G11.png", box=[20, 15, 740, 555])

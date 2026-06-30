@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -38,6 +39,23 @@ def _existing(path: Path) -> str:
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _clear_run_outputs(out_dir: Path) -> None:
+    for name in (
+        "run_summary.json",
+        "run_summary.md",
+        "case_actions.tsv",
+        "route_summary.json",
+        "route_summary.md",
+        "artifact_index.json",
+    ):
+        path = out_dir / name
+        if path.is_file():
+            path.unlink()
+    compare_dir = out_dir / "compare"
+    if compare_dir.is_dir():
+        shutil.rmtree(compare_dir)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -578,6 +596,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args(argv)
 
+    _clear_run_outputs(args.out_dir)
     input_dir = args.out_dir / "input"
     compare_dir = args.out_dir / "compare"
     batch_args = [
