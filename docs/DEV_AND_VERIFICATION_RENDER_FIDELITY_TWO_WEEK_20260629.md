@@ -848,3 +848,47 @@ Boundary:
 - No renderer change.
 - No private drawing or AutoCAD PNG committed.
 - Does not change X3 semantics or AutoCAD-equivalence wording.
+
+### Slice 16 — Reference Request Next-Command Handoff
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make each generated `reference_request.md` self-contained for the next
+  operator action.
+- Reduce the chance of manually stitching the wrong candidate path or missing
+  the new one-command runner after PNGs are returned.
+
+Deliverables:
+
+- `tools/render_regression/acad_manifest_compare.py`
+- `tools/render_regression/tests/test_acad_manifest_compare.py`
+
+Behavior:
+
+- `reference_request.md` now includes an "After The PNGs Are Returned" section.
+- The section provides the exact `acad_reference_request_run.py` command:
+  - `--from-request <generated reference_request.json>`;
+  - `--candidate-cases <current candidate_cases.json>`;
+  - `--reference-dir <returned-png-dir>`;
+  - `--out-dir <next-run-dir>`.
+- It also repeats the critical boundary: `viewspace_mismatch` still exits `2`
+  and is not an AutoCAD-equivalence result.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 6 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 92 passed
+```
+
+Boundary:
+
+- Generated operator guidance only.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- Does not change X3 semantics or AutoCAD-equivalence wording.
