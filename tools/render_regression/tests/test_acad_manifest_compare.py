@@ -95,7 +95,12 @@ def test_readme_recapture_route_example_documents_handoff_guards():
         "--require-request-boundary autocad_equivalence_claim=false",
         "--require-request-boundary requires_returned_autocad_png=true",
         "--require-request-boundary requires_viewspace_match=true",
+        "--forbid-action-domain input \\",
         "--forbid-action-domain input-review",
+        "--forbid-action-domain renderer-candidate",
+        "--forbid-viewspace-status mismatch",
+        "--forbid-x3-band review",
+        "--forbid-x3-band fallback",
         "--require-kind batch",
         "--require-kind compare",
         "--require-kind request_run",
@@ -466,7 +471,12 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert request_md.count("--require-request-boundary requires_returned_autocad_png=true") == 3
     assert request_md.count("--require-request-boundary requires_viewspace_match=true") == 3
     assert request_md.count("--fail-on-input-review") == 1
+    assert request_md.count("--forbid-action-domain input \\") == 1
     assert request_md.count("--forbid-action-domain input-review") == 1
+    assert request_md.count("--forbid-action-domain renderer-candidate") == 1
+    assert request_md.count("--forbid-viewspace-status mismatch") == 1
+    assert request_md.count("--forbid-x3-band review") == 1
+    assert request_md.count("--forbid-x3-band fallback") == 1
     assert request_md.count("--require-kind batch") == 1
     assert request_md.count("--require-kind compare") == 1
     assert request_md.count("--require-kind request_run") == 1
@@ -489,7 +499,12 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
         "--require-request-boundary autocad_equivalence_claim=false",
         "--require-request-boundary requires_returned_autocad_png=true",
         "--require-request-boundary requires_viewspace_match=true",
+        "--forbid-action-domain input \\",
         "--forbid-action-domain input-review",
+        "--forbid-action-domain renderer-candidate",
+        "--forbid-viewspace-status mismatch",
+        "--forbid-x3-band review",
+        "--forbid-x3-band fallback",
         "--require-kind batch",
         "--require-kind compare",
         "--require-kind request_run",

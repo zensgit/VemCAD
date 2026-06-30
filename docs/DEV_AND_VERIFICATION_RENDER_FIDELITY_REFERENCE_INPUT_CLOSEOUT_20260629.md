@@ -1441,6 +1441,54 @@ python3 -m pytest tools/render_regression/tests -q
 # 195 passed
 ```
 
+## Follow-Up Generated Route Command Semantic Guards
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep the generated post-return route command from passing merely because exit
+  codes and artifacts are success-shaped.
+- Make the command also fail closed on routed semantic distributions that still
+  require input recapture or renderer investigation.
+- Prevent X3 `review`/`fallback` bands from being treated as a clean
+  AutoCAD-parity result by unattended scripts.
+
+Changes:
+
+- `acad_manifest_compare.py` now writes these additional guards into generated
+  `reference_request.md`:
+  - `--forbid-action-domain input`
+  - `--forbid-action-domain renderer-candidate`
+  - `--forbid-viewspace-status mismatch`
+  - `--forbid-x3-band review`
+  - `--forbid-x3-band fallback`
+- `tools/render_regression/README.md` mirrors the same quick-start route
+  command.
+- Regression coverage asserts the generated and documented command blocks carry
+  those guards. The `input` assertion uses the exact line fragment so it cannot
+  be satisfied accidentally by `input-review`.
+
+Boundary:
+
+- Operator command hardening only.
+- No route priority change.
+- No request-run action change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 11 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 195 passed
+```
+
 ## Follow-Up Generated Route Command Final-Exit Guard
 
 Status: implemented in this branch.
