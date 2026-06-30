@@ -5766,3 +5766,37 @@ python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
 python3 -m pytest tools/render_regression/tests -q
 # 192 passed
 ```
+
+## Follow-Up README Expected Size Summary Note
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep operator documentation aligned with the expected-size summary surface.
+- Make it clear that `summary.json`, `summary.tsv`, and `summary.md` now expose
+  each row's `expected_size`, so operators do not need to open the generated
+  request package merely to audit the capture-size contract.
+
+Changes:
+
+- `tools/render_regression/README.md` now states that compare summaries surface
+  per-row `expected_size` alongside the existing recommended action domain
+  evidence.
+
+Boundary:
+
+- Documentation-only.
+- No wrapper default behavior change.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests -q
+# 192 passed
+```
