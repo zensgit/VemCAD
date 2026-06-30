@@ -1294,6 +1294,55 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 11 passed
 ```
 
+## Follow-Up Request Validation TSV
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make request-package validation provenance machine-readable in the same way
+  the missing-reference handoff already has a TSV surface.
+- Let unattended CI, handoff scripts, and spreadsheet review inspect the
+  per-case source/candidate SHA256+size, requested capture contract, and
+  issue codes without parsing Markdown.
+
+Changes:
+
+- `acad_reference_batch.py --validate-request` and `--from-request` now write
+  `reference_request_validation.tsv` beside
+  `reference_request_validation.json/md`.
+- The TSV has one row per request case and records:
+  - case id / drawing id / recommended output name;
+  - requested capture method / view contract / expected size;
+  - resolved source DXF path plus source SHA256 and size;
+  - resolved candidate PNG path plus candidate SHA256 and size;
+  - per-case `severity:issue_code` values.
+- Batch artifact indexes include `reference_request_validation_tsv`.
+- `_clear_batch_outputs()` removes stale `reference_request_validation.tsv`.
+- `reference_request_validation.md` now points at the sibling TSV.
+- The README documents the TSV as the machine-readable companion to the
+  request-validation Markdown provenance table.
+
+Boundary:
+
+- Request-validation evidence surface only.
+- No request validation rule change.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 22 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 192 passed
+```
+
 ## Follow-Up Route Case Action Issue-Code Counts
 
 Status: implemented in this branch.

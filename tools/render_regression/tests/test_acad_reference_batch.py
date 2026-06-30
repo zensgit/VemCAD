@@ -199,11 +199,22 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
     assert "AutoCAD Reference Request Validation" in validation_md
     assert "G11_autocad_model_extents.png" in validation_md
     assert "`1600x1131`" in validation_md
+    assert "reference_request_validation_tsv" in validation_md
     assert "issue_code_counts: `none`" in validation_md
     assert "source_request_boundary: `autocad_equivalence_claim=False" in validation_md
     assert "requires_returned_autocad_png=True" in validation_md
     assert f"sha256={_sha256(source)} size={source.stat().st_size}" in validation_md
     assert f"sha256={_sha256(ours)} size={ours.stat().st_size}" in validation_md
+    validation_tsv = (out / "reference_request_validation.tsv").read_text(encoding="utf-8").splitlines()
+    assert validation_tsv[0] == (
+        "id\tdrawing_id\trecommended_output_name\trequested_capture_method\t"
+        "requested_view_contract\trequested_expected_size\tsource_dxf\tsource_dxf_sha256\t"
+        "source_dxf_size_bytes\tcandidate_png\tcandidate_png_sha256\tcandidate_png_size_bytes\tissue_codes"
+    )
+    assert validation_tsv[1].startswith("G11\tG11/B11\tG11_autocad_model_extents.png\t")
+    assert f"\t{_sha256(source)}\t{source.stat().st_size}\t" in validation_tsv[1]
+    assert f"\t{_sha256(ours)}\t{ours.stat().st_size}\t" in validation_tsv[1]
+    assert validation_tsv[1].endswith("\t")
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["stage"] == "request_validation"
     assert artifact_index["status"] == "pass"
@@ -223,6 +234,7 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
     assert {item["kind"] for item in artifact_index["artifacts"]} == {
         "reference_request_validation_json",
         "reference_request_validation_markdown",
+        "reference_request_validation_tsv",
         "route_summary_json",
         "route_summary_markdown",
     }
@@ -375,6 +387,9 @@ def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(t
     assert "`0xbad`" in validation_md
     assert "source_dxf_sha256_mismatch=1" in validation_md
     assert "unsafe_recommended_output_name=2" in validation_md
+    validation_tsv = (out / "reference_request_validation.tsv").read_text(encoding="utf-8").splitlines()
+    assert "source_dxf_sha256_mismatch" in validation_tsv[1]
+    assert "unsafe_recommended_output_name" in validation_tsv[1]
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["stage"] == "request_validation"
     assert artifact_index["status"] == "blocked"
@@ -394,7 +409,10 @@ def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(t
         "unmatched_requested_view_contract": 1,
         "unsafe_recommended_output_name": 2,
     }
-    assert "reference_request_validation_markdown" in {item["kind"] for item in artifact_index["artifacts"]}
+    assert {
+        "reference_request_validation_markdown",
+        "reference_request_validation_tsv",
+    } <= {item["kind"] for item in artifact_index["artifacts"]}
 
 
 def test_batch_generator_fulfills_reference_request(tmp_path):
@@ -474,6 +492,7 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
         "reference_intake_markdown",
         "reference_request_validation_json",
         "reference_request_validation_markdown",
+        "reference_request_validation_tsv",
         "route_summary_json",
         "route_summary_markdown",
     }
@@ -808,6 +827,7 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path, capsys):
         "missing_references_tsv",
         "reference_request_validation_json",
         "reference_request_validation_markdown",
+        "reference_request_validation_tsv",
         "route_summary_json",
         "route_summary_markdown",
     }
