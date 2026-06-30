@@ -1597,6 +1597,47 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Operator README Route Handoff
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Move the reference-request / route-artifact operating path into the public
+  render regression README.
+- Keep future operators from needing to reverse-engineer the flow from this
+  long closeout ledger.
+
+Changes:
+
+- `tools/render_regression/README.md` now documents:
+  - `acad_manifest_compare.py`
+  - `acad_reference_request_run.py`
+  - `acad_artifact_route.py <run-dir> --recursive --text`
+  - `acad_artifact_route.py --require-action <code>`
+- The README names the artifact-index `boundary` fields and the route
+  `recommended_next_action` codes.
+- The README keeps the same hard boundary: route assertions do not compare
+  renders, render DXFs, tune X3, or claim AutoCAD equivalence.
+
+Boundary:
+
+- Documentation only.
+- No CLI behavior change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 Private compatibility smoke:
 
 ```bash
