@@ -648,6 +648,17 @@ def _action_domain_counts(payload: dict[str, Any]) -> dict[str, int]:
     return {domain: 1} if domain else {}
 
 
+def _action_counts(payload: dict[str, Any]) -> dict[str, int]:
+    counts = payload.get("recommended_action_counts")
+    if isinstance(counts, dict):
+        return {str(key): int(value) for key, value in counts.items() if str(key)}
+    counts = payload.get("case_action_counts")
+    if isinstance(counts, dict):
+        return {str(key): int(value) for key, value in counts.items() if str(key)}
+    action = _recommended_action_code(payload)
+    return {action: 1} if action else {}
+
+
 def _status_counts(payload: dict[str, Any]) -> dict[str, int]:
     counts = payload.get("status_counts")
     if isinstance(counts, dict):
@@ -710,6 +721,23 @@ def _parse_boundary_expectation(raw: str) -> tuple[str, Any]:
     return key, value
 
 
+def _parse_count_expectation(raw: str) -> tuple[str, int]:
+    if "=" not in raw:
+        raise ValueError(f"count expectation must be key=count: {raw}")
+    key, value = raw.split("=", 1)
+    key = key.strip()
+    value = value.strip()
+    if not key:
+        raise ValueError(f"count expectation key is empty: {raw}")
+    try:
+        count = int(value)
+    except Exception as exc:
+        raise ValueError(f"count expectation value must be an integer: {raw}") from exc
+    if count < 0:
+        raise ValueError(f"count expectation value must be non-negative: {raw}")
+    return key, count
+
+
 def _source_boundary_routes(payload: dict[str, Any]) -> list[dict[str, Any]]:
     if payload.get("schema") == BATCH_SCHEMA:
         return [route for route in payload.get("routes") or [] if isinstance(route, dict)]
@@ -754,6 +782,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--forbid-action-domain", action="append", default=[],
                         help=(
                             "exit 2 if any routed action domain count includes this domain; "
+                            "may repeat"
+                        ))
+    parser.add_argument("--require-action-count", action="append", default=[],
+                        help=(
+                            "exit 2 unless routed action counts contain code=count; "
                             "may repeat"
                         ))
     parser.add_argument("--require-status", action="append", default=[],
@@ -803,6 +836,9 @@ def main(argv: list[str] | None = None) -> int:
         source_boundary_expectations = [
             _parse_boundary_expectation(item) for item in args.require_source_boundary
         ]
+        action_count_expectations = [
+            _parse_count_expectation(item) for item in args.require_action_count
+        ]
     except Exception as exc:
         print(f"acad_artifact_route: {exc}", file=sys.stderr)
         return 2
@@ -850,6 +886,25 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(
                 "acad_artifact_route: action domain counts: "
+                + _format_counts(counts),
+                file=sys.stderr,
+            )
+            return 2
+    if action_count_expectations:
+        counts = _action_counts(payload)
+        failures = [
+            f"{action}={expected} (got {counts.get(action, 0)})"
+            for action, expected in action_count_expectations
+            if counts.get(action, 0) != expected
+        ]
+        if failures:
+            print(
+                "acad_artifact_route: required action count mismatch: "
+                + ", ".join(failures),
+                file=sys.stderr,
+            )
+            print(
+                "acad_artifact_route: action counts: "
                 + _format_counts(counts),
                 file=sys.stderr,
             )
