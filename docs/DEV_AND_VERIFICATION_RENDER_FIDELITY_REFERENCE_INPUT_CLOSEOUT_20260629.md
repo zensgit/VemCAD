@@ -1302,6 +1302,45 @@ python3 -m pytest tools/render_regression/tests -q
 # 114 passed
 ```
 
+## Follow-Up Batch Route Reports
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make batch/input-prep outputs self-routing, just like standalone compare and
+  request-run outputs.
+- Let CI or an unattended operator upload one `route_summary.json/md` from a
+  batch run without invoking `acad_artifact_route.py` as a second command.
+
+Changes:
+
+- `acad_reference_batch.py` now writes:
+  - `<out-dir>/route_summary.json`;
+  - `<out-dir>/route_summary.md`.
+- The batch `artifact_index.json` lists both route summary files.
+- The route payload is produced by the shared `acad_artifact_route.py`
+  implementation, so batch/request-run/compare routing cannot drift.
+- The route summary covers all batch stages: manifest generation, request
+  validation, missing returned references, and returned-reference intake.
+
+Boundary:
+
+- Reporting/indexing only.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 14 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 114 passed
+```
+
 Private compatibility smoke:
 
 ```bash

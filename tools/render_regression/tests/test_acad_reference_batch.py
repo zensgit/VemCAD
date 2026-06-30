@@ -31,6 +31,11 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _route_summary(out: Path) -> dict:
+    assert (out / "route_summary.md").is_file()
+    return json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
+
+
 def test_batch_generator_writes_manifest_and_candidates(tmp_path):
     _png(tmp_path / "acad" / "G01.png", (320, 240))
     _png(tmp_path / "ours" / "G01.png", (320, 240))
@@ -82,7 +87,12 @@ def test_batch_generator_writes_manifest_and_candidates(tmp_path):
     assert {item["kind"] for item in artifact_index["artifacts"]} == {
         "acad_manifest",
         "candidate_cases",
+        "route_summary_json",
+        "route_summary_markdown",
     }
+    route = _route_summary(out)
+    assert route["kind"] == "batch"
+    assert route["recommended_next_action"]["code"] == "continue-to-request-run"
 
     dry_run = tmp_path / "dry-run"
     assert harness.main([
@@ -149,7 +159,12 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
     assert {item["kind"] for item in artifact_index["artifacts"]} == {
         "reference_request_validation_json",
         "reference_request_validation_markdown",
+        "route_summary_json",
+        "route_summary_markdown",
     }
+    route = _route_summary(out)
+    assert route["kind"] == "batch"
+    assert route["recommended_next_action"]["code"] == "continue-to-request-run"
 
 
 def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(tmp_path):
@@ -288,7 +303,12 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
         "reference_intake_markdown",
         "reference_request_validation_json",
         "reference_request_validation_markdown",
+        "route_summary_json",
+        "route_summary_markdown",
     }
+    route = _route_summary(out)
+    assert route["kind"] == "batch"
+    assert route["recommended_next_action"]["code"] == "continue-to-request-run"
 
     dry_run = tmp_path / "dry-run-request"
     assert harness.main([
@@ -491,7 +511,12 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path):
         "missing_references_markdown",
         "reference_request_validation_json",
         "reference_request_validation_markdown",
+        "route_summary_json",
+        "route_summary_markdown",
     }
+    route = _route_summary(out)
+    assert route["kind"] == "batch"
+    assert route["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
 
 
 def test_batch_generator_clears_stale_missing_reports_on_successful_rerun(tmp_path):
