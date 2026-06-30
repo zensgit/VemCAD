@@ -216,6 +216,19 @@ The wrapper summary also surfaces
 request package is visible from the run root without opening the input
 directory first.
 
+The wrapper also writes `recommended_next_action` into `run_summary.json` and
+prints it near the top of `run_summary.md`. Treat that as the first unattended
+review cue:
+
+| Recommended action | Meaning |
+| --- | --- |
+| `fix-request-package` | Source/candidate provenance or request structure is blocked. Fix the request before exporting AutoCAD PNGs. |
+| `provide-returned-autocad-pngs` | Requested AutoCAD PNGs are still missing. Return files with the requested names. |
+| `inspect-returned-reference-warnings` | Returned PNGs exist, but intake flagged capture-quality warnings. Inspect before trusting visual conclusions. |
+| `recapture-autocad-or-provide-window` | The matched-view gate failed. Recapture AutoCAD at matched extents or provide the real world window; do not tune the renderer. |
+| `review-x3-pass` | The matched-view gate passed. Review X3 and artifacts before opening renderer work. |
+| `inspect-compare-failure` | Inputs reached compare, but compare failed. Inspect compare artifacts and per-case logs. |
+
 Generated requests may include source-DXF and candidate-PNG provenance
 (`sha256` + byte size). When present, `acad_reference_batch.py --from-request`
 checks those files before building the next manifest. A mismatch means the

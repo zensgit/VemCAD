@@ -507,6 +507,19 @@ python3 tools/render_regression/acad_reference_request_run.py \
   --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
   --reference-dir /private/tmp/vemcad-provenance-compat-smoke-20260629/returned \
   --case-id G11 \
+  --out-dir /private/tmp/vemcad-run-next-action-smoke-20260629
+# AutoCAD reference request run: viewspace_mismatch
+# recommended_next_action.code=recapture-autocad-or-provide-window
+```
+
+Private compatibility smoke:
+
+```bash
+python3 tools/render_regression/acad_reference_request_run.py \
+  --from-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir /private/tmp/vemcad-provenance-compat-smoke-20260629/returned \
+  --case-id G11 \
   --out-dir /private/tmp/vemcad-validate-on-fulfill-smoke-20260629
 # AutoCAD reference request run: viewspace_mismatch
 # run_summary: reference_request_validation_status=pass, reference_intake_status=pass
@@ -562,4 +575,49 @@ python3 tools/render_regression/acad_reference_request_run.py \
 # AutoCAD reference request run: viewspace_mismatch
 # artifact_index.schema=vemcad.acad_reference_request_run_artifact_index/v1
 # artifact_index.count=10
+```
+
+## Follow-Up Recommended Next Action
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make unattended `acad_reference_request_run.py` outputs self-directing.
+- Prevent operators from treating suspicious input or `viewspace_mismatch` as a
+  renderer bug by default.
+
+Changes:
+
+- `run_summary.json` now includes `recommended_next_action`.
+- `run_summary.md` prints the recommended action code and message near the top.
+- The recommendation is derived only from already-recorded gate states:
+  request validation, missing returned PNGs, returned-reference intake,
+  matched-view compare status, and pass/fail status.
+
+Decision order:
+
+1. `fix-request-package` when request validation is blocked or unreadable.
+2. `provide-returned-autocad-pngs` when returned PNGs are missing.
+3. `inspect-returned-reference-warnings` when intake is `review`.
+4. `recapture-autocad-or-provide-window` on `viewspace_mismatch`.
+5. `review-x3-pass` on matched-view pass.
+6. `inspect-compare-failure` on compare failures.
+
+Boundary:
+
+- Run-summary/reporting only.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- Does not change X3 semantics or AutoCAD-equivalence wording.
+- Does not turn `viewspace_mismatch` into renderer work.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 5 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 101 passed
 ```
