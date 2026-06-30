@@ -1,0 +1,165 @@
+# DEV/V — Render Fidelity Reference Input Continuation Closeout (2026-06-29)
+
+## Scope
+
+This closeout records the continuation run after
+`docs/DEV_AND_VERIFICATION_RENDER_FIDELITY_TWO_WEEK_20260629.md`.
+
+The goal was to keep developing without crossing the hard AutoCAD ground-truth
+boundary:
+
+- no GUI AutoCAD automation;
+- no renderer tuning from `viewspace_mismatch`;
+- no private drawing or AutoCAD PNG committed;
+- no AutoCAD-equivalence claim without a matched-view comparison.
+
+## Delivered
+
+| PR | Commit | Slice | Result |
+| --- | --- | --- | --- |
+| #192 | `ef22331` | Returned-reference intake preflight | Merged, CI green |
+| #193 | `2abc374` | Reference batch artifact index | Merged, CI green |
+| #194 | `f52a86d` | One-command reference request runner | Merged, CI green |
+| #195 | `544cf2c` | Generated request handoff command | Merged, CI green |
+
+## What Changed
+
+### #192 — Returned Reference Intake Preflight
+
+`acad_reference_batch.py --from-request` now writes:
+
+- `reference_intake.json`
+- `reference_intake.md`
+
+It records capture-quality signals for returned AutoCAD PNGs:
+
+- PNG size and long edge;
+- alpha/transparency presence;
+- sampled corner-white ratio.
+
+Missing or unreadable PNGs still fail closed. Present-but-suspicious PNGs are
+`status=review`, not hidden success.
+
+### #193 — Reference Batch Artifact Index
+
+`acad_reference_batch.py` now writes `artifact_index.json` for:
+
+- successful `--cases` runs;
+- successful `--from-request` runs;
+- missing-reference blocked runs.
+
+This gives unattended input-prep runs a single review entry point.
+
+### #194 — One-Command Reference Request Runner
+
+New command:
+
+```bash
+python3 tools/render_regression/acad_reference_request_run.py \
+  --from-request <reference_request.json> \
+  --candidate-cases <candidate_cases.json> \
+  --reference-dir <returned-png-dir> \
+  --case-id G11 \
+  --out-dir <run-dir>
+```
+
+It runs:
+
+1. `acad_reference_batch.py` into `<run-dir>/input`;
+2. `acad_manifest_compare.py` into `<run-dir>/compare`;
+3. `run_summary.json` and `run_summary.md` at the run root.
+
+It preserves existing gates: input-blocked stops before compare, and
+`viewspace_mismatch` still exits `2`.
+
+### #195 — Generated Request Handoff
+
+Generated `reference_request.md` now includes the next command to run after
+AutoCAD PNGs are returned. The command points at
+`acad_reference_request_run.py` and carries the current `candidate_cases.json`
+path.
+
+## Verification
+
+Each PR passed VemCAD CI:
+
+- `pytest`
+- `build-and-smoke`
+
+Local verification during development:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 6 passed
+
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 3 passed
+
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 6 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 92 passed
+```
+
+Private workflow smoke:
+
+- G11 partial returned-reference path using the old existing PNG:
+  - input-prep: pass;
+  - intake: pass;
+  - compare: `viewspace_mismatch`;
+  - wrapper exit: `2`.
+- Missing-reference smoke:
+  - input-prep: blocked;
+  - `artifact_index.json` still written with `missing_references_json` and
+    `missing_references_markdown`.
+
+These smokes prove the workflow behavior. They do not convert the old G11 PNG
+into valid ground truth.
+
+## Current State
+
+- VemCAD `origin/main`: `544cf2c`.
+- Open VemCAD PRs at closeout: pre-existing draft `#1` only.
+- The returned-reference loop is now:
+
+```text
+reference_request.json
+  -> returned AutoCAD PNG directory
+  -> acad_reference_request_run.py
+  -> input/reference_intake.*
+  -> input/artifact_index.json
+  -> compare/summary.*
+  -> compare/artifact_index.json
+  -> run_summary.*
+```
+
+## Remaining Hard Gate
+
+Formal render fidelity still requires a fresh matched-view AutoCAD PNG:
+
+- model space;
+- drawing extents / fit-to-drawing;
+- white background;
+- monochrome off;
+- no toolbar/chrome/screenshot crop;
+- long edge at least `1600px`.
+
+Without that returned PNG, the correct status remains `viewspace_mismatch` or
+`recapture-required`, and renderer tuning must not start.
+
+## Next Command When Input Arrives
+
+For the current private request bundle:
+
+```bash
+python3 tools/render_regression/acad_reference_request_run.py \
+  --from-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir <returned-png-dir> \
+  --case-id G11 \
+  --out-dir <next-run-dir>
+```
+
+Only if the resulting compare reaches `viewspace_status=match` should X3 be
+interpreted as a render-fidelity signal.
