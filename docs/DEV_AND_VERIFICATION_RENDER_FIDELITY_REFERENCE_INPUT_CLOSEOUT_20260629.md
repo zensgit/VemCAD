@@ -1198,6 +1198,54 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 10 passed
 ```
 
+## Follow-Up Request-Run Input-Review Fail Flag
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let unattended request-run workflows fail closed on returned-reference intake
+  warnings without changing the default soft-review behavior.
+- Keep the existing semantics intact: returned-reference warnings still route
+  to `inspect-returned-reference-warnings` / `input-review`, and operators can
+  choose whether that review lane should be a hard process gate.
+- Cover the subtle case where the matched-view compare itself passes, but the
+  returned AutoCAD PNG still has intake warnings such as low resolution.
+
+Changes:
+
+- `acad_reference_request_run.py` now accepts `--fail-on-input-review`.
+- Default behavior is unchanged: if the compare exits `0`, the wrapper exits
+  `0` even when the recommended action is `input-review`.
+- With `--fail-on-input-review`, the wrapper exits `2` when the final
+  recommended action domain is `input-review` and the compare would otherwise
+  have exited `0`.
+- Regression coverage creates an intentionally low-resolution but otherwise
+  matched returned/candidate pair:
+  - the default run exits `0`, with `reference_intake_status=review`;
+  - the flagged run exits `2`, with the same run summary and
+    `recommended_next_action.domain=input-review`.
+- `tools/render_regression/README.md` documents the flag as an opt-in
+  unattended-job gate.
+
+Boundary:
+
+- Operator/CI fail-closed control only.
+- No default behavior change.
+- No renderer change.
+- No compare metric change.
+- No route priority change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 11 passed
+```
+
 ## Follow-Up Per-Case Action Artifact Resolution
 
 Status: implemented in this branch.

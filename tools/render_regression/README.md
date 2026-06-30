@@ -161,6 +161,7 @@ python3 tools/render_regression/acad_reference_request_run.py \
   --require-request-boundary autocad_equivalence_claim=false \
   --require-request-boundary requires_returned_autocad_png=true \
   --require-request-boundary requires_viewspace_match=true \
+  --fail-on-input-review \
   --out-dir <run-dir>
 
 python3 tools/render_regression/acad_artifact_route.py <run-dir> \
@@ -177,6 +178,12 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
 `case_action_domain_counts`, plus `recommended_next_action.domain`, so the run
 summary itself distinguishes input/recapture gates from renderer-candidate
 work before a separate route report is generated. The run summary and run-level
+artifact index keep returned-reference intake warnings visible even when the
+matched-view compare itself passes. By default those warnings remain a review
+lane rather than a hard failure; pass `--fail-on-input-review` when an
+unattended job should exit `2` if the run's recommended action is in the
+`input-review` domain.
+The run summary and run-level
 artifact index also surface route-level `route_count`, `route_kind_counts`,
 `route_status_counts`,
 `route_recommended_action_counts`, and

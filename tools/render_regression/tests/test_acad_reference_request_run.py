@@ -640,6 +640,57 @@ def test_reference_request_run_surfaces_intake_review_warnings(tmp_path):
     assert "recommended_next_action: `inspect-returned-reference-warnings`" in summary_md
 
 
+def test_reference_request_run_can_fail_closed_on_input_review_warnings(tmp_path):
+    _dxf(tmp_path / "dxf" / "B11.dxf")
+    _png(
+        tmp_path / "ours" / "G11.png",
+        size=(900, 600),
+        box=[220, 165, 580, 435],
+    )
+    _png(
+        tmp_path / "returned" / "G11_autocad_model_extents.png",
+        size=(900, 600),
+        box=[220, 165, 580, 435],
+    )
+    request = _request(tmp_path / "reference_request.json")
+    candidates = _candidates(tmp_path / "candidate_cases.json")
+    default_out = tmp_path / "default-run"
+
+    assert runner.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--case-id", "G11",
+        "--out-dir", str(default_out),
+    ]) == 0
+
+    default_summary = json.loads((default_out / "run_summary.json").read_text(encoding="utf-8"))
+    assert default_summary["status"] == "pass"
+    assert default_summary["compare_exit_code"] == 0
+    assert default_summary["reference_intake_status"] == "review"
+    assert default_summary["reference_intake_issue_code_counts"] == {"long_edge_below_requested": 1}
+    assert default_summary["recommended_next_action"]["code"] == "inspect-returned-reference-warnings"
+    assert default_summary["recommended_next_action"]["domain"] == "input-review"
+
+    fail_out = tmp_path / "fail-run"
+    assert runner.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--case-id", "G11",
+        "--fail-on-input-review",
+        "--out-dir", str(fail_out),
+    ]) == 2
+
+    fail_summary = json.loads((fail_out / "run_summary.json").read_text(encoding="utf-8"))
+    assert fail_summary["status"] == "pass"
+    assert fail_summary["compare_exit_code"] == 0
+    assert fail_summary["reference_intake_status"] == "review"
+    assert fail_summary["reference_intake_issue_code_counts"] == {"long_edge_below_requested": 1}
+    assert fail_summary["recommended_next_action"]["domain"] == "input-review"
+    assert fail_summary["case_action_domain_counts"] == {"input-review": 1}
+
+
 def test_reference_request_run_routes_intake_blocked_to_fix_returned_input(tmp_path, capsys):
     _dxf(tmp_path / "dxf" / "B11.dxf")
     _png(tmp_path / "ours" / "G11.png", size=(760, 570), box=[20, 15, 740, 555])

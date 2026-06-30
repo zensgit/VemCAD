@@ -805,6 +805,21 @@ def _print_run_summary(summary: dict[str, Any], out_dir: Path) -> None:
     print(f"  run summary: {out_dir / 'run_summary.md'}")
 
 
+def _final_exit_code(
+    summary: dict[str, Any],
+    compare_rc: int,
+    *,
+    fail_on_input_review: bool,
+) -> int:
+    if (
+        fail_on_input_review
+        and compare_rc == 0
+        and summary.get("recommended_next_action", {}).get("domain") == "input-review"
+    ):
+        return 2
+    return compare_rc
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="acad_reference_request_run",
@@ -819,6 +834,11 @@ def main(argv: list[str] | None = None) -> int:
                         help="fulfill and compare only this case id; may repeat")
     parser.add_argument("--require-request-boundary", action="append", default=[],
                         help="require reference_request.json boundary key=value before fulfilment; may repeat")
+    parser.add_argument("--fail-on-input-review", action="store_true",
+                        help=(
+                            "return exit code 2 when the run's recommended action is in the "
+                            "input-review domain, even if the matched-view compare itself exits 0"
+                        ))
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args(argv)
 
@@ -860,7 +880,11 @@ def main(argv: list[str] | None = None) -> int:
         compare_rc=compare_rc,
     )
     _print_run_summary(summary, args.out_dir)
-    return compare_rc
+    return _final_exit_code(
+        summary,
+        compare_rc,
+        fail_on_input_review=args.fail_on_input_review,
+    )
 
 
 if __name__ == "__main__":
