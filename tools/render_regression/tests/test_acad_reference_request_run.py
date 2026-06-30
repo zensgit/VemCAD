@@ -287,7 +287,8 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     )
     assert "G11\tG11/B11\treview-x3-pass\tpass-review\tcompare\tmatched-pass\tmatch\tpass\t\t\t" in case_actions_tsv[1]
     assert "route summary markdown" in summary_md
-    assert _run_artifact_kinds(out) >= {
+    artifact_kinds = _run_artifact_kinds(out)
+    assert artifact_kinds >= {
         "run_summary_json",
         "run_summary_markdown",
         "case_actions_tsv",
@@ -302,6 +303,8 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
         "compare_summary_markdown",
         "compare_artifact_index",
     }
+    assert "compare_reference_request_json" not in artifact_kinds
+    assert "compare_reference_request_markdown" not in artifact_kinds
     route_summary = json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
     route_summary_md = (out / "route_summary.md").read_text(encoding="utf-8")
     request_run_route = next(item for item in route_summary["routes"] if item["kind"] == "request_run")
@@ -392,6 +395,8 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert summary["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
     assert summary["recommended_next_action"]["domain"] == "input"
     assert summary["recommended_next_action"]["artifact"].endswith("compare/reference_request.md")
+    assert summary["compare_reference_request_json"].endswith("compare/reference_request.json")
+    assert summary["compare_reference_request_markdown"].endswith("compare/reference_request.md")
     assert summary["case_action_counts"] == {
         "recapture-autocad-or-provide-window": 1,
         "review-x3-pass": 1,
@@ -440,6 +445,9 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
         "mismatch": 1,
     }
     assert artifact_index["route_x3_band_counts"] == {"pass": 2}
+    artifact_kinds = _run_artifact_kinds(out)
+    assert "compare_reference_request_json" in artifact_kinds
+    assert "compare_reference_request_markdown" in artifact_kinds
     assert "case action counts: recapture-autocad-or-provide-window=1, review-x3-pass=1" in stdout
     assert "case action domain counts: input=1, pass-review=1" in stdout
     assert f"recommended next action artifact: {out / 'compare' / 'reference_request.md'}" in stdout
@@ -463,6 +471,8 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert summary["case_actions"][1]["artifact"].endswith("compare/summary.md")
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
     assert f"recommended next action artifact: `{out / 'compare' / 'reference_request.md'}`" in summary_md
+    assert f"compare reference request: `{out / 'compare' / 'reference_request.md'}`" in summary_md
+    assert f"compare reference request json: `{out / 'compare' / 'reference_request.json'}`" in summary_md
     assert "route_status_counts: `pass=1, viewspace_mismatch=2`" in summary_md
     assert (
         "route_recommended_action_counts: "

@@ -1192,6 +1192,50 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 10 passed
 ```
 
+## Follow-Up Run-Level Compare Reference Request Artifacts
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make the one-command request-run artifact index list the generated compare
+  recapture request directly.
+- Let automation discover `compare/reference_request.md` from the run-level
+  artifact index and run summary, without first opening the nested compare
+  artifact index.
+
+Changes:
+
+- `acad_reference_request_run.py` now records these fields in
+  `run_summary.json` when they exist:
+  - `compare_reference_request_json`
+  - `compare_reference_request_markdown`
+- The run-level `artifact_index.json` now includes
+  `compare_reference_request_json` and
+  `compare_reference_request_markdown` artifact entries when the compare phase
+  generated a recapture request.
+- `run_summary.md` now lists the same compare reference request artifacts in
+  its `Artifacts` section.
+- Pass/matched runs, which do not generate a recapture request, keep those
+  artifact entries absent.
+- `tools/render_regression/README.md` documents the run-level artifact
+  discovery behavior.
+
+Boundary:
+
+- Operator artifact discovery/reporting only.
+- No renderer change.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- No private drawing or AutoCAD PNG committed.
+- No generated request JSON schema/content change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 10 passed
+```
+
 ## Follow-Up Legacy Batch Compare Optional Report Cleanup
 
 Status: implemented in this branch.
