@@ -237,14 +237,14 @@ def route_artifact_index(path: Path) -> dict[str, Any]:
         route = _route_compare(payload)
     else:
         raise ValueError(f"unsupported artifact index schema: {schema or '<missing>'}")
-    return {
+    return _annotate_action_artifact({
         "schema": SCHEMA,
         "artifact_index": str(path),
         "artifact_index_schema": schema,
         "artifact_index_boundary": _artifact_index_boundary(payload),
         "boundary": dict(BOUNDARY),
         **route,
-    }
+    })
 
 
 def _count_values(values: list[str]) -> dict[str, int]:
@@ -313,18 +313,59 @@ def _recommended_batch_action(routes: list[dict[str, Any]]) -> dict[str, str]:
     return payload
 
 
+def _recommended_action_artifact(payload: dict[str, Any]) -> str:
+    return str((payload.get("recommended_next_action") or {}).get("artifact") or "")
+
+
+def _recommended_action_source_index(payload: dict[str, Any]) -> str:
+    action = payload.get("recommended_next_action") or {}
+    source = str(action.get("source_artifact_index") or "")
+    if source:
+        return source
+    if payload.get("schema") != BATCH_SCHEMA:
+        return str(payload.get("artifact_index") or "")
+    return ""
+
+
+def _resolve_action_artifact(payload: dict[str, Any]) -> Path | None:
+    artifact = _recommended_action_artifact(payload)
+    if not artifact:
+        return None
+    artifact_path = Path(artifact)
+    if artifact_path.is_absolute():
+        return artifact_path
+    source_index = _recommended_action_source_index(payload)
+    if source_index:
+        if artifact == source_index:
+            return Path(artifact).resolve()
+        return (Path(source_index).parent / artifact).resolve()
+    return artifact_path.resolve()
+
+
+def _annotate_action_artifact(payload: dict[str, Any]) -> dict[str, Any]:
+    artifact = _recommended_action_artifact(payload)
+    resolved = _resolve_action_artifact(payload)
+    if artifact and resolved is not None:
+        payload["action_artifact_resolved"] = str(resolved)
+        payload["action_artifact_exists"] = resolved.is_file()
+    for route in payload.get("routes") or []:
+        if isinstance(route, dict):
+            _annotate_action_artifact(route)
+    return payload
+
+
 def route_artifact_indexes(paths: list[Path]) -> dict[str, Any]:
     if not paths:
         raise ValueError("at least one artifact index is required")
     routes = [route_artifact_index(path) for path in paths]
-    return {
+    return _annotate_action_artifact({
         "schema": BATCH_SCHEMA,
         "boundary": dict(BOUNDARY),
         "count": len(routes),
         **_route_batch_summary(routes),
         "recommended_next_action": _recommended_batch_action(routes),
         "routes": routes,
-    }
+    })
 
 
 def _format_counts(counts: dict[str, Any]) -> str:
@@ -343,6 +384,9 @@ def _write_text(route: dict[str, Any]) -> str:
     ]
     if action.get("artifact"):
         lines.append(f"action_artifact: {action.get('artifact', '')}")
+    if route.get("action_artifact_resolved"):
+        lines.append(f"action_artifact_resolved: {route.get('action_artifact_resolved', '')}")
+        lines.append(f"action_artifact_exists: {str(bool(route.get('action_artifact_exists'))).lower()}")
     if source_boundary:
         lines.append(
             "source_artifact_boundary: "
@@ -363,21 +407,27 @@ def _write_text(route: dict[str, Any]) -> str:
 def _write_batch_text(payload: dict[str, Any]) -> str:
     action = payload.get("recommended_next_action") or {}
     boundary = payload.get("boundary") or {}
-    chunks = [
-        "\n".join([
-            f"route_count: {payload.get('count', 0)}",
-            "kind_counts: " + _format_counts(payload.get("kind_counts") or {}),
-            "status_counts: " + _format_counts(payload.get("status_counts") or {}),
-            "recommended_action_counts: " + _format_counts(payload.get("recommended_action_counts") or {}),
-            "recommended_action_domain_counts: "
-            + _format_counts(payload.get("recommended_action_domain_counts") or {}),
-            f"recommended_next_action: {action.get('code', '')}",
-            f"recommended_action_domain: {action.get('domain', '')}",
-            f"message: {action.get('message', '')}",
-            f"action_artifact: {action.get('artifact', '')}",
-            f"autocad_equivalence_claim: {str(bool(boundary.get('autocad_equivalence_claim'))).lower()}",
-        ])
+    summary = [
+        f"route_count: {payload.get('count', 0)}",
+        "kind_counts: " + _format_counts(payload.get("kind_counts") or {}),
+        "status_counts: " + _format_counts(payload.get("status_counts") or {}),
+        "recommended_action_counts: " + _format_counts(payload.get("recommended_action_counts") or {}),
+        "recommended_action_domain_counts: "
+        + _format_counts(payload.get("recommended_action_domain_counts") or {}),
+        f"recommended_next_action: {action.get('code', '')}",
+        f"recommended_action_domain: {action.get('domain', '')}",
+        f"message: {action.get('message', '')}",
+        f"action_artifact: {action.get('artifact', '')}",
     ]
+    if payload.get("action_artifact_resolved"):
+        summary.extend([
+            f"action_artifact_resolved: {payload.get('action_artifact_resolved', '')}",
+            f"action_artifact_exists: {str(bool(payload.get('action_artifact_exists'))).lower()}",
+        ])
+    summary.append(
+        f"autocad_equivalence_claim: {str(bool(boundary.get('autocad_equivalence_claim'))).lower()}"
+    )
+    chunks = ["\n".join(summary)]
     for index, route in enumerate(payload.get("routes") or [], start=1):
         chunks.append("\n".join([
             f"route: {index}",
@@ -413,6 +463,9 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         ])
     if action["artifact"]:
         lines.append(f"- action_artifact: `{action['artifact']}`")
+    if route.get("action_artifact_resolved"):
+        lines.append(f"- action_artifact_resolved: `{route['action_artifact_resolved']}`")
+        lines.append(f"- action_artifact_exists: `{bool(route.get('action_artifact_exists'))}`")
     if route.get("case_action_counts"):
         lines.append(f"- case_action_counts: `{_format_counts(route['case_action_counts'])}`")
     if route.get("case_action_domain_counts"):
@@ -455,6 +508,8 @@ def _write_markdown(payload: dict[str, Any]) -> str:
                 "## Recommended Action Artifact",
                 "",
                 f"- action_artifact: `{action['artifact']}`",
+                f"- action_artifact_resolved: `{payload.get('action_artifact_resolved', '')}`",
+                f"- action_artifact_exists: `{bool(payload.get('action_artifact_exists'))}`",
                 "",
             ])
         for index, route in enumerate(payload.get("routes") or [], start=1):
@@ -491,41 +546,12 @@ def _recommended_action_code(payload: dict[str, Any]) -> str:
     return str((payload.get("recommended_next_action") or {}).get("code") or "")
 
 
-def _recommended_action_artifact(payload: dict[str, Any]) -> str:
-    return str((payload.get("recommended_next_action") or {}).get("artifact") or "")
-
-
-def _recommended_action_source_index(payload: dict[str, Any]) -> str:
-    action = payload.get("recommended_next_action") or {}
-    source = str(action.get("source_artifact_index") or "")
-    if source:
-        return source
-    if payload.get("schema") != BATCH_SCHEMA:
-        return str(payload.get("artifact_index") or "")
-    return ""
-
-
 def _artifact_matches(actual: str, expected: str) -> bool:
     actual_norm = actual.replace("\\", "/")
     expected_norm = expected.replace("\\", "/").lstrip("/")
     if not expected_norm:
         return not actual_norm
     return actual_norm == expected_norm or actual_norm.endswith(f"/{expected_norm}")
-
-
-def _resolve_action_artifact(payload: dict[str, Any]) -> Path | None:
-    artifact = _recommended_action_artifact(payload)
-    if not artifact:
-        return None
-    artifact_path = Path(artifact)
-    if artifact_path.is_absolute():
-        return artifact_path
-    source_index = _recommended_action_source_index(payload)
-    if source_index:
-        if artifact == source_index:
-            return Path(artifact).resolve()
-        return (Path(source_index).parent / artifact).resolve()
-    return artifact_path.resolve()
 
 
 def _recommended_action_domain(payload: dict[str, Any]) -> str:

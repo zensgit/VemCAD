@@ -238,6 +238,10 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
 Add `--require-action-artifact-exists` when the workflow should also prove the
 handoff file is present. Relative action artifacts resolve from the source
 `artifact_index.json` directory, not from the shell's current directory.
+Route JSON, text, and Markdown also surface that same resolution as
+`action_artifact_resolved` plus `action_artifact_exists`, so CI logs and
+uploaded route reports can point directly at the handoff file without a second
+artifact-index lookup.
 
 To assert source artifact boundaries as part of the same route step, repeat
 `--require-source-boundary key=value`. For example, this guarantees every
