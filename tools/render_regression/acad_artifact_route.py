@@ -298,8 +298,24 @@ def _sum_count_maps(routes: list[dict[str, Any]], key: str) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
+def _sum_int_field(routes: list[dict[str, Any]], key: str) -> int | None:
+    total = 0
+    seen = False
+    for route in routes:
+        value = route.get(key)
+        if value is None:
+            continue
+        try:
+            total += int(value)
+        except Exception:
+            continue
+        seen = True
+    return total if seen else None
+
+
 def _route_batch_summary(routes: list[dict[str, Any]]) -> dict[str, Any]:
-    return {
+    compare_routes = [route for route in routes if route.get("kind") == "compare"]
+    summary = {
         "kind_counts": _count_values([str(route.get("kind") or "") for route in routes]),
         "status_counts": _count_values([str(route.get("status") or "") for route in routes]),
         "recommended_action_counts": _count_values([
@@ -317,6 +333,15 @@ def _route_batch_summary(routes: list[dict[str, Any]]) -> dict[str, Any]:
             "reference_intake_issue_code_counts",
         ),
     }
+    if compare_routes:
+        summary.update({
+            "compare_case_count": _sum_int_field(compare_routes, "case_count"),
+            "compared_count": _sum_int_field(compare_routes, "compared_count"),
+            "triage_bucket_counts": _sum_count_maps(compare_routes, "triage_bucket_counts"),
+            "viewspace_status_counts": _sum_count_maps(compare_routes, "viewspace_status_counts"),
+            "x3_band_counts": _sum_count_maps(compare_routes, "x3_band_counts"),
+        })
+    return summary
 
 
 _ACTION_PRIORITY = {
@@ -514,6 +539,16 @@ def _write_batch_text(payload: dict[str, Any]) -> str:
         f"message: {action.get('message', '')}",
         f"action_artifact: {action.get('artifact', '')}",
     ]
+    if payload.get("compare_case_count") is not None:
+        summary.append(f"compare_case_count: {payload.get('compare_case_count')}")
+    if payload.get("compared_count") is not None:
+        summary.append(f"compared_count: {payload.get('compared_count')}")
+    if payload.get("triage_bucket_counts"):
+        summary.append("triage_bucket_counts: " + _format_counts(payload["triage_bucket_counts"]))
+    if payload.get("viewspace_status_counts"):
+        summary.append("viewspace_status_counts: " + _format_counts(payload["viewspace_status_counts"]))
+    if payload.get("x3_band_counts"):
+        summary.append("x3_band_counts: " + _format_counts(payload["x3_band_counts"]))
     if payload.get("reference_request_validation_issue_code_counts"):
         summary.append(
             "reference_request_validation_issue_code_counts: "
@@ -650,6 +685,24 @@ def _write_markdown(payload: dict[str, Any]) -> str:
             f"- autocad_equivalence_claim: `{bool(boundary.get('autocad_equivalence_claim'))}`",
             "",
         ])
+        if payload.get("compare_case_count") is not None:
+            lines.append(f"- compare_case_count: `{payload.get('compare_case_count')}`")
+        if payload.get("compared_count") is not None:
+            lines.append(f"- compared_count: `{payload.get('compared_count')}`")
+        if payload.get("triage_bucket_counts"):
+            lines.append(f"- triage_bucket_counts: `{_format_counts(payload['triage_bucket_counts'])}`")
+        if payload.get("viewspace_status_counts"):
+            lines.append(f"- viewspace_status_counts: `{_format_counts(payload['viewspace_status_counts'])}`")
+        if payload.get("x3_band_counts"):
+            lines.append(f"- x3_band_counts: `{_format_counts(payload['x3_band_counts'])}`")
+        if (
+            payload.get("compare_case_count") is not None
+            or payload.get("compared_count") is not None
+            or payload.get("triage_bucket_counts")
+            or payload.get("viewspace_status_counts")
+            or payload.get("x3_band_counts")
+        ):
+            lines.append("")
         if payload.get("reference_request_validation_issue_code_counts"):
             lines.extend([
                 "- reference_request_validation_issue_code_counts: "

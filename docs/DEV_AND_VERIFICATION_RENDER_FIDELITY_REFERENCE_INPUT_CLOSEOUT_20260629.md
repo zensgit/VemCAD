@@ -3891,3 +3891,47 @@ python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
 python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
+
+## Follow-Up Multi-Route Compare Count Visibility
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Surface compare-route count distributions in recursive/multi-index route
+  summaries, not only inside each nested compare route.
+- Let an unattended route artifact show whether its compare portion contains
+  renderer-candidate, recapture-required, or X3 band failures without requiring
+  operators to drill into every nested route.
+
+Changes:
+
+- Multi-route payloads now aggregate compare-route:
+  - `compare_case_count`;
+  - `compared_count`;
+  - `triage_bucket_counts`;
+  - `viewspace_status_counts`;
+  - `x3_band_counts`.
+- Multi-route text and Markdown summaries print those aggregates when compare
+  routes are present.
+- Regression coverage proves the top-level route summary still prioritizes
+  input repair over renderer work while surfacing the nested compare
+  distributions.
+
+Boundary:
+
+- Route-summary visibility only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
