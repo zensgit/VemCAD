@@ -164,6 +164,11 @@ def _route_compare(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _artifact_index_boundary(payload: dict[str, Any]) -> dict[str, Any]:
+    boundary = payload.get("boundary")
+    return dict(boundary) if isinstance(boundary, dict) else {}
+
+
 def route_artifact_index(path: Path) -> dict[str, Any]:
     path = _resolve_artifact_index(path)
     payload = _read_json(path)
@@ -180,6 +185,7 @@ def route_artifact_index(path: Path) -> dict[str, Any]:
         "schema": SCHEMA,
         "artifact_index": str(path),
         "artifact_index_schema": schema,
+        "artifact_index_boundary": _artifact_index_boundary(payload),
         "boundary": dict(BOUNDARY),
         **route,
     }
@@ -262,12 +268,21 @@ def _format_counts(counts: dict[str, Any]) -> str:
 
 def _write_text(route: dict[str, Any]) -> str:
     action = route.get("recommended_next_action") or {}
+    source_boundary = route.get("artifact_index_boundary") or {}
     lines = [
         f"kind: {route.get('kind', '')}",
         f"status: {route.get('status', '')}",
         f"recommended_next_action: {action.get('code', '')}",
         f"message: {action.get('message', '')}",
     ]
+    if source_boundary:
+        lines.append(
+            "source_artifact_boundary: "
+            + ",".join(
+                f"{key}={str(bool(value)).lower() if isinstance(value, bool) else value}"
+                for key, value in sorted(source_boundary.items())
+            )
+        )
     if route.get("case_action_counts"):
         lines.append(f"case_action_counts: {_format_counts(route['case_action_counts'])}")
     if route.get("triage_bucket_counts"):
@@ -312,6 +327,7 @@ def _route_action(route: dict[str, Any]) -> dict[str, str]:
 def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
     action = _route_action(route)
     boundary = route.get("boundary") or {}
+    source_boundary = route.get("artifact_index_boundary") or {}
     lines = [
         f"## {heading}",
         "",
@@ -325,6 +341,11 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         lines.extend([
             f"- read_only_routing: `{bool(boundary.get('read_only_routing'))}`",
             f"- autocad_equivalence_claim: `{bool(boundary.get('autocad_equivalence_claim'))}`",
+        ])
+    if source_boundary:
+        lines.extend([
+            f"- source_compares_renders: `{bool(source_boundary.get('compares_renders'))}`",
+            f"- source_autocad_equivalence_claim: `{bool(source_boundary.get('autocad_equivalence_claim'))}`",
         ])
     if action["artifact"]:
         lines.append(f"- action_artifact: `{action['artifact']}`")
