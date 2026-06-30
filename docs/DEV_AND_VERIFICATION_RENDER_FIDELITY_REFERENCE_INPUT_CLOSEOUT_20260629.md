@@ -392,6 +392,46 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Route Issue Code Guards
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let unattended route steps assert exact request/intake issue classes, not only
+  action domains.
+- Make CI fail closed when an expected input issue is absent or a forbidden
+  input issue appears.
+
+Changes:
+
+- `acad_artifact_route.py` adds repeatable `--require-issue-code <code>`.
+- `acad_artifact_route.py` adds repeatable `--forbid-issue-code <code>`.
+- The guards inspect only routed request/intake issue-code counts:
+  `reference_request_validation_issue_code_counts` and
+  `reference_intake_issue_code_counts`.
+- Failure messages print the current issue-code counts for operator diagnosis.
+- `tools/render_regression/README.md` documents the operator-facing behavior.
+
+Boundary:
+
+- Route assertion only.
+- No route priority change.
+- No renderer change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Blank Candidate Render Advisory
 
 Status: implemented in this branch.
