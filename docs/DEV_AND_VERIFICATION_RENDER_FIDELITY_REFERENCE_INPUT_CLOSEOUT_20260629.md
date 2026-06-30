@@ -1059,6 +1059,43 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py too
 # passed
 ```
 
+## Follow-Up Request Run Boundary Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let `acad_reference_request_run.py` fail closed on the same source request
+  boundary before it fulfills returned PNGs or runs matched-view comparison.
+- Keep direct wrapper usage aligned with the pre-capture validation command and
+  generated route guard.
+
+Changes:
+
+- `acad_reference_request_run.py` now accepts repeatable
+  `--require-request-boundary key=value` and forwards it to
+  `acad_reference_batch.py`.
+- Generated `reference_request.md` adds the request-boundary guard to the
+  `acad_reference_request_run.py` command.
+- `tools/render_regression/README.md` documents the same guarded wrapper
+  command.
+
+Boundary:
+
+- Wrapper input validation only.
+- No renderer change.
+- No X3 scoring change.
+- No compare behavior change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py tools/render_regression/tests/test_acad_manifest_compare.py -q
+# passed
+```
+
 ## Follow-Up Source Report Issue Code Counts
 
 Status: implemented in this branch.
