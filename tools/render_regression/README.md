@@ -279,6 +279,8 @@ handoff without opening the nested compare artifact index first.
 values into `summary.json`, `summary.tsv`, `summary.md`, and the compare
 artifact index counts. A `viewspace_mismatch` case therefore remains an
 `input` domain case even when its raw X3 pixels look bad.
+The same compare summaries surface each row's `expected_size`, so operators can
+audit the capture-size contract without opening the generated request package.
 
 These operator-facing tools are safe to rerun against the same generated
 `--out-dir`; they clear their own known generated outputs before writing the new
