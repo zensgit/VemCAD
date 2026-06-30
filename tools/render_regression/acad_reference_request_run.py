@@ -16,6 +16,7 @@ import acad_reference_batch as batch  # noqa: E402
 
 
 SCHEMA = "vemcad.acad_reference_request_run/v1"
+RUN_ARTIFACT_INDEX_SCHEMA = "vemcad.acad_reference_request_run_artifact_index/v1"
 
 
 def _existing(path: Path) -> str:
@@ -25,6 +26,12 @@ def _existing(path: Path) -> str:
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _maybe_artifact(kind: str, path: str) -> dict[str, str] | None:
+    if not path or not Path(path).is_file():
+        return None
+    return {"kind": kind, "path": path}
 
 
 def _compare_status(compare_summary: Path) -> str:
@@ -84,6 +91,7 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- compare_dir: `{summary['compare_dir']}`",
     ]
     for label, key in (
+        ("run artifact index", "run_artifact_index"),
         ("input artifact index", "input_artifact_index"),
         ("request validation", "reference_request_validation_markdown"),
         ("reference intake", "reference_intake_markdown"),
@@ -120,6 +128,7 @@ def _write_run_summary(
         "compare_exit_code": compare_rc,
         "input_dir": str(input_dir),
         "compare_dir": str(compare_dir),
+        "run_artifact_index": str(out_dir / "artifact_index.json"),
         "input_artifact_index": _existing(input_dir / "artifact_index.json"),
         "reference_request_validation_json": _existing(input_dir / "reference_request_validation.json"),
         "reference_request_validation_markdown": _existing(input_dir / "reference_request_validation.md"),
@@ -144,6 +153,30 @@ def _write_run_summary(
     }
     _write_json(out_dir / "run_summary.json", payload)
     _write_markdown(out_dir / "run_summary.md", payload)
+    artifacts = [
+        {"kind": "run_summary_json", "path": str(out_dir / "run_summary.json")},
+        {"kind": "run_summary_markdown", "path": str(out_dir / "run_summary.md")},
+    ]
+    for kind, key in (
+        ("input_artifact_index", "input_artifact_index"),
+        ("reference_request_validation_json", "reference_request_validation_json"),
+        ("reference_request_validation_markdown", "reference_request_validation_markdown"),
+        ("reference_intake_json", "reference_intake_json"),
+        ("reference_intake_markdown", "reference_intake_markdown"),
+        ("missing_references_json", "missing_references_json"),
+        ("missing_references_markdown", "missing_references_markdown"),
+        ("compare_summary_json", "compare_summary_json"),
+        ("compare_summary_markdown", "compare_summary_markdown"),
+        ("compare_artifact_index", "compare_artifact_index"),
+    ):
+        item = _maybe_artifact(kind, str(payload.get(key) or ""))
+        if item is not None:
+            artifacts.append(item)
+    _write_json(out_dir / "artifact_index.json", {
+        "schema": RUN_ARTIFACT_INDEX_SCHEMA,
+        "count": len(artifacts),
+        "artifacts": artifacts,
+    })
     return payload
 
 
