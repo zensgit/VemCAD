@@ -577,6 +577,47 @@ python3 -m pytest tools/render_regression/tests -q
 # 101 passed
 ```
 
+## Follow-Up Run Intake Issue Code Counts
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make one-command run summaries explain why returned-reference intake is in
+  `review`, without requiring the operator to open `input/reference_intake.*`
+  first.
+- Surface request-validation error codes in the same place for blocked input
+  packages.
+
+Changes:
+
+- `acad_reference_request_run.py` now adds:
+  - `reference_request_validation_issue_code_counts`
+  - `reference_intake_issue_code_counts`
+- `run_summary.md` prints both code-count fields.
+- The run-level `artifact_index.json` carries both fields so artifact routers
+  and CI consumers can inspect them without opening nested JSON.
+- Existing recommended-action ordering is unchanged.
+
+Boundary:
+
+- Run-summary and artifact-index evidence only.
+- No input gate semantics change.
+- No route priority change.
+- No renderer change.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- No private drawing or AutoCAD PNG committed.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Action Artifact Resolution Report
 
 Status: implemented in this branch.
