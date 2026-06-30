@@ -636,7 +636,7 @@ def _write_reference_request(
                 "monochrome off, no toolbar/chrome, long edge >= 1600px."
             ),
         }
-        expected_size = _png_size(_str(row.get("acad_png")))
+        expected_size = row.get("expected_size") or _png_size(_str(row.get("acad_png")))
         if expected_size is not None:
             case["requested_expected_size"] = expected_size
         source_provenance = _file_provenance(_str(row.get("source_dxf")))
@@ -833,6 +833,7 @@ def _compare_case(case: dict[str, Any], candidate: dict[str, Any], out_dir: Path
         "drawing_id": case["drawing_id"],
         "source_dxf": case["source_dxf"],
         "acad_png": case["acad_png"],
+        "expected_size": case.get("expected_size"),
         "ours": candidate["ours"],
         "render_report": render_report,
         "semantic_mask": candidate.get("semantic_mask", ""),

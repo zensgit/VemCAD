@@ -116,6 +116,31 @@ def test_readme_recapture_request_run_example_documents_input_review_guard():
         assert expected in block
 
 
+def test_reference_request_prefers_manifest_expected_size_over_current_png(tmp_path):
+    acad = _png(tmp_path / "stale-current-acad.png", size=(640, 480), box=[20, 15, 620, 460])
+    ours = _png(tmp_path / "ours.png", size=(800, 600), box=[40, 30, 760, 570])
+    dxf = _dxf(tmp_path / "B11.dxf")
+    out = tmp_path / "out"
+    out.mkdir()
+
+    harness._write_reference_request(out, [{
+        "id": "G11",
+        "drawing_id": "G11/B11",
+        "source_dxf": dxf,
+        "acad_png": acad,
+        "ours": ours,
+        "expected_size": {"width": 800, "height": 600},
+        "viewspace_status": "mismatch",
+        "x3_summary": {"band": "fallback", "ink_iou": 0.5},
+    }])
+
+    request = json.loads((out / "reference_request.json").read_text(encoding="utf-8"))
+    assert request["cases"][0]["requested_expected_size"] == {"width": 800, "height": 600}
+    request_md = (out / "reference_request.md").read_text(encoding="utf-8")
+    assert "`800x600`" in request_md
+    assert "`640x480`" not in request_md
+
+
 def _candidates(path: Path, ours: str, **extra) -> Path:
     payload = [{"id": "G11", "ours": ours, **extra}]
     path.write_text(json.dumps(payload), encoding="utf-8")

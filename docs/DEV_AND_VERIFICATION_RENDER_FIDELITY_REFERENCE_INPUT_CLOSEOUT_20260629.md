@@ -5683,3 +5683,46 @@ python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
 python3 -m pytest tools/render_regression/tests -q
 # 191 passed
 ```
+
+## Follow-Up Recapture Expected Size Source
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Prevent generated recapture requests from inheriting a stale or chrome-cropped
+  current AutoCAD PNG's pixel size when the manifest already declared the
+  expected matched-view size.
+- Keep the old PNG size as a fallback only when the manifest has no
+  `expected_size` to carry forward.
+
+Changes:
+
+- `_compare_case()` now preserves the validated manifest `expected_size` on
+  each compare row.
+- `_write_reference_request()` now prefers row `expected_size` for
+  `requested_expected_size`, falling back to the current AutoCAD PNG dimensions
+  only when no expected size is available.
+- Added a direct regression test where the current AutoCAD PNG is 640x480 but
+  the manifest row declares 800x600; the generated request and Markdown keep
+  800x600.
+
+Boundary:
+
+- Recapture request metadata hardening only.
+- No wrapper default behavior change.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 11 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 192 passed
+```
