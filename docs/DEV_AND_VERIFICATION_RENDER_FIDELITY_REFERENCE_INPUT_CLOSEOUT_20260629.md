@@ -5297,3 +5297,53 @@ python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
 python3 -m pytest tools/render_regression/tests -q
 # 189 passed
 ```
+
+## Follow-Up Request-Run Compare Issue Code Counts
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep request-run wrapper artifacts aligned with route compare issue-code
+  evidence introduced by the compare issue-code-count slice.
+- Let `run_summary.json`, run-level `artifact_index.json`, routed
+  request-run artifacts, Markdown/stdout, and route guards see nested compare
+  manifest/candidate issue-code distributions.
+- Preserve the no-double-counting discipline: direct compare routes remain the
+  source of truth when present; request-run nested compare counts are used when
+  routing request-run artifacts by themselves.
+
+Changes:
+
+- `acad_reference_request_run.py` now copies route-level
+  `compare_issue_code_counts` into `route_compare_issue_code_counts`.
+- Run-level artifact indexes include `route_compare_issue_code_counts`.
+- Run Markdown/stdout print non-empty `route_compare_issue_code_counts`.
+- `acad_artifact_route.py` preserves request-run
+  `route_compare_issue_code_counts`, prints them, and includes them in
+  issue-code guards for single request-run artifacts.
+- Multi-route summaries aggregate request-run nested compare issue-code counts
+  only when no direct compare route is present, matching the existing
+  compare-distribution pattern.
+
+Boundary:
+
+- Evidence and operator-routing hardening only.
+- No route priority change.
+- No default exit-code behavior change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_reference_request_run.py \
+  tools/render_regression/tests/test_acad_artifact_route.py -q
+# 81 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 189 passed
+```

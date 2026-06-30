@@ -205,6 +205,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert summary["route_triage_bucket_counts"] == {"matched-pass": 1}
     assert summary["route_viewspace_status_counts"] == {"match": 1}
     assert summary["route_x3_band_counts"] == {"pass": 1}
+    assert summary["route_compare_issue_code_counts"] == {}
     assert artifact_index["status"] == "pass"
     assert artifact_index["final_exit_code"] == 0
     assert artifact_index["fail_on_input_review"] is False
@@ -247,6 +248,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert artifact_index["route_triage_bucket_counts"] == {"matched-pass": 1}
     assert artifact_index["route_viewspace_status_counts"] == {"match": 1}
     assert artifact_index["route_x3_band_counts"] == {"pass": 1}
+    assert artifact_index["route_compare_issue_code_counts"] == {}
     routed_run = route.route_artifact_index(out / "artifact_index.json")
     assert routed_run["route_compare_case_count"] == 1
     assert routed_run["route_compared_count"] == 1
@@ -254,6 +256,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert routed_run["route_viewspace_status_counts"] == {"match": 1}
     assert routed_run["route_final_exit_code_counts"] == {"0": 2}
     assert routed_run["route_x3_band_counts"] == {"pass": 1}
+    assert routed_run["route_compare_issue_code_counts"] == {}
     assert "recommended next action: review-x3-pass" in stdout
     assert "final exit code: 0" in stdout
     assert "fail on input review: False" in stdout

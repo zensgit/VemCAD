@@ -252,6 +252,9 @@ def test_routes_run_case_actions(tmp_path):
             "fallback": 1,
             "pass": 1,
         },
+        "route_compare_issue_code_counts": {
+            "diagnostic_capture_method": 1,
+        },
         "reference_request_validation_status": "blocked",
         "reference_request_validation_error_count": 1,
         "reference_request_validation_warning_count": 0,
@@ -312,6 +315,9 @@ def test_routes_run_case_actions(tmp_path):
         "fallback": 1,
         "pass": 1,
     }
+    assert payload["route_compare_issue_code_counts"] == {
+        "diagnostic_capture_method": 1,
+    }
     assert payload["reference_request_validation_status"] == "blocked"
     assert payload["reference_request_validation_error_count"] == 1
     assert payload["reference_request_validation_warning_count"] == 0
@@ -339,6 +345,7 @@ def test_routes_run_case_actions(tmp_path):
     assert "route_triage_bucket_counts: matched-pass=1, recapture-required=1" in text
     assert "route_viewspace_status_counts: match=1, mismatch=1" in text
     assert "route_x3_band_counts: fallback=1, pass=1" in text
+    assert "route_compare_issue_code_counts: diagnostic_capture_method=1" in text
     assert "reference_request_validation_status: blocked" in text
     assert "reference_request_validation_errors: 1" in text
     assert "reference_request_validation_warnings: 0" in text
@@ -357,6 +364,7 @@ def test_routes_run_case_actions(tmp_path):
     assert "- route_count: `3`" in markdown
     assert "- route_final_exit_code_counts: `0=2, 2=1`" in markdown
     assert "- route_triage_bucket_counts: `matched-pass=1, recapture-required=1`" in markdown
+    assert "- route_compare_issue_code_counts: `diagnostic_capture_method=1`" in markdown
     assert "- reference_request_validation_errors: `1`" in markdown
     assert "- reference_request_validation_warnings: `0`" in markdown
     assert "- reference_request_validation_issue_code_counts: `source_dxf_sha256_mismatch=1`" in markdown
@@ -369,6 +377,15 @@ def test_routes_run_case_actions(tmp_path):
         "- reference_intake_issue_code_counts: `candidate_render_blank=1, "
         "returned_reference_blank=1`"
     ) in markdown
+    assert route.main([
+        str(index),
+        "--require-issue-code-count",
+        "diagnostic_capture_method=1",
+    ]) == 0
+    batch_payload = route.route_artifact_indexes([index])
+    assert batch_payload["compare_issue_code_counts"] == {
+        "diagnostic_capture_method": 1,
+    }
 
 
 def test_routes_multiple_directories_as_batch(tmp_path):
