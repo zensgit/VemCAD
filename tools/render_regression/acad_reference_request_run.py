@@ -140,6 +140,7 @@ def _run_artifact_index_payload(
         payload.update({
             "route_count": summary.get("route_count"),
             "route_kind_counts": summary.get("route_kind_counts") or {},
+            "route_artifact_kind_counts": summary.get("route_artifact_kind_counts") or {},
             "route_status_counts": summary.get("route_status_counts") or {},
             "route_final_exit_code_counts": summary.get("route_final_exit_code_counts") or {},
             "route_recommended_action_counts": summary.get("route_recommended_action_counts") or {},
@@ -579,6 +580,8 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         lines.extend([
             f"- route_count: `{summary['route_count']}`",
             f"- route_kind_counts: `{_format_case_action_counts(summary.get('route_kind_counts') or {})}`",
+            "- route_artifact_kind_counts: "
+            f"`{_format_case_action_counts(summary.get('route_artifact_kind_counts') or {})}`",
             f"- route_status_counts: `{_format_case_action_counts(summary.get('route_status_counts') or {})}`",
             "- route_final_exit_code_counts: "
             f"`{_format_case_action_counts(summary.get('route_final_exit_code_counts') or {})}`",
@@ -792,6 +795,7 @@ def _write_run_summary(
     payload.update({
         "route_count": route_payload.get("count"),
         "route_kind_counts": route_payload.get("kind_counts") or {},
+        "route_artifact_kind_counts": route_payload.get("artifact_kind_counts") or {},
         "route_status_counts": route_payload.get("status_counts") or {},
         "route_final_exit_code_counts": route_payload.get("final_exit_code_counts") or {},
         "route_recommended_action_counts": route_payload.get("recommended_action_counts") or {},
@@ -838,6 +842,11 @@ def _print_run_summary(summary: dict[str, Any], out_dir: Path) -> None:
         )
     print(f"  case action counts: {_format_case_action_counts(summary['case_action_counts'])}")
     print(f"  case action domain counts: {_format_case_action_counts(summary['case_action_domain_counts'])}")
+    if summary.get("route_artifact_kind_counts"):
+        print(
+            "  route artifact kinds: "
+            f"{_format_case_action_counts(summary['route_artifact_kind_counts'])}"
+        )
     print(
         "  reference request validation issue codes: "
         f"{_format_case_action_counts(summary['reference_request_validation_issue_code_counts'])}"

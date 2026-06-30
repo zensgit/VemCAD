@@ -240,12 +240,14 @@ def _route_run(payload: dict[str, Any]) -> dict[str, Any]:
         or payload.get("route_triage_bucket_counts")
         or payload.get("route_viewspace_status_counts")
         or payload.get("route_x3_band_counts")
+        or payload.get("route_artifact_kind_counts")
         or payload.get("route_final_exit_code_counts")
         or payload.get("route_compare_issue_code_counts")
     ):
         route.update({
             "route_count": payload.get("route_count"),
             "route_kind_counts": payload.get("route_kind_counts") or {},
+            "route_artifact_kind_counts": payload.get("route_artifact_kind_counts") or {},
             "route_status_counts": payload.get("route_status_counts") or {},
             "route_final_exit_code_counts": payload.get("route_final_exit_code_counts") or {},
             "route_recommended_action_counts": payload.get("route_recommended_action_counts") or {},
@@ -630,6 +632,8 @@ def _write_text(route: dict[str, Any]) -> str:
         lines.append(f"route_count: {route.get('route_count')}")
     if route.get("route_kind_counts"):
         lines.append(f"route_kind_counts: {_format_counts(route['route_kind_counts'])}")
+    if route.get("route_artifact_kind_counts"):
+        lines.append(f"route_artifact_kind_counts: {_format_counts(route['route_artifact_kind_counts'])}")
     if route.get("route_status_counts"):
         lines.append(f"route_status_counts: {_format_counts(route['route_status_counts'])}")
     if route.get("route_final_exit_code_counts"):
@@ -826,6 +830,11 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         lines.append(f"- route_count: {_md_code_cell(route.get('route_count'))}")
     if route.get("route_kind_counts"):
         lines.append(f"- route_kind_counts: {_md_code_cell(_format_counts(route['route_kind_counts']))}")
+    if route.get("route_artifact_kind_counts"):
+        lines.append(
+            "- route_artifact_kind_counts: "
+            f"{_md_code_cell(_format_counts(route['route_artifact_kind_counts']))}"
+        )
     if route.get("route_status_counts"):
         lines.append(f"- route_status_counts: {_md_code_cell(_format_counts(route['route_status_counts']))}")
     if route.get("route_final_exit_code_counts"):

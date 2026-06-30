@@ -192,6 +192,10 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
         "compare": 1,
         "request_run": 1,
     }
+    assert summary["route_artifact_kind_counts"]["reference_request_validation_tsv"] == 2
+    assert summary["route_artifact_kind_counts"]["reference_intake_tsv"] == 2
+    assert summary["route_artifact_kind_counts"]["summary_tsv"] == 1
+    assert summary["route_artifact_kind_counts"]["run_summary_json"] == 1
     assert summary["route_status_counts"] == {"pass": 3}
     assert summary["route_final_exit_code_counts"] == {"0": 2}
     assert summary["route_recommended_action_counts"] == {
@@ -235,6 +239,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
         "compare": 1,
         "request_run": 1,
     }
+    assert artifact_index["route_artifact_kind_counts"] == summary["route_artifact_kind_counts"]
     assert artifact_index["route_status_counts"] == {"pass": 3}
     assert artifact_index["route_final_exit_code_counts"] == {"0": 2}
     assert artifact_index["route_recommended_action_counts"] == {
@@ -256,6 +261,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert routed_run["route_compared_count"] == 1
     assert routed_run["route_triage_bucket_counts"] == {"matched-pass": 1}
     assert routed_run["route_viewspace_status_counts"] == {"match": 1}
+    assert routed_run["route_artifact_kind_counts"] == summary["route_artifact_kind_counts"]
     assert routed_run["route_final_exit_code_counts"] == {"0": 2}
     assert routed_run["route_x3_band_counts"] == {"pass": 1}
     assert routed_run["route_compare_issue_code_counts"] == {}
@@ -265,6 +271,8 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert "recommended next action domain: pass-review" in stdout
     assert "reference request validation issue codes: none" in stdout
     assert "case action domain counts: pass-review=1" in stdout
+    assert "route artifact kinds: " in stdout
+    assert "reference_intake_tsv=2" in stdout
     assert "route compare cases: 1" in stdout
     assert "route compared cases: 1" in stdout
     assert "route triage buckets: matched-pass=1" in stdout
@@ -278,6 +286,8 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert "fail_on_input_review: `False`" in summary_md
     assert "recommended_next_action: `review-x3-pass`" in summary_md
     assert "recommended_next_action_domain: `pass-review`" in summary_md
+    assert "route_artifact_kind_counts: " in summary_md
+    assert "reference_intake_tsv=2" in summary_md
     assert "reference_request_validation_warnings: `0`" in summary_md
     assert "reference_intake_errors: `0`" in summary_md
     assert "case_action_counts: `review-x3-pass=1`" in summary_md
