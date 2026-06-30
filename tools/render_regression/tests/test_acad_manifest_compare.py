@@ -228,6 +228,9 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     request_md = (out / "reference_request.md").read_text(encoding="utf-8")
     assert "AutoCAD Reference Recapture Request" in request_md
     assert "G11_autocad_model_extents.png" in request_md
+    assert "acad_reference_request_run.py" in request_md
+    assert f"--candidate-cases {candidates}" in request_md
+    assert "viewspace_mismatch` still exits `2`" in request_md
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert {item["kind"] for item in artifact_index["artifacts"]} >= {
         "reference_request_json",

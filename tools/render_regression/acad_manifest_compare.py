@@ -429,7 +429,12 @@ def _recapture_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [row for row in _triage_rows(rows) if _triage_bucket(row) == "recapture-required"]
 
 
-def _write_reference_request(out_dir: Path, rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+def _write_reference_request(
+    out_dir: Path,
+    rows: list[dict[str, Any]],
+    *,
+    candidate_cases: str = "",
+) -> list[dict[str, str]]:
     recaptures = _recapture_rows(rows)
     if not recaptures:
         return []
@@ -486,6 +491,24 @@ def _write_reference_request(out_dir: Path, rows: list[dict[str, Any]]) -> list[
         "- No toolbar, viewport chrome, screenshot crop, or post-scaled image.",
         "- Long edge >= 1600 px.",
         "- If a custom plot window is used, record the AutoCAD world rectangle and use `explicit-window` instead of this request.",
+    ])
+    candidate_arg = candidate_cases or "<candidate_cases.json>"
+    lines.extend([
+        "",
+        "## After The PNGs Are Returned",
+        "",
+        "Place the returned AutoCAD PNGs in one directory using the requested filenames, then run:",
+        "",
+        "```bash",
+        "python3 tools/render_regression/acad_reference_request_run.py \\",
+        f"  --from-request {json_path} \\",
+        f"  --candidate-cases {candidate_arg} \\",
+        "  --reference-dir <returned-png-dir> \\",
+        "  --out-dir <next-run-dir>",
+        "```",
+        "",
+        "For a partial return, repeat `--case-id <ID>` to process only the cases that have PNGs.",
+        "The wrapper preserves the X3 exit code: `viewspace_mismatch` still exits `2` and is not an AutoCAD-equivalence result.",
     ])
     md_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
     return [
@@ -689,7 +712,11 @@ def main(argv: list[str] | None = None) -> int:
         _write_tsv(summary_tsv, report["rows"])
         contact_sheet = _write_contact_sheet(args.out_dir / "contact_sheet.png", report["rows"])
     _write_markdown_summary(summary_md, report, contact_sheet=contact_sheet)
-    reference_request_artifacts = _write_reference_request(args.out_dir, report["rows"])
+    reference_request_artifacts = _write_reference_request(
+        args.out_dir,
+        report["rows"],
+        candidate_cases=report.get("candidate_cases", ""),
+    )
     run_artifacts = [
         {"id": "", "kind": "summary_json", "path": str(summary_json)},
         {"id": "", "kind": "summary_markdown", "path": str(summary_md)},
