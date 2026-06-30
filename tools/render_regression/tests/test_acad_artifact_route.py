@@ -114,6 +114,8 @@ def test_routes_batch_reference_intake_blocked(tmp_path):
 
     assert payload["kind"] == "batch"
     assert payload["status"] == "blocked"
+    assert payload["stage"] == "reference_intake"
+    assert payload["case_count"] == 1
     assert payload["recommended_next_action"]["code"] == "fix-returned-reference-input"
     assert payload["recommended_next_action"]["domain"] == "input"
     assert payload["recommended_next_action"]["artifact"] == "input/reference_intake.md"
@@ -122,8 +124,12 @@ def test_routes_batch_reference_intake_blocked(tmp_path):
     }
     assert payload["error_count"] == 1
     assert payload["warning_count"] == 0
+    assert "stage: reference_intake" in text
+    assert "case_count: 1" in text
     assert "errors: 1" in text
     assert "warnings: 0" in text
+    assert "- stage: `reference_intake`" in markdown
+    assert "- case_count: `1`" in markdown
     assert "- errors: `1`" in markdown
     assert "- warnings: `0`" in markdown
 
@@ -181,8 +187,12 @@ def test_routes_prioritize_blocked_returned_reference_input_over_renderer_candid
     }
     assert payload["routes"][1]["error_count"] == 1
     assert payload["routes"][1]["warning_count"] == 0
+    assert "stage: reference_intake" in input_route_text
+    assert "case_count: 1" in input_route_text
     assert "errors: 1" in input_route_text
     assert "warnings: 0" in input_route_text
+    assert "- stage: `reference_intake`" in markdown
+    assert "- case_count: `1`" in markdown
     assert "- errors: `1`" in markdown
     assert "- warnings: `0`" in markdown
 

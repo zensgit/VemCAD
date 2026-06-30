@@ -3814,3 +3814,40 @@ python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
 python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
+
+## Follow-Up Route Stage/Case Count Visibility
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Surface the routed batch/input-prep stage and case count in route text and
+  Markdown.
+- Let operators distinguish `request_validation`, `missing_references`, and
+  `reference_intake` routes without opening the nested artifact index JSON.
+
+Changes:
+
+- Route text now prints `stage` and `case_count` whenever the routed artifact
+  exposes them.
+- Route Markdown prints the same fields.
+- Regression coverage proves a returned-reference intake block surfaces
+  `stage=reference_intake` and `case_count=1` in both text and Markdown.
+
+Boundary:
+
+- Route-report visibility only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```

@@ -434,6 +434,10 @@ def _write_text(route: dict[str, Any]) -> str:
         f"recommended_action_domain: {action.get('domain', '')}",
         f"message: {action.get('message', '')}",
     ]
+    if route.get("stage"):
+        lines.append(f"stage: {route.get('stage')}")
+    if route.get("case_count") is not None:
+        lines.append(f"case_count: {route.get('case_count')}")
     if route.get("error_count") is not None:
         lines.append(f"errors: {route.get('error_count')}")
     if route.get("warning_count") is not None:
@@ -546,6 +550,10 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         f"- recommended_action_domain: `{action['domain']}`",
         f"- message: {action['message']}",
     ]
+    if route.get("stage"):
+        lines.append(f"- stage: `{route.get('stage')}`")
+    if route.get("case_count") is not None:
+        lines.append(f"- case_count: `{route.get('case_count')}`")
     if route.get("error_count") is not None:
         lines.append(f"- errors: `{route.get('error_count')}`")
     if route.get("warning_count") is not None:
