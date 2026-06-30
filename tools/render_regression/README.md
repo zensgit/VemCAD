@@ -174,6 +174,16 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --require-action review-x3-pass
 ```
 
+To assert source artifact boundaries as part of the same route step, repeat
+`--require-source-boundary key=value`. For example, this guarantees every
+routed source artifact explicitly says it is not an AutoCAD-equivalence claim:
+
+```bash
+python3 tools/render_regression/acad_artifact_route.py <run-dir> \
+  --recursive \
+  --require-source-boundary autocad_equivalence_claim=false
+```
+
 这只是 route assertion：它不重新比较图、不渲染 DXF、不调整 X3 阈值，也不声称
 AutoCAD 等价。`viewspace_mismatch` 仍然路由到重新导出 AutoCAD PNG 或提供明确
 world window；只有 `viewspace_status=match` 且 X3 非 pass 的 case 才进入

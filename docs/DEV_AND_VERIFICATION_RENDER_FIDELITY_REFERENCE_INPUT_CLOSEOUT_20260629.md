@@ -1679,6 +1679,54 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Route Source Boundary Gate
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let CI assert source artifact-index boundaries directly from
+  `acad_artifact_route.py`.
+- Fail closed when an artifact index is missing the expected boundary or carries
+  an unexpected value.
+
+Changes:
+
+- `acad_artifact_route.py` now accepts repeatable
+  `--require-source-boundary key=value`.
+- The check applies to the routed source artifact boundary:
+  - single route: the one source `artifact_index.json`;
+  - multi-route/recursive: every child route.
+- Missing boundary keys fail with exit code `2`; mismatched values also fail
+  with exit code `2`.
+- `tools/render_regression/README.md` documents the CI guard pattern.
+
+Example:
+
+```bash
+python3 tools/render_regression/acad_artifact_route.py <run-dir> \
+  --recursive \
+  --require-source-boundary autocad_equivalence_claim=false
+```
+
+Boundary:
+
+- Route assertion only.
+- No routing-rule change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 Private compatibility smoke:
 
 ```bash

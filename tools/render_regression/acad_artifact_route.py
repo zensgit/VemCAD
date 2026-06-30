@@ -426,6 +426,48 @@ def _recommended_action_artifact(payload: dict[str, Any]) -> str:
     return str((payload.get("recommended_next_action") or {}).get("artifact") or "")
 
 
+def _parse_boundary_expectation(raw: str) -> tuple[str, Any]:
+    if "=" not in raw:
+        raise ValueError(f"boundary expectation must be key=value: {raw}")
+    key, value = raw.split("=", 1)
+    key = key.strip()
+    value = value.strip()
+    if not key:
+        raise ValueError(f"boundary expectation key is empty: {raw}")
+    lowered = value.lower()
+    if lowered == "true":
+        return key, True
+    if lowered == "false":
+        return key, False
+    return key, value
+
+
+def _source_boundary_routes(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    if payload.get("schema") == BATCH_SCHEMA:
+        return [route for route in payload.get("routes") or [] if isinstance(route, dict)]
+    return [payload]
+
+
+def _check_source_boundary_requirements(
+    payload: dict[str, Any],
+    expectations: list[tuple[str, Any]],
+) -> list[str]:
+    failures: list[str] = []
+    for route in _source_boundary_routes(payload):
+        boundary = route.get("artifact_index_boundary")
+        artifact = str(route.get("artifact_index") or "<unknown>")
+        if not isinstance(boundary, dict):
+            boundary = {}
+        for key, expected in expectations:
+            if key not in boundary:
+                failures.append(f"{artifact}: missing source boundary {key}")
+                continue
+            actual = boundary.get(key)
+            if actual != expected:
+                failures.append(f"{artifact}: source boundary {key}={actual!r} != {expected!r}")
+    return failures
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="acad_artifact_route",
@@ -439,6 +481,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out-md", type=Path, help="also write a Markdown route report to this file")
     parser.add_argument("--require-action", default="",
                         help="exit 2 unless the top-level recommended_next_action.code matches this value")
+    parser.add_argument("--require-source-boundary", action="append", default=[],
+                        help="exit 2 unless every routed source artifact boundary has key=value; may repeat")
     args = parser.parse_args(argv)
 
     try:
@@ -447,6 +491,13 @@ def main(argv: list[str] | None = None) -> int:
             payload = route_artifact_index(paths[0])
         else:
             payload = route_artifact_indexes(paths)
+    except Exception as exc:
+        print(f"acad_artifact_route: {exc}", file=sys.stderr)
+        return 2
+    try:
+        source_boundary_expectations = [
+            _parse_boundary_expectation(item) for item in args.require_source_boundary
+        ]
     except Exception as exc:
         print(f"acad_artifact_route: {exc}", file=sys.stderr)
         return 2
@@ -469,6 +520,13 @@ def main(argv: list[str] | None = None) -> int:
             )
             if artifact:
                 print(f"acad_artifact_route: action artifact: {artifact}", file=sys.stderr)
+            return 2
+    if source_boundary_expectations:
+        failures = _check_source_boundary_requirements(payload, source_boundary_expectations)
+        if failures:
+            print("acad_artifact_route: source boundary requirement failed", file=sys.stderr)
+            for failure in failures:
+                print(f"acad_artifact_route: {failure}", file=sys.stderr)
             return 2
     return 0
 
