@@ -118,6 +118,55 @@ def test_routes_batch_reference_intake_blocked(tmp_path):
     }
 
 
+def test_routes_prioritize_blocked_returned_reference_input_over_renderer_candidate(tmp_path):
+    compare_dir = tmp_path / "compare"
+    input_dir = tmp_path / "input"
+    compare_dir.mkdir()
+    input_dir.mkdir()
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "compare_failed",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"renderer-candidate": 1},
+        "viewspace_status_counts": {"match": 1},
+        "x3_band_counts": {"fail": 1},
+        "artifacts": [
+            {"kind": "summary_markdown", "path": "compare/summary.md"},
+        ],
+    })
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "blocked",
+        "case_count": 1,
+        "reference_intake_issue_code_counts": {
+            "returned_png_size_mismatch": 1,
+        },
+        "artifacts": [
+            {"kind": "reference_intake_markdown", "path": "input/reference_intake.md"},
+        ],
+    })
+
+    payload = route.route_artifact_indexes([
+        compare_dir / "artifact_index.json",
+        input_dir / "artifact_index.json",
+    ])
+
+    assert payload["recommended_next_action"]["code"] == "fix-returned-reference-input"
+    assert payload["recommended_next_action"]["domain"] == "input"
+    assert payload["recommended_next_action"]["artifact"] == "input/reference_intake.md"
+    assert payload["recommended_next_action"]["source_route_index"] == "2"
+    assert payload["recommended_action_counts"] == {
+        "fix-returned-reference-input": 1,
+        "inspect-renderer-candidate": 1,
+    }
+    assert payload["recommended_action_domain_counts"] == {
+        "input": 1,
+        "renderer-candidate": 1,
+    }
+
+
 def test_routes_run_case_actions(tmp_path):
     index = _write(tmp_path / "artifact_index.json", {
         "schema": "vemcad.acad_reference_request_run_artifact_index/v1",

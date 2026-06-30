@@ -289,6 +289,46 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Returned Reference Action Priority
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make multi-route top-level recommendations prioritize blocked returned
+  AutoCAD PNG input before renderer-candidate work.
+- Close the gap introduced by the new `fix-returned-reference-input` action:
+  single-route and request-run actions were correct, but recursive/multi-index
+  routing still used the default low priority for the new action code.
+
+Changes:
+
+- `_ACTION_PRIORITY` now includes `fix-returned-reference-input` between
+  missing returned PNGs and returned-reference warning review.
+- Existing relative order is preserved after that insertion:
+  request package fix > missing PNGs > returned PNG input error > intake review
+  > renderer candidate > recapture.
+- Added a regression where a renderer-candidate compare route appears before a
+  blocked reference-intake route; the top-level recommendation still selects
+  `fix-returned-reference-input` and points to `reference_intake.md`.
+
+Boundary:
+
+- Operator route-priority fix only.
+- No renderer change.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- No private drawing or AutoCAD PNG committed.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Provenance Hardening
 
 Status: implemented in this branch.

@@ -234,6 +234,9 @@ inside these generated output directories if they need to survive a rerun.
   `renderer-candidate`, `pass-review`, or `continue`, so unattended jobs can
   distinguish "get better AutoCAD input" from "inspect renderer output" without
   parsing action-code strings.
+- multi-route top-level actions prioritize input-package fixes and returned
+  AutoCAD PNG input errors before renderer-candidate work; do not open renderer
+  work while returned-reference intake is `blocked`.
 - `acad_artifact_route.py --require-action <code>` exits `2` if the top-level
   action is not the expected one. Example CI guard:
 
