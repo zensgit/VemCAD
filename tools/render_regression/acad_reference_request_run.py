@@ -573,6 +573,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="directory containing returned AutoCAD PNGs")
     parser.add_argument("--case-id", action="append", default=None,
                         help="fulfill and compare only this case id; may repeat")
+    parser.add_argument("--require-request-boundary", action="append", default=[],
+                        help="require reference_request.json boundary key=value before fulfilment; may repeat")
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args(argv)
 
@@ -584,6 +586,8 @@ def main(argv: list[str] | None = None) -> int:
         "--reference-dir", str(args.reference_dir),
         "--out-dir", str(input_dir),
     ]
+    for item in args.require_request_boundary:
+        batch_args.extend(["--require-request-boundary", item])
     for case_id in args.case_id or []:
         batch_args.extend(["--case-id", case_id])
     batch_rc = batch.main(batch_args)

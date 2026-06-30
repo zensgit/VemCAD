@@ -158,6 +158,9 @@ python3 tools/render_regression/acad_reference_request_run.py \
   --from-request <compare-dir>/reference_request.json \
   --candidate-cases <candidate_cases.json> \
   --reference-dir <returned-autocad-png-dir> \
+  --require-request-boundary autocad_equivalence_claim=false \
+  --require-request-boundary requires_returned_autocad_png=true \
+  --require-request-boundary requires_viewspace_match=true \
   --out-dir <run-dir>
 
 python3 tools/render_regression/acad_artifact_route.py <run-dir> --recursive --text

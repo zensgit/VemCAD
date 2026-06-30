@@ -530,3 +530,41 @@ def test_reference_request_run_surfaces_request_validation_block(tmp_path):
     }
     assert "reference_intake_json" not in _run_artifact_kinds(out)
     assert "compare_summary_json" not in _run_artifact_kinds(out)
+
+
+def test_reference_request_run_can_require_request_boundary(tmp_path):
+    _dxf(tmp_path / "dxf" / "B11.dxf")
+    _png(tmp_path / "ours" / "G11.png", box=[20, 15, 740, 555])
+    _png(
+        tmp_path / "returned" / "G11_autocad_model_extents.png",
+        size=(1600, 1131),
+        box=[40, 30, 1560, 1100],
+    )
+    request = _request(tmp_path / "reference_request.json")
+    payload = json.loads(request.read_text(encoding="utf-8"))
+    payload["boundary"]["autocad_equivalence_claim"] = True
+    request.write_text(json.dumps(payload), encoding="utf-8")
+    candidates = _candidates(tmp_path / "candidate_cases.json")
+    out = tmp_path / "run"
+
+    assert runner.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--require-request-boundary", "autocad_equivalence_claim=false",
+        "--out-dir", str(out),
+    ]) == 2
+
+    summary = json.loads((out / "run_summary.json").read_text(encoding="utf-8"))
+    assert summary["status"] == "input_blocked"
+    assert summary["reference_request_validation_status"] == "blocked"
+    assert summary["reference_request_validation_issue_code_counts"] == {
+        "request_boundary_mismatch": 1,
+    }
+    assert summary["recommended_next_action"]["code"] == "fix-request-package"
+    assert summary["source_request_boundary"]["autocad_equivalence_claim"] is True
+    artifact_index = _run_artifact_index(out)
+    assert artifact_index["reference_request_validation_issue_code_counts"] == {
+        "request_boundary_mismatch": 1,
+    }
+    assert not (out / "compare" / "summary.json").exists()
