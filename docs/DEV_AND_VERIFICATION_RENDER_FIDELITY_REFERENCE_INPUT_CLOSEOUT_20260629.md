@@ -1441,6 +1441,48 @@ python3 -m pytest tools/render_regression/tests -q
 # 195 passed
 ```
 
+## Follow-Up Strict Route Guard Execution Tests
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Prove the strict post-return route guard is not merely documented, but
+  executable against real request-run outputs.
+- Guard against over-tightening the generated command so that a clean
+  matched-view pass can no longer satisfy it.
+- Guard against under-tightening it so that a `viewspace_mismatch` run can pass
+  the route guard because artifacts are present.
+
+Changes:
+
+- `test_acad_reference_request_run.py` now defines a strict post-return route
+  argument helper matching the generated `reference_request.md` command.
+- The clean matched-view pass test runs that guard and asserts exit `0`.
+- The `viewspace_mismatch` test runs the same guard and asserts exit `2` with
+  `forbidden action domain present: input=2`.
+
+Boundary:
+
+- Test/evidence hardening only.
+- No generated command change in this slice.
+- No route priority change.
+- No request-run action change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 11 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 195 passed
+```
+
 ## Follow-Up Generated Route Command Semantic Guards
 
 Status: implemented in this branch.

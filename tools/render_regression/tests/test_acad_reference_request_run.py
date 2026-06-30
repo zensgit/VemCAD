@@ -136,6 +136,53 @@ def _batch_candidates(path: Path) -> Path:
     return path
 
 
+def _strict_post_return_route_args(out: Path) -> list[str]:
+    return [
+        str(out),
+        "--recursive",
+        "--text",
+        "--require-source-boundary",
+        "autocad_equivalence_claim=false",
+        "--require-request-boundary",
+        "autocad_equivalence_claim=false",
+        "--require-request-boundary",
+        "requires_returned_autocad_png=true",
+        "--require-request-boundary",
+        "requires_viewspace_match=true",
+        "--forbid-action-domain",
+        "input",
+        "--forbid-action-domain",
+        "input-review",
+        "--forbid-action-domain",
+        "renderer-candidate",
+        "--forbid-viewspace-status",
+        "mismatch",
+        "--forbid-x3-band",
+        "review",
+        "--forbid-x3-band",
+        "fallback",
+        "--require-kind",
+        "batch",
+        "--require-kind",
+        "compare",
+        "--require-kind",
+        "request_run",
+        "--require-artifact-kind",
+        "reference_request_validation_tsv",
+        "--require-artifact-kind",
+        "reference_intake_tsv",
+        "--require-artifact-kind",
+        "case_actions_tsv",
+        "--require-artifact-kind",
+        "summary_tsv",
+        "--require-route-count",
+        "3",
+        "--require-final-exit-code-count",
+        "0=2",
+        "--require-action-artifact-exists",
+    ]
+
+
 def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     _dxf(tmp_path / "dxf" / "B11.dxf")
     _png(tmp_path / "ours" / "G11.png", size=(1600, 1131), box=[40, 30, 1560, 1100])
@@ -311,6 +358,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     route_summary_md = (out / "route_summary.md").read_text(encoding="utf-8")
     assert "- reference_request_validation_status: `pass`" in route_summary_md
     assert "- reference_intake_status: `pass`" in route_summary_md
+    assert route.main(_strict_post_return_route_args(out)) == 0
     case_actions_tsv = (out / "case_actions.tsv").read_text(encoding="utf-8").splitlines()
     assert case_actions_tsv[0] == (
         "id\tdrawing_id\tcode\tdomain\tsource\ttriage_bucket\t"
@@ -599,7 +647,7 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     }
 
 
-def test_reference_request_run_preserves_viewspace_mismatch_exit(tmp_path):
+def test_reference_request_run_preserves_viewspace_mismatch_exit(tmp_path, capsys):
     _dxf(tmp_path / "dxf" / "B11.dxf")
     _png(tmp_path / "ours" / "G11.png", size=(760, 570), box=[20, 15, 740, 555])
     _png(
@@ -634,6 +682,9 @@ def test_reference_request_run_preserves_viewspace_mismatch_exit(tmp_path):
     route_summary_md = (out / "route_summary.md").read_text(encoding="utf-8")
     assert "recapture-autocad-or-provide-window=2" in route_summary_md
     assert "recommended_action_domain_counts: `continue=1, input=2`" in route_summary_md
+    assert route.main(_strict_post_return_route_args(out)) == 2
+    stderr = capsys.readouterr().err
+    assert "forbidden action domain present: input=2" in stderr
 
 
 def test_reference_request_run_surfaces_intake_review_warnings(tmp_path):
