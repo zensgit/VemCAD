@@ -5514,3 +5514,45 @@ python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
 python3 -m pytest tools/render_regression/tests -q
 # 189 passed
 ```
+
+## Follow-Up Recapture Input-Review Route Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep the generated post-return route-inspection command aligned with the
+  generated wrapper's `--fail-on-input-review` behavior.
+- Fail closed if any routed artifact still recommends an `input-review` action
+  before operators interpret pixels.
+- Avoid over-constraining legitimate outcomes: the guard does not forbid
+  `viewspace_mismatch`, `renderer-candidate`, or `pass-review` results.
+
+Changes:
+
+- `acad_manifest_compare.py` now adds
+  `--forbid-action-domain input-review` to the generated post-return
+  `acad_artifact_route.py <next-run-dir> --recursive` command in
+  `reference_request.md`.
+- The generated handoff test asserts the route-level input-review guard appears
+  exactly once.
+
+Boundary:
+
+- Generated operator handoff hardening only.
+- No wrapper default behavior change.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 8 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 189 passed
+```
