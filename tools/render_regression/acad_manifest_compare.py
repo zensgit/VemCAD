@@ -30,6 +30,15 @@ import text_provenance_diagnostics as tpd  # noqa: E402
 
 
 SCHEMA = "vemcad.acad_manifest_compare/v1"
+REFERENCE_REQUEST_BOUNDARY = {
+    "renders_dxf": False,
+    "compares_renders": False,
+    "changes_x3_scoring": False,
+    "changes_renderer": False,
+    "requires_returned_autocad_png": True,
+    "requires_viewspace_match": True,
+    "autocad_equivalence_claim": False,
+}
 
 
 def _artifact_index_boundary(report: dict[str, Any] | None) -> dict[str, bool]:
@@ -561,6 +570,7 @@ def _write_reference_request(
         "schema": "vemcad.acad_reference_request/v1",
         "reason": "recapture-required",
         "case_count": len(cases),
+        "boundary": dict(REFERENCE_REQUEST_BOUNDARY),
         "cases": cases,
     }
     _write_json(json_path, payload)

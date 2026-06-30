@@ -127,6 +127,15 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
     request = tmp_path / "reference_request.json"
     request.write_text(json.dumps({
         "schema": "vemcad.acad_reference_request/v1",
+        "boundary": {
+            "renders_dxf": False,
+            "compares_renders": False,
+            "changes_x3_scoring": False,
+            "changes_renderer": False,
+            "requires_returned_autocad_png": True,
+            "requires_viewspace_match": True,
+            "autocad_equivalence_claim": False,
+        },
         "cases": [{
             "id": "G11",
             "drawing_id": "G11/B11",
@@ -157,6 +166,15 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
     assert validation["issue_code_counts"] == {}
     assert validation["boundary"]["requires_returned_autocad_png"] is False
     assert validation["boundary"]["autocad_equivalence_claim"] is False
+    assert validation["source_request_boundary"] == {
+        "renders_dxf": False,
+        "compares_renders": False,
+        "changes_x3_scoring": False,
+        "changes_renderer": False,
+        "requires_returned_autocad_png": True,
+        "requires_viewspace_match": True,
+        "autocad_equivalence_claim": False,
+    }
     row = validation["cases"][0]
     assert row["source_dxf_provenance"]["sha256"] == _sha256(source)
     assert row["candidate_png_provenance"]["sha256"] == _sha256(ours)
@@ -166,6 +184,8 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
     assert "G11_autocad_model_extents.png" in validation_md
     assert "`1600x1131`" in validation_md
     assert "issue_code_counts: `none`" in validation_md
+    assert "source_request_boundary: `autocad_equivalence_claim=False" in validation_md
+    assert "requires_returned_autocad_png=True" in validation_md
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["stage"] == "request_validation"
     assert artifact_index["status"] == "pass"
