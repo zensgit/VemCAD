@@ -444,9 +444,15 @@ def _case_actions(summary: dict[str, Any]) -> list[dict[str, Any]]:
 
     compare_summary = _read_json(Path(str(summary.get("compare_summary_json") or "")))
     compare_artifact = str(summary.get("compare_summary_markdown") or "")
+    compare_request_artifact = _compare_reference_request_markdown(summary)
     for row in compare_summary.get("rows") or []:
         case_id = str(row.get("id") or "")
         code, message = _compare_case_action(row)
+        artifact = (
+            compare_request_artifact
+            if code == "recapture-autocad-or-provide-window" and compare_request_artifact
+            else compare_artifact
+        )
         x3 = row.get("x3_summary") or {}
         _put_case_action(
             actions,
@@ -455,7 +461,7 @@ def _case_actions(summary: dict[str, Any]) -> list[dict[str, Any]]:
             code=code,
             message=message,
             source="compare",
-            artifact=compare_artifact,
+            artifact=artifact,
             extra={
                 "triage_rank": row.get("triage_rank"),
                 "triage_bucket": str(row.get("triage_bucket") or ""),

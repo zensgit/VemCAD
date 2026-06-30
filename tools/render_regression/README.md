@@ -237,6 +237,10 @@ opening JSON artifacts.
 When a recommended action has a handoff artifact, those CLIs also print the
 artifact path; route-backed CLIs additionally print the resolved path and
 whether it exists.
+For one-command request runs, per-case `case_actions` rows use the same
+recapture handoff: a `recapture-autocad-or-provide-window` case points at
+`compare/reference_request.md` when generated, while matched/pass review cases
+still point at the compare summary.
 `acad_manifest_compare.py` also writes per-case `recommended_action_domain`
 values into `summary.json`, `summary.tsv`, `summary.md`, and the compare
 artifact index counts. A `viewspace_mismatch` case therefore remains an
