@@ -20,6 +20,17 @@ SCHEMA = "vemcad.acad_reference_request_run/v1"
 RUN_ARTIFACT_INDEX_SCHEMA = "vemcad.acad_reference_request_run_artifact_index/v1"
 
 
+def _artifact_index_boundary(summary: dict[str, Any]) -> dict[str, bool]:
+    return {
+        "renders_dxf": False,
+        "compares_renders": bool(summary.get("compare_artifact_index")),
+        "changes_x3_scoring": False,
+        "changes_renderer": False,
+        "requires_viewspace_match": True,
+        "autocad_equivalence_claim": False,
+    }
+
+
 def _existing(path: Path) -> str:
     return str(path) if path.is_file() else ""
 
@@ -407,6 +418,7 @@ def _write_run_summary(
             artifacts.append(item)
     _write_json(out_dir / "artifact_index.json", {
         "schema": RUN_ARTIFACT_INDEX_SCHEMA,
+        "boundary": _artifact_index_boundary(payload),
         "status": payload["status"],
         "recommended_next_action": payload["recommended_next_action"],
         "case_actions": payload["case_actions"],

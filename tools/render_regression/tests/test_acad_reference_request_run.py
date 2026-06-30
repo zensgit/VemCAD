@@ -145,6 +145,14 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert summary["recommended_next_action"]["code"] == "review-x3-pass"
     assert summary["recommended_next_action"]["artifact"].endswith("summary.md")
     assert artifact_index["status"] == "pass"
+    assert artifact_index["boundary"] == {
+        "renders_dxf": False,
+        "compares_renders": True,
+        "changes_x3_scoring": False,
+        "changes_renderer": False,
+        "requires_viewspace_match": True,
+        "autocad_equivalence_claim": False,
+    }
     assert artifact_index["recommended_next_action"]["code"] == "review-x3-pass"
     assert "recommended next action: review-x3-pass" in stdout
     assert compare_summary["status"] == "pass"
@@ -318,6 +326,8 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
     assert summary["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
     assert summary["recommended_next_action"]["artifact"].endswith("missing_references.md")
     assert artifact_index["status"] == "input_blocked"
+    assert artifact_index["boundary"]["compares_renders"] is False
+    assert artifact_index["boundary"]["autocad_equivalence_claim"] is False
     assert artifact_index["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
     assert artifact_index["case_actions"] == summary["case_actions"]
     assert artifact_index["case_action_counts"] == summary["case_action_counts"]
