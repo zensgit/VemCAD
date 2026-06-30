@@ -293,6 +293,10 @@ JSON first. When a returned PNG is byte-identical to the rejected
 `returned_png_matches_rejected_reference`; this prevents accidentally rerunning
 the same chrome-cropped or stale AutoCAD reference as if it were a fresh
 model-extents export.
+When the request package also includes a readable `current_acad_png` path,
+request validation checks its declared SHA/size before fulfilment, so a hand
+edited or stale recapture request cannot silently weaken that rejected-reference
+reuse guard.
 It also shows the current view-space status, current X3 band, and requested
 expected size for each recapture case, so the handoff explains why a fresh
 AutoCAD export is needed and what size contract it should satisfy.

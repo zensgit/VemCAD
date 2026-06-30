@@ -1294,6 +1294,47 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 11 passed
 ```
 
+## Follow-Up Current AutoCAD Provenance Validation
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Protect the rejected-reference reuse guard from hand-edited or stale request
+  packages.
+- When a recapture request includes a readable `current_acad_png` path, verify
+  its declared `current_acad_png_sha256` / `current_acad_png_size_bytes` before
+  AutoCAD fulfilment.
+
+Changes:
+
+- `reference_request_validation.json` rows now include optional
+  `current_acad_png` and `current_acad_png_provenance`.
+- `reference_request_validation.tsv` adds current AutoCAD path/SHA/size columns.
+- `reference_request_validation.md` adds current AutoCAD path/provenance
+  columns.
+- Validation reports `current_acad_png_sha256_mismatch` and
+  `current_acad_png_size_mismatch` when a readable current AutoCAD PNG disagrees
+  with its declared provenance.
+- The README documents that this strengthens the rejected-reference reuse guard.
+
+Boundary:
+
+- Request-package validation only.
+- `current_acad_png` remains optional; the hash alone can still serve as the
+  returned-reference reuse sentinel.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 24 passed
+```
+
 ## Follow-Up Rejected Reference Reuse Guard
 
 Status: implemented in this branch.

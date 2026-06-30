@@ -807,6 +807,26 @@ def _write_reference_request_validation_report(
                     source_provenance["size_bytes"],
                 ))
 
+        current_acad_path = None
+        current_acad_provenance = None
+        current_acad_raw = _str(request.get("current_acad_png"))
+        if current_acad_raw:
+            current_acad_path = Path(_resolve(request_json.parent, current_acad_raw))
+            if current_acad_path.is_file():
+                current_acad_provenance = _file_provenance(current_acad_path)
+                row_issues.extend(_sha_mismatch_issue(
+                    case_id,
+                    "current_acad_png",
+                    request.get("current_acad_png_sha256"),
+                    current_acad_provenance["sha256"],
+                ))
+                row_issues.extend(_size_mismatch_issue(
+                    case_id,
+                    "current_acad_png",
+                    request.get("current_acad_png_size_bytes"),
+                    current_acad_provenance["size_bytes"],
+                ))
+
         candidate = candidates.get(case_id)
         candidate_path = None
         candidate_provenance = None
@@ -863,11 +883,13 @@ def _write_reference_request_validation_report(
             "drawing_id": _str(request.get("drawing_id")),
             "recommended_output_name": output_name,
             "source_dxf": str(source_path) if source_path else "",
+            "current_acad_png": str(current_acad_path) if current_acad_path else "",
             "candidate_png": str(candidate_path) if candidate_path else "",
             "requested_capture_method": _str(request.get("requested_capture_method") or "plot-export").lower(),
             "requested_view_contract": _str(request.get("requested_view_contract") or "model-extents").lower(),
             "requested_expected_size": _expected_size_text(expected_size),
             "source_dxf_provenance": source_provenance,
+            "current_acad_png_provenance": current_acad_provenance,
             "candidate_png_provenance": candidate_provenance,
             "issues": row_issues,
         })
@@ -903,13 +925,17 @@ def _write_reference_request_validation_report(
         handle.write(
             "id\tdrawing_id\trecommended_output_name\trequested_capture_method\t"
             "requested_view_contract\trequested_expected_size\tsource_dxf\tsource_dxf_sha256\t"
-            "source_dxf_size_bytes\tcandidate_png\tcandidate_png_sha256\tcandidate_png_size_bytes\t"
+            "source_dxf_size_bytes\tcurrent_acad_png\tcurrent_acad_png_sha256\t"
+            "current_acad_png_size_bytes\tcandidate_png\tcandidate_png_sha256\tcandidate_png_size_bytes\t"
             "issue_codes\n"
         )
         for row in rows:
             source_prov = row.get("source_dxf_provenance")
             if not isinstance(source_prov, dict):
                 source_prov = {}
+            current_acad_prov = row.get("current_acad_png_provenance")
+            if not isinstance(current_acad_prov, dict):
+                current_acad_prov = {}
             candidate_prov = row.get("candidate_png_provenance")
             if not isinstance(candidate_prov, dict):
                 candidate_prov = {}
@@ -924,6 +950,9 @@ def _write_reference_request_validation_report(
                 f"{_tsv(row.get('source_dxf'))}\t"
                 f"{_tsv(source_prov.get('sha256'))}\t"
                 f"{_tsv(source_prov.get('size_bytes'))}\t"
+                f"{_tsv(row.get('current_acad_png'))}\t"
+                f"{_tsv(current_acad_prov.get('sha256'))}\t"
+                f"{_tsv(current_acad_prov.get('size_bytes'))}\t"
                 f"{_tsv(row.get('candidate_png'))}\t"
                 f"{_tsv(candidate_prov.get('sha256'))}\t"
                 f"{_tsv(candidate_prov.get('size_bytes'))}\t"
@@ -947,9 +976,10 @@ def _write_reference_request_validation_report(
         "",
         (
             "| Case | Drawing | Output PNG | Capture | View | Expected size | "
-            "Source | Source provenance | Candidate | Candidate provenance | Issues |"
+            "Source | Source provenance | Current AutoCAD | Current AutoCAD provenance | "
+            "Candidate | Candidate provenance | Issues |"
         ),
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in rows:
         issue_text = ", ".join(f"{item['severity']}:{item['code']}" for item in row["issues"]) or "-"
@@ -960,6 +990,8 @@ def _write_reference_request_validation_report(
             f"{_md_code_cell(row.get('requested_expected_size'))} | "
             f"{_md_code_cell(row.get('source_dxf'))} | "
             f"{_md_code_cell(_provenance_text(row.get('source_dxf_provenance')))} | "
+            f"{_md_code_cell(row.get('current_acad_png'))} | "
+            f"{_md_code_cell(_provenance_text(row.get('current_acad_png_provenance')))} | "
             f"{_md_code_cell(row.get('candidate_png'))} | "
             f"{_md_code_cell(_provenance_text(row.get('candidate_png_provenance')))} | "
             f"{_md_table_cell(issue_text)} |"
