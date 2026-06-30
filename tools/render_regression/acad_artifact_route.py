@@ -664,6 +664,15 @@ def _kind_counts(payload: dict[str, Any]) -> dict[str, int]:
     return {kind: 1} if kind else {}
 
 
+def _route_count(payload: dict[str, Any]) -> int:
+    if payload.get("schema") == BATCH_SCHEMA:
+        try:
+            return int(payload.get("count") or 0)
+        except Exception:
+            return 0
+    return 1
+
+
 def _issue_code_counts(payload: dict[str, Any]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for key in (
@@ -755,6 +764,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="exit 2 unless the routed kind counts include this kind; may repeat")
     parser.add_argument("--forbid-kind", action="append", default=[],
                         help="exit 2 if the routed kind counts include this kind; may repeat")
+    parser.add_argument("--require-route-count", type=int,
+                        help="exit 2 unless the routed artifact-index count exactly matches this value")
     parser.add_argument("--require-action-artifact", default="",
                         help=(
                             "exit 2 unless the top-level recommended_next_action.artifact "
@@ -896,6 +907,20 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 "acad_artifact_route: kind counts: "
                 + _format_counts(counts),
+                file=sys.stderr,
+            )
+            return 2
+    if args.require_route_count is not None:
+        actual = _route_count(payload)
+        if actual != args.require_route_count:
+            print(
+                f"acad_artifact_route: required route count {args.require_route_count} "
+                f"but got {actual}",
+                file=sys.stderr,
+            )
+            print(
+                "acad_artifact_route: kind counts: "
+                + _format_counts(_kind_counts(payload)),
                 file=sys.stderr,
             )
             return 2
