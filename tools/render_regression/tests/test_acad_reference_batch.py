@@ -154,6 +154,7 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
     assert validation["schema"] == "vemcad.acad_reference_request_validation/v1"
     assert validation["status"] == "pass"
     assert validation["error_count"] == 0
+    assert validation["issue_code_counts"] == {}
     assert validation["boundary"]["requires_returned_autocad_png"] is False
     assert validation["boundary"]["autocad_equivalence_claim"] is False
     row = validation["cases"][0]
@@ -164,6 +165,7 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
     assert "AutoCAD Reference Request Validation" in validation_md
     assert "G11_autocad_model_extents.png" in validation_md
     assert "`1600x1131`" in validation_md
+    assert "issue_code_counts: `none`" in validation_md
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["stage"] == "request_validation"
     assert artifact_index["status"] == "pass"
@@ -228,6 +230,8 @@ def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(t
 
     validation = json.loads((out / "reference_request_validation.json").read_text(encoding="utf-8"))
     assert validation["status"] == "blocked"
+    assert validation["issue_code_counts"]["source_dxf_sha256_mismatch"] == 1
+    assert validation["issue_code_counts"]["unsafe_recommended_output_name"] == 2
     issue_codes = {issue["code"] for issue in validation["issues"]}
     assert {
         "duplicate_candidate_id",
@@ -246,6 +250,8 @@ def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(t
     assert validation["cases"][0]["requested_expected_size"] == "0xbad"
     validation_md = (out / "reference_request_validation.md").read_text(encoding="utf-8")
     assert "`0xbad`" in validation_md
+    assert "source_dxf_sha256_mismatch=1" in validation_md
+    assert "unsafe_recommended_output_name=2" in validation_md
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["stage"] == "request_validation"
     assert artifact_index["status"] == "blocked"
@@ -317,6 +323,7 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
     assert intake["schema"] == "vemcad.acad_reference_intake/v1"
     assert intake["status"] == "pass"
     assert intake["warning_count"] == 0
+    assert intake["issue_code_counts"] == {}
     assert intake["boundary"]["autocad_equivalence_claim"] is False
     assert intake["cases"][0]["inspection"]["sha256"] == _sha256(
         tmp_path / "returned" / "G11_autocad_model_extents.png"
@@ -324,6 +331,7 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
     intake_md = (out / "reference_intake.md").read_text(encoding="utf-8")
     assert "AutoCAD Reference Intake Preflight" in intake_md
     assert "G11_autocad_model_extents.png" in intake_md
+    assert "issue_code_counts: `none`" in intake_md
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["boundary"]["compares_renders"] is False
     assert artifact_index["boundary"]["autocad_equivalence_claim"] is False
@@ -711,6 +719,10 @@ def test_batch_generator_intake_warns_on_low_resolution_or_non_white_png(tmp_pat
     intake = json.loads((out / "reference_intake.json").read_text(encoding="utf-8"))
     assert intake["status"] == "review"
     assert intake["warning_count"] == 2
+    assert intake["issue_code_counts"] == {
+        "corner_background_not_white": 1,
+        "long_edge_below_requested": 1,
+    }
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["stage"] == "reference_intake"
     assert artifact_index["status"] == "review"
@@ -724,6 +736,8 @@ def test_batch_generator_intake_warns_on_low_resolution_or_non_white_png(tmp_pat
     issue_codes = {issue["code"] for issue in intake["cases"][0]["issues"]}
     assert issue_codes == {"long_edge_below_requested", "corner_background_not_white"}
     intake_md = (out / "reference_intake.md").read_text(encoding="utf-8")
+    assert "corner_background_not_white=1" in intake_md
+    assert "long_edge_below_requested=1" in intake_md
     assert "warning:long_edge_below_requested" in intake_md
     assert "warning:corner_background_not_white" in intake_md
 

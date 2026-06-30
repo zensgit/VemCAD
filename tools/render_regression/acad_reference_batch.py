@@ -96,6 +96,10 @@ def _issue_code_counts(payload: dict[str, Any]) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
+def _format_counts(counts: dict[str, Any]) -> str:
+    return ", ".join(f"{key}={value}" for key, value in sorted(counts.items())) or "none"
+
+
 def _near_white(rgb: tuple[int, int, int]) -> bool:
     return min(rgb) >= 245 and (max(rgb) - min(rgb)) <= 10
 
@@ -713,6 +717,7 @@ def _write_reference_request_validation_report(
 
     error_count = sum(1 for issue in issues if issue.get("severity") == "error")
     warning_count = sum(1 for issue in issues if issue.get("severity") == "warning")
+    issue_code_counts = _issue_code_counts({"issues": issues})
     status = "blocked" if error_count else ("review" if warning_count else "pass")
     payload = {
         "schema": REQUEST_VALIDATION_SCHEMA,
@@ -722,6 +727,7 @@ def _write_reference_request_validation_report(
         "case_count": len(rows),
         "error_count": error_count,
         "warning_count": warning_count,
+        "issue_code_counts": issue_code_counts,
         "cases": rows,
         "issues": issues,
         "boundary": {
@@ -743,6 +749,7 @@ def _write_reference_request_validation_report(
         f"- cases: `{len(rows)}`",
         f"- errors: `{error_count}`",
         f"- warnings: `{warning_count}`",
+        f"- issue_code_counts: `{_format_counts(issue_code_counts)}`",
         "",
         "This validates request-package identity and provenance before AutoCAD PNG fulfilment. "
         "It does not compare renders and does not claim AutoCAD equivalence.",
@@ -1127,6 +1134,7 @@ def _write_reference_intake_report(
             "purpose": "preflight returned AutoCAD PNGs before matched-view comparison",
         },
     }
+    payload["issue_code_counts"] = _issue_code_counts(payload)
     out_dir.mkdir(parents=True, exist_ok=True)
     json_path = out_dir / "reference_intake.json"
     md_path = out_dir / "reference_intake.md"
@@ -1140,6 +1148,7 @@ def _write_reference_intake_report(
         f"- cases: `{len(rows)}`",
         f"- errors: `{error_count}`",
         f"- warnings: `{warning_count}`",
+        f"- issue_code_counts: `{_format_counts(payload['issue_code_counts'])}`",
         "",
         "This is a capture-quality preflight only. It does not compare against VemCAD and does not claim AutoCAD equivalence.",
         "",

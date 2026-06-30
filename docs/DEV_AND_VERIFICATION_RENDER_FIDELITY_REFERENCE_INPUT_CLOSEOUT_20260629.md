@@ -577,6 +577,46 @@ python3 -m pytest tools/render_regression/tests -q
 # 101 passed
 ```
 
+## Follow-Up Source Report Issue Code Counts
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make the source request-validation and returned-reference intake reports
+  summarize their issue classes directly.
+- Let operators understand why a source report is `blocked` or `review`
+  without scanning every per-case table row or opening route artifacts.
+
+Changes:
+
+- `reference_request_validation.json` now includes top-level
+  `issue_code_counts`.
+- `reference_request_validation.md` prints `issue_code_counts`.
+- `reference_intake.json` now includes top-level `issue_code_counts`.
+- `reference_intake.md` prints `issue_code_counts`.
+- `tools/render_regression/README.md` documents the operator-facing behavior.
+
+Boundary:
+
+- Source report evidence only.
+- No request validation semantics change.
+- No intake warning/blocking semantics change.
+- No renderer change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Batch Route Issue Code Counts
 
 Status: implemented in this branch.
