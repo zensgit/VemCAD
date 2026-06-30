@@ -279,6 +279,12 @@ exact routed action distribution. For multi-route payloads this checks
 `case_action_counts`; for a single route it checks the top-level action as
 count `1`.
 
+Use `--require-action-domain-count <domain=count>` when a workflow needs to
+assert the exact routed action-domain distribution. This is useful when an
+operator gate must prove the route contains only the expected mix of `input`,
+`renderer-candidate`, `pass-review`, and `continue` work without enumerating
+every specific action code.
+
 Use `--require-status <status>` / `--forbid-status <status>` when a workflow
 needs to assert the routed status distribution itself, such as requiring
 `viewspace_mismatch` in a recapture test or forbidding any nested `blocked`

@@ -945,6 +945,72 @@ def test_cli_require_action_count_rejects_bad_expectation(tmp_path, capsys):
     assert "count expectation value must be an integer" in stderr
 
 
+def test_cli_require_action_domain_count_passes_for_request_run_cases(tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    _write(run_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_request_run_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "recommended_next_action": {
+            "code": "recapture-autocad-or-provide-window",
+            "message": "recapture",
+            "domain": "input",
+        },
+        "case_action_counts": {
+            "recapture-autocad-or-provide-window": 2,
+            "review-x3-pass": 1,
+        },
+        "case_action_domain_counts": {
+            "input": 2,
+            "pass-review": 1,
+        },
+        "case_actions": [],
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(run_dir),
+        "--require-action-domain-count",
+        "input=2",
+        "--require-action-domain-count",
+        "pass-review=1",
+    ]) == 0
+
+
+def test_cli_require_action_domain_count_fails_closed_for_mismatch(tmp_path, capsys):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    _write(run_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_request_run_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "recommended_next_action": {
+            "code": "recapture-autocad-or-provide-window",
+            "message": "recapture",
+            "domain": "input",
+        },
+        "case_action_counts": {
+            "recapture-autocad-or-provide-window": 2,
+            "review-x3-pass": 1,
+        },
+        "case_action_domain_counts": {
+            "input": 2,
+            "pass-review": 1,
+        },
+        "case_actions": [],
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(run_dir),
+        "--require-action-domain-count",
+        "input=3",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "required action domain count mismatch: input=3 (got 2)" in stderr
+    assert "action domain counts: input=2, pass-review=1" in stderr
+
+
 def test_cli_require_status_passes_when_present(tmp_path):
     input_dir = tmp_path / "input"
     compare_dir = tmp_path / "compare"

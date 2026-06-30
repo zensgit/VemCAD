@@ -831,6 +831,11 @@ def main(argv: list[str] | None = None) -> int:
                             "exit 2 unless routed action counts contain code=count; "
                             "may repeat"
                         ))
+    parser.add_argument("--require-action-domain-count", action="append", default=[],
+                        help=(
+                            "exit 2 unless routed action domain counts contain domain=count; "
+                            "may repeat"
+                        ))
     parser.add_argument("--require-status", action="append", default=[],
                         help="exit 2 unless the routed status counts include this status; may repeat")
     parser.add_argument("--forbid-status", action="append", default=[],
@@ -890,6 +895,9 @@ def main(argv: list[str] | None = None) -> int:
         action_count_expectations = [
             _parse_count_expectation(item) for item in args.require_action_count
         ]
+        action_domain_count_expectations = [
+            _parse_count_expectation(item) for item in args.require_action_domain_count
+        ]
     except Exception as exc:
         print(f"acad_artifact_route: {exc}", file=sys.stderr)
         return 2
@@ -933,6 +941,25 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 "acad_artifact_route: forbidden action domain present: "
                 + ", ".join(f"{domain}={counts.get(domain, 0)}" for domain in forbidden),
+                file=sys.stderr,
+            )
+            print(
+                "acad_artifact_route: action domain counts: "
+                + _format_counts(counts),
+                file=sys.stderr,
+            )
+            return 2
+    if action_domain_count_expectations:
+        counts = _action_domain_counts(payload)
+        failures = [
+            f"{domain}={expected} (got {counts.get(domain, 0)})"
+            for domain, expected in action_domain_count_expectations
+            if counts.get(domain, 0) != expected
+        ]
+        if failures:
+            print(
+                "acad_artifact_route: required action domain count mismatch: "
+                + ", ".join(failures),
                 file=sys.stderr,
             )
             print(
