@@ -98,6 +98,18 @@ def _artifact_path(payload: dict[str, Any], kind: str) -> str:
     return ""
 
 
+def _artifact_kind_counts_from_payload(payload: dict[str, Any]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in payload.get("artifacts") or []:
+        if not isinstance(item, dict):
+            continue
+        kind = str(item.get("kind") or "")
+        if not kind:
+            continue
+        counts[kind] = counts.get(kind, 0) + 1
+    return dict(sorted(counts.items()))
+
+
 def _route_action(route: dict[str, Any]) -> dict[str, str]:
     action = route.get("recommended_next_action") or {}
     if isinstance(action, dict):
@@ -314,6 +326,7 @@ def route_artifact_index(path: Path) -> dict[str, Any]:
         "artifact_index": str(path),
         "artifact_index_schema": schema,
         "artifact_index_boundary": _artifact_index_boundary(payload),
+        "artifact_kind_counts": _artifact_kind_counts_from_payload(payload),
         "boundary": dict(BOUNDARY),
         **route,
     })
@@ -389,6 +402,7 @@ def _route_batch_summary(routes: list[dict[str, Any]]) -> dict[str, Any]:
     request_run_routes = [route for route in routes if route.get("kind") == "request_run"]
     summary = {
         "kind_counts": _count_values([str(route.get("kind") or "") for route in routes]),
+        "artifact_kind_counts": _sum_count_maps(routes, "artifact_kind_counts"),
         "status_counts": _count_values([str(route.get("status") or "") for route in routes]),
         "final_exit_code_counts": _count_final_exit_codes(routes),
         "recommended_action_counts": _count_values([
@@ -604,6 +618,8 @@ def _write_text(route: dict[str, Any]) -> str:
                 for key, value in sorted(source_boundary.items())
             )
         )
+    if route.get("artifact_kind_counts"):
+        lines.append(f"artifact_kind_counts: {_format_counts(route['artifact_kind_counts'])}")
     if route.get("case_action_counts"):
         lines.append(f"case_action_counts: {_format_counts(route['case_action_counts'])}")
     if route.get("case_action_domain_counts"):
@@ -694,6 +710,7 @@ def _write_batch_text(payload: dict[str, Any]) -> str:
     summary = [
         f"route_count: {payload.get('count', 0)}",
         "kind_counts: " + _format_counts(payload.get("kind_counts") or {}),
+        "artifact_kind_counts: " + _format_counts(payload.get("artifact_kind_counts") or {}),
         "status_counts: " + _format_counts(payload.get("status_counts") or {}),
         "recommended_action_counts: " + _format_counts(payload.get("recommended_action_counts") or {}),
         "recommended_action_domain_counts: "
@@ -789,6 +806,8 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
             f"- source_compares_renders: `{bool(source_boundary.get('compares_renders'))}`",
             f"- source_autocad_equivalence_claim: `{bool(source_boundary.get('autocad_equivalence_claim'))}`",
         ])
+    if route.get("artifact_kind_counts"):
+        lines.append(f"- artifact_kind_counts: {_md_code_cell(_format_counts(route['artifact_kind_counts']))}")
     if action["artifact"]:
         lines.append(f"- action_artifact: {_md_code_cell(action['artifact'])}")
     if route.get("action_artifact_resolved"):
@@ -897,6 +916,7 @@ def _write_markdown(payload: dict[str, Any]) -> str:
             "",
             f"- route_count: {_md_code_cell(payload.get('count', 0))}",
             f"- kind_counts: {_md_code_cell(_format_counts(payload.get('kind_counts') or {}))}",
+            f"- artifact_kind_counts: {_md_code_cell(_format_counts(payload.get('artifact_kind_counts') or {}))}",
             f"- status_counts: {_md_code_cell(_format_counts(payload.get('status_counts') or {}))}",
             "- recommended_action_counts: "
             f"{_md_code_cell(_format_counts(payload.get('recommended_action_counts') or {}))}",
@@ -1050,6 +1070,13 @@ def _kind_counts(payload: dict[str, Any]) -> dict[str, int]:
         return {str(key): int(value) for key, value in counts.items() if str(key)}
     kind = str(payload.get("kind") or "")
     return {kind: 1} if kind else {}
+
+
+def _artifact_kind_counts(payload: dict[str, Any]) -> dict[str, int]:
+    counts = payload.get("artifact_kind_counts")
+    if isinstance(counts, dict):
+        return {str(key): int(value) for key, value in counts.items() if str(key)}
+    return {}
 
 
 def _route_count(payload: dict[str, Any]) -> int:
@@ -1309,6 +1336,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="exit 2 unless the routed kind counts include this kind; may repeat")
     parser.add_argument("--forbid-kind", action="append", default=[],
                         help="exit 2 if the routed kind counts include this kind; may repeat")
+    parser.add_argument("--require-artifact-kind", action="append", default=[],
+                        help="exit 2 unless routed artifact kind counts include this artifact kind; may repeat")
+    parser.add_argument("--forbid-artifact-kind", action="append", default=[],
+                        help="exit 2 if routed artifact kind counts include this artifact kind; may repeat")
     parser.add_argument("--require-route-count", type=int,
                         help="exit 2 unless the routed artifact-index count exactly matches this value")
     parser.add_argument("--require-compare-case-count", type=int,
@@ -1609,6 +1640,34 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(
                 "acad_artifact_route: kind counts: "
+                + _format_counts(counts),
+                file=sys.stderr,
+            )
+            return 2
+    if args.require_artifact_kind or args.forbid_artifact_kind:
+        counts = _artifact_kind_counts(payload)
+        missing = [kind for kind in args.require_artifact_kind if not counts.get(kind, 0)]
+        if missing:
+            print(
+                "acad_artifact_route: required artifact kind missing: "
+                + ", ".join(missing),
+                file=sys.stderr,
+            )
+            print(
+                "acad_artifact_route: artifact kind counts: "
+                + _format_counts(counts),
+                file=sys.stderr,
+            )
+            return 2
+        forbidden_kinds = [kind for kind in args.forbid_artifact_kind if counts.get(kind, 0)]
+        if forbidden_kinds:
+            print(
+                "acad_artifact_route: forbidden artifact kind present: "
+                + ", ".join(f"{kind}={counts.get(kind, 0)}" for kind in forbidden_kinds),
+                file=sys.stderr,
+            )
+            print(
+                "acad_artifact_route: artifact kind counts: "
                 + _format_counts(counts),
                 file=sys.stderr,
             )

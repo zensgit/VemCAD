@@ -1769,6 +1769,94 @@ def test_cli_forbid_kind_fails_closed_when_present(tmp_path, capsys):
     assert "kind counts: batch=1, compare=1" in stderr
 
 
+def test_cli_require_artifact_kind_passes_when_present(tmp_path):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "pass",
+        "case_count": 1,
+        "artifacts": [
+            {"kind": "reference_intake_tsv", "path": "reference_intake.tsv"},
+        ],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--require-artifact-kind",
+        "reference_intake_tsv",
+    ]) == 0
+
+    payload = route.route_artifact_index(input_dir)
+    assert payload["artifact_kind_counts"] == {"reference_intake_tsv": 1}
+
+
+def test_cli_require_artifact_kind_fails_closed_when_missing(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "pass",
+        "case_count": 1,
+        "artifacts": [
+            {"kind": "reference_intake_markdown", "path": "reference_intake.md"},
+        ],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--require-artifact-kind",
+        "reference_intake_tsv",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "required artifact kind missing: reference_intake_tsv" in stderr
+    assert "artifact kind counts: reference_intake_markdown=1" in stderr
+
+
+def test_cli_forbid_artifact_kind_fails_closed_when_present(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    run_dir = tmp_path / "run"
+    input_dir.mkdir()
+    run_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "pass",
+        "case_count": 1,
+        "artifacts": [
+            {"kind": "reference_intake_tsv", "path": "reference_intake.tsv"},
+        ],
+    })
+    _write(run_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_request_run_artifact_index/v1",
+        "status": "pass",
+        "final_exit_code": 0,
+        "recommended_next_action": {
+            "code": "review-x3-pass",
+            "message": "review",
+            "domain": "pass-review",
+        },
+        "case_actions": [],
+        "artifacts": [
+            {"kind": "reference_intake_tsv", "path": "input/reference_intake.tsv"},
+        ],
+    })
+
+    assert route.main([
+        str(input_dir),
+        str(run_dir),
+        "--forbid-artifact-kind",
+        "reference_intake_tsv",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "forbidden artifact kind present: reference_intake_tsv=2" in stderr
+    assert "artifact kind counts: reference_intake_tsv=2" in stderr
+
+
 def test_cli_require_route_count_passes_for_batch(tmp_path):
     input_dir = tmp_path / "input"
     compare_dir = tmp_path / "compare"
