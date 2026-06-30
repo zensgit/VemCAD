@@ -317,6 +317,8 @@ python3 tools/render_regression/acad_artifact_route.py <artifact_index.json> --t
 python3 tools/render_regression/acad_artifact_route.py <artifact-directory> --text
 python3 tools/render_regression/acad_artifact_route.py \
   <run-directory>/input <run-directory> <run-directory>/compare --text
+python3 tools/render_regression/acad_artifact_route.py \
+  <unpacked-artifact-root> --recursive --text
 ```
 
 The route helper is read-only. It does not compare renders, does not change
@@ -326,6 +328,11 @@ artifact index into the next safe operator action.
 With one input, JSON output remains the single route object. With multiple
 inputs, JSON output is a `vemcad.acad_artifact_route_batch/v1` wrapper carrying
 one route per supplied artifact index or directory.
+
+Use `--recursive` only when pointing at an unpacked CI artifact root or run
+directory that may contain several nested `artifact_index.json` files. Without
+`--recursive`, directory inputs still require an `artifact_index.json` directly
+inside that directory and fail closed otherwise.
 
 ## Interpret The Result
 
