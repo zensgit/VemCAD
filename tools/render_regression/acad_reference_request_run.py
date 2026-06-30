@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import acad_manifest_compare as compare  # noqa: E402
 import acad_reference_batch as batch  # noqa: E402
+import acad_artifact_route as artifact_route  # noqa: E402
 
 
 SCHEMA = "vemcad.acad_reference_request_run/v1"
@@ -302,6 +303,8 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         ("missing references", "missing_references_markdown"),
         ("compare summary", "compare_summary_markdown"),
         ("compare artifact index", "compare_artifact_index"),
+        ("route summary json", "route_summary_json"),
+        ("route summary markdown", "route_summary_markdown"),
     ):
         value = summary.get(key) or ""
         if value:
@@ -368,6 +371,8 @@ def _write_run_summary(
         "compare_summary_json": _existing(compare_summary_json),
         "compare_summary_markdown": _existing(compare_dir / "summary.md"),
         "compare_artifact_index": _existing(compare_dir / "artifact_index.json"),
+        "route_summary_json": str(out_dir / "route_summary.json"),
+        "route_summary_markdown": str(out_dir / "route_summary.md"),
         "boundary": {
             "renders_dxf": False,
             "requires_viewspace_match": True,
@@ -382,6 +387,8 @@ def _write_run_summary(
     artifacts = [
         {"kind": "run_summary_json", "path": str(out_dir / "run_summary.json")},
         {"kind": "run_summary_markdown", "path": str(out_dir / "run_summary.md")},
+        {"kind": "route_summary_json", "path": str(out_dir / "route_summary.json")},
+        {"kind": "route_summary_markdown", "path": str(out_dir / "route_summary.md")},
     ]
     for kind, key in (
         ("input_artifact_index", "input_artifact_index"),
@@ -407,6 +414,17 @@ def _write_run_summary(
         "count": len(artifacts),
         "artifacts": artifacts,
     })
+    route_inputs = [Path(path) for path in (
+        payload.get("input_artifact_index"),
+        str(out_dir / "artifact_index.json"),
+        payload.get("compare_artifact_index"),
+    ) if path]
+    route_payload = artifact_route.route_artifact_indexes(route_inputs)
+    artifact_route.write_route_report_files(
+        route_payload,
+        out_json=Path(payload["route_summary_json"]),
+        out_md=Path(payload["route_summary_markdown"]),
+    )
     return payload
 
 

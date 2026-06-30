@@ -211,6 +211,8 @@ The wrapper writes:
 - `$NEXT_DIR/run_summary.md`.
 - `$NEXT_DIR/artifact_index.json` — run-level index for the summary, input
   artifacts, and compare artifacts that were actually produced.
+- `$NEXT_DIR/route_summary.json`;
+- `$NEXT_DIR/route_summary.md`.
 
 It returns the comparison exit code, so `viewspace_mismatch` still exits `2`.
 The wrapper is only an orchestration convenience; it does not render DXFs and
@@ -343,6 +345,10 @@ inside that directory and fail closed otherwise.
 Use `--out-json` and `--out-md` when CI should upload the route result as stable
 artifacts. These options are write-only reporting conveniences; they do not
 change the route decision, comparison result, or exit semantics.
+
+`acad_reference_request_run.py` already writes `route_summary.json/md` at the
+run root. Use the standalone route helper when reviewing unpacked artifacts from
+older runs or ad-hoc directories.
 
 ## Interpret The Result
 

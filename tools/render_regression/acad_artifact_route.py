@@ -307,6 +307,22 @@ def _write_output_file(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def route_markdown(payload: dict[str, Any]) -> str:
+    return _write_markdown(payload)
+
+
+def write_route_report_files(
+    payload: dict[str, Any],
+    *,
+    out_json: Path | None = None,
+    out_md: Path | None = None,
+) -> None:
+    if out_json:
+        _write_output_file(out_json, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+    if out_md:
+        _write_output_file(out_md, route_markdown(payload))
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="acad_artifact_route",
@@ -336,10 +352,7 @@ def main(argv: list[str] | None = None) -> int:
             print(_write_text(payload))
     else:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
-    if args.out_json:
-        _write_output_file(args.out_json, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
-    if args.out_md:
-        _write_output_file(args.out_md, _write_markdown(payload))
+    write_route_report_files(payload, out_json=args.out_json, out_md=args.out_md)
     return 0
 
 
