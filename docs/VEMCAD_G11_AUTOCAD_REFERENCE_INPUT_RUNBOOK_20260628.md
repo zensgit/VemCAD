@@ -327,7 +327,9 @@ artifact index into the next safe operator action.
 
 With one input, JSON output remains the single route object. With multiple
 inputs, JSON output is a `vemcad.acad_artifact_route_batch/v1` wrapper carrying
-one route per supplied artifact index or directory.
+one route per supplied artifact index or directory, plus `kind_counts`,
+`status_counts`, and `recommended_action_counts` so CI logs can surface the
+overall disposition before listing every route.
 
 Use `--recursive` only when pointing at an unpacked CI artifact root or run
 directory that may contain several nested `artifact_index.json` files. Without
