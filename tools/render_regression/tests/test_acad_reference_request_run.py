@@ -205,6 +205,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert "recommended_next_action: `review-x3-pass`" in summary_md
     assert "recommended_next_action_domain: `pass-review`" in summary_md
     assert "reference_request_validation_warnings: `0`" in summary_md
+    assert "reference_intake_errors: `0`" in summary_md
     assert "case_action_domain_counts: `pass-review=1`" in summary_md
     assert "source_request_boundary: `autocad_equivalence_claim=False" in summary_md
     assert "requires_returned_autocad_png=True" in summary_md
@@ -445,6 +446,7 @@ def test_reference_request_run_routes_intake_blocked_to_fix_returned_input(tmp_p
     assert summary["status"] == "input_blocked"
     assert summary["reference_request_validation_status"] == "pass"
     assert summary["reference_intake_status"] == "blocked"
+    assert summary["reference_intake_error_count"] == 1
     assert summary["reference_intake_issue_code_counts"]["returned_png_size_mismatch"] == 1
     assert summary["recommended_next_action"]["code"] == "fix-returned-reference-input"
     assert summary["recommended_next_action"]["domain"] == "input"
@@ -457,6 +459,8 @@ def test_reference_request_run_routes_intake_blocked_to_fix_returned_input(tmp_p
     assert artifact_index["case_actions"] == summary["case_actions"]
     assert "recommended next action: fix-returned-reference-input" in stdout
     assert "case action counts: fix-returned-reference-input=1" in stdout
+    summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
+    assert "reference_intake_errors: `1`" in summary_md
 
 
 def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
