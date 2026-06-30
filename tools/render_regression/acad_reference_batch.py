@@ -430,6 +430,34 @@ def _expected_size_issues(case_id: str, expected_size: Any) -> list[dict[str, st
     return []
 
 
+def _capture_contract_issues(case_id: str, capture_method: Any, view_contract: Any) -> list[dict[str, str]]:
+    issues: list[dict[str, str]] = []
+    method = _str(capture_method or "plot-export").lower()
+    view = _str(view_contract or "model-extents").lower()
+    if method in arm.DIAGNOSTIC_CAPTURE_METHODS:
+        issues.append({
+            "severity": "error",
+            "case_id": case_id,
+            "code": "diagnostic_requested_capture_method",
+            "message": f"requested_capture_method={method} is diagnostic-only and cannot gate X3 equivalence",
+        })
+    elif method and method not in arm.GATE_CAPTURE_METHODS:
+        issues.append({
+            "severity": "error",
+            "case_id": case_id,
+            "code": "unknown_requested_capture_method",
+            "message": f"requested_capture_method={method} is not recognized",
+        })
+    if view and view not in arm.MATCHED_VIEW_CONTRACTS:
+        issues.append({
+            "severity": "error",
+            "case_id": case_id,
+            "code": "unmatched_requested_view_contract",
+            "message": f"requested_view_contract={view} is not a matched-view contract",
+        })
+    return issues
+
+
 def _size_mismatch_issue(case_id: str, label: str, declared: Any, actual: int) -> list[dict[str, str]]:
     if declared is None:
         return []
@@ -604,6 +632,11 @@ def _write_reference_request_validation_report(
             case_id,
             request.get("requested_expected_size") or request.get("expected_size"),
         ))
+        row_issues.extend(_capture_contract_issues(
+            case_id,
+            request.get("requested_capture_method"),
+            request.get("requested_view_contract"),
+        ))
         issues.extend(row_issues)
         rows.append({
             "id": case_id,
@@ -611,6 +644,8 @@ def _write_reference_request_validation_report(
             "recommended_output_name": output_name,
             "source_dxf": str(source_path) if source_path else "",
             "candidate_png": str(candidate_path) if candidate_path else "",
+            "requested_capture_method": _str(request.get("requested_capture_method") or "plot-export").lower(),
+            "requested_view_contract": _str(request.get("requested_view_contract") or "model-extents").lower(),
             "source_dxf_provenance": source_provenance,
             "candidate_png_provenance": candidate_provenance,
             "issues": row_issues,
@@ -652,14 +687,15 @@ def _write_reference_request_validation_report(
         "This validates request-package identity and provenance before AutoCAD PNG fulfilment. "
         "It does not compare renders and does not claim AutoCAD equivalence.",
         "",
-        "| Case | Drawing | Output PNG | Source | Candidate | Issues |",
-        "| --- | --- | --- | --- | --- | --- |",
+        "| Case | Drawing | Output PNG | Capture | View | Source | Candidate | Issues |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in rows:
         issue_text = ", ".join(f"{item['severity']}:{item['code']}" for item in row["issues"]) or "-"
         lines.append(
             f"| `{row['id']}` | {_str(row.get('drawing_id'))} | "
-            f"`{row['recommended_output_name']}` | `{row.get('source_dxf') or '-'}` | "
+            f"`{row['recommended_output_name']}` | `{row.get('requested_capture_method') or '-'}` | "
+            f"`{row.get('requested_view_contract') or '-'}` | `{row.get('source_dxf') or '-'}` | "
             f"`{row.get('candidate_png') or '-'}` | {issue_text} |"
         )
     if global_issues:
