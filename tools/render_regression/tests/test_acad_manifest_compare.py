@@ -99,6 +99,10 @@ def test_readme_recapture_route_example_documents_handoff_guards():
         "--require-kind batch",
         "--require-kind compare",
         "--require-kind request_run",
+        "--require-artifact-kind reference_request_validation_tsv",
+        "--require-artifact-kind reference_intake_tsv",
+        "--require-artifact-kind case_actions_tsv",
+        "--require-artifact-kind summary_tsv",
         "--require-route-count 3",
         "--require-action-artifact-exists",
     ]:
@@ -465,6 +469,10 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert request_md.count("--require-kind batch") == 1
     assert request_md.count("--require-kind compare") == 1
     assert request_md.count("--require-kind request_run") == 1
+    assert request_md.count("--require-artifact-kind reference_request_validation_tsv") == 1
+    assert request_md.count("--require-artifact-kind reference_intake_tsv") == 1
+    assert request_md.count("--require-artifact-kind case_actions_tsv") == 1
+    assert request_md.count("--require-artifact-kind summary_tsv") == 1
     assert request_md.count("--require-route-count 3") == 1
     assert request_md.count("--require-action-artifact-exists") == 1
     for expected in [
@@ -483,6 +491,10 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
         "--require-kind batch",
         "--require-kind compare",
         "--require-kind request_run",
+        "--require-artifact-kind reference_request_validation_tsv",
+        "--require-artifact-kind reference_intake_tsv",
+        "--require-artifact-kind case_actions_tsv",
+        "--require-artifact-kind summary_tsv",
         "--require-route-count 3",
         "--require-action-artifact-exists",
     ]:

@@ -1394,6 +1394,53 @@ python3 -m pytest tools/render_regression/tests -q
 # 195 passed
 ```
 
+## Follow-Up Generated Route Command Artifact Guards
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make the generated post-return `acad_artifact_route.py <next-run-dir>
+  --recursive` command use the artifact-kind guards added in the previous
+  slices.
+- Fail closed if a run has the expected route topology but is missing the key
+  uploaded handoff artifacts operators need for review.
+- Keep the generated `reference_request.md` and README quick-start command in
+  sync.
+
+Changes:
+
+- `acad_manifest_compare.py` now writes these guards into generated
+  `reference_request.md`:
+  - `--require-artifact-kind reference_request_validation_tsv`
+  - `--require-artifact-kind reference_intake_tsv`
+  - `--require-artifact-kind case_actions_tsv`
+  - `--require-artifact-kind summary_tsv`
+- `tools/render_regression/README.md` mirrors the same post-return route
+  command.
+- Regression coverage extracts both Markdown command blocks and asserts the
+  four artifact-kind guards are present exactly once.
+
+Boundary:
+
+- Operator command hardening only.
+- No route priority change.
+- No request-run action change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 11 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 195 passed
+```
+
 ## Follow-Up Request-Run Input TSV Artifacts
 
 Status: implemented in this branch.

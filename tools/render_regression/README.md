@@ -175,6 +175,10 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --require-kind batch \
   --require-kind compare \
   --require-kind request_run \
+  --require-artifact-kind reference_request_validation_tsv \
+  --require-artifact-kind reference_intake_tsv \
+  --require-artifact-kind case_actions_tsv \
+  --require-artifact-kind summary_tsv \
   --require-route-count 3 \
   --require-action-artifact-exists
 ```
