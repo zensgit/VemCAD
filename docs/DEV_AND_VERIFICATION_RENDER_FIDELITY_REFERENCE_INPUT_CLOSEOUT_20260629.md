@@ -1294,6 +1294,52 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 11 passed
 ```
 
+## Follow-Up Request-Run Input TSV Artifacts
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep the one-command AutoCAD reference request runner's top-level artifact
+  surface aligned with the nested input artifacts.
+- Let artifact-upload jobs collect request-validation, missing-reference, and
+  returned-reference-intake TSVs from `run_summary.json/md` and the run-level
+  artifact index without walking `input/`.
+
+Changes:
+
+- `acad_reference_request_run.py` now records
+  `reference_request_validation_tsv` and `reference_intake_tsv` in
+  `run_summary.json` when those nested files exist.
+- `run_summary.md` lists `request validation tsv` and `reference intake tsv`
+  in the Artifacts section.
+- The wrapper-level `artifact_index.json` includes
+  `reference_request_validation_tsv` and `reference_intake_tsv` artifacts.
+- Existing recommended next actions still point at Markdown reports for human
+  handoff; this only expands the machine-readable artifact surface.
+- The README documents that the wrapper surfaces all three input TSVs:
+  request validation, missing references, and reference intake.
+
+Boundary:
+
+- Run-level artifact surfacing only.
+- No route priority change.
+- No recommended-action target change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 11 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 192 passed
+```
+
 ## Follow-Up Request Validation TSV
 
 Status: implemented in this branch.
