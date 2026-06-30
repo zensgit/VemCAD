@@ -172,6 +172,33 @@ def _format_case_action_counts(counts: dict[str, int]) -> str:
     return ", ".join(f"{key}={value}" for key, value in sorted(counts.items())) or "none"
 
 
+def _tsv(value: Any) -> str:
+    return str(value or "").replace("\t", " ").replace("\r", " ").replace("\n", " ")
+
+
+def _write_case_actions_tsv(path: Path, case_actions: list[dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        handle.write(
+            "id\tdrawing_id\tcode\tdomain\tsource\ttriage_bucket\t"
+            "viewspace_status\tx3_band\tissue_count\trecommended_output_name\tartifact\n"
+        )
+        for action in case_actions:
+            handle.write(
+                f"{_tsv(action.get('id'))}\t"
+                f"{_tsv(action.get('drawing_id'))}\t"
+                f"{_tsv(action.get('code'))}\t"
+                f"{_tsv(action.get('domain'))}\t"
+                f"{_tsv(action.get('source'))}\t"
+                f"{_tsv(action.get('triage_bucket'))}\t"
+                f"{_tsv(action.get('viewspace_status'))}\t"
+                f"{_tsv(action.get('x3_band'))}\t"
+                f"{_tsv(action.get('issue_count'))}\t"
+                f"{_tsv(action.get('recommended_output_name'))}\t"
+                f"{_tsv(action.get('artifact'))}\n"
+            )
+
+
 def _put_case_action(
     actions: dict[str, dict[str, Any]],
     case_id: str,
@@ -339,6 +366,7 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         ("missing references", "missing_references_markdown"),
         ("compare summary", "compare_summary_markdown"),
         ("compare artifact index", "compare_artifact_index"),
+        ("case actions tsv", "case_actions_tsv"),
         ("route summary json", "route_summary_json"),
         ("route summary markdown", "route_summary_markdown"),
     ):
@@ -410,6 +438,7 @@ def _write_run_summary(
         "compare_artifact_index": _existing(compare_dir / "artifact_index.json"),
         "route_summary_json": str(out_dir / "route_summary.json"),
         "route_summary_markdown": str(out_dir / "route_summary.md"),
+        "case_actions_tsv": str(out_dir / "case_actions.tsv"),
         "boundary": {
             "renders_dxf": False,
             "requires_viewspace_match": True,
@@ -420,11 +449,13 @@ def _write_run_summary(
     payload["case_actions"] = _case_actions(payload)
     payload["case_action_counts"] = _case_action_counts(payload["case_actions"])
     payload["case_action_domain_counts"] = _case_action_domain_counts(payload["case_actions"])
+    _write_case_actions_tsv(Path(payload["case_actions_tsv"]), payload["case_actions"])
     _write_json(out_dir / "run_summary.json", payload)
     _write_markdown(out_dir / "run_summary.md", payload)
     artifacts = [
         {"kind": "run_summary_json", "path": str(out_dir / "run_summary.json")},
         {"kind": "run_summary_markdown", "path": str(out_dir / "run_summary.md")},
+        {"kind": "case_actions_tsv", "path": str(out_dir / "case_actions.tsv")},
         {"kind": "route_summary_json", "path": str(out_dir / "route_summary.json")},
         {"kind": "route_summary_markdown", "path": str(out_dir / "route_summary.md")},
     ]

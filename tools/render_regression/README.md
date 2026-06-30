@@ -159,7 +159,9 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> --recursive --t
 `artifact_index.json`. These carry both `case_action_counts` and
 `case_action_domain_counts`, plus `recommended_next_action.domain`, so the run
 summary itself distinguishes input/recapture gates from renderer-candidate
-work before a separate route report is generated.
+work before a separate route report is generated. It also writes
+`case_actions.tsv` for spreadsheet-friendly per-case sorting/filtering by
+action code, domain, source, triage bucket, view-space status, and X3 band.
 The batch, compare, and request-run CLIs also print the recommended action
 domain next to the action code, so CI logs can show the route class without
 opening JSON artifacts.
