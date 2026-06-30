@@ -159,9 +159,11 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
     row = validation["cases"][0]
     assert row["source_dxf_provenance"]["sha256"] == _sha256(source)
     assert row["candidate_png_provenance"]["sha256"] == _sha256(ours)
+    assert row["requested_expected_size"] == "1600x1131"
     validation_md = (out / "reference_request_validation.md").read_text(encoding="utf-8")
     assert "AutoCAD Reference Request Validation" in validation_md
     assert "G11_autocad_model_extents.png" in validation_md
+    assert "`1600x1131`" in validation_md
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["stage"] == "request_validation"
     assert artifact_index["status"] == "pass"
@@ -241,6 +243,9 @@ def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(t
         "source_dxf_missing",
         "candidate_missing",
     } <= issue_codes
+    assert validation["cases"][0]["requested_expected_size"] == "0xbad"
+    validation_md = (out / "reference_request_validation.md").read_text(encoding="utf-8")
+    assert "`0xbad`" in validation_md
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["stage"] == "request_validation"
     assert artifact_index["status"] == "blocked"

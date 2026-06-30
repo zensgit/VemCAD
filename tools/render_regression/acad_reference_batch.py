@@ -689,10 +689,8 @@ def _write_reference_request_validation_report(
                         candidate_provenance["size_bytes"],
                     ))
 
-        row_issues.extend(_expected_size_issues(
-            case_id,
-            request.get("requested_expected_size") or request.get("expected_size"),
-        ))
+        expected_size = request.get("requested_expected_size") or request.get("expected_size")
+        row_issues.extend(_expected_size_issues(case_id, expected_size))
         row_issues.extend(_capture_contract_issues(
             case_id,
             request.get("requested_capture_method"),
@@ -707,6 +705,7 @@ def _write_reference_request_validation_report(
             "candidate_png": str(candidate_path) if candidate_path else "",
             "requested_capture_method": _str(request.get("requested_capture_method") or "plot-export").lower(),
             "requested_view_contract": _str(request.get("requested_view_contract") or "model-extents").lower(),
+            "requested_expected_size": _expected_size_text(expected_size),
             "source_dxf_provenance": source_provenance,
             "candidate_png_provenance": candidate_provenance,
             "issues": row_issues,
@@ -748,15 +747,17 @@ def _write_reference_request_validation_report(
         "This validates request-package identity and provenance before AutoCAD PNG fulfilment. "
         "It does not compare renders and does not claim AutoCAD equivalence.",
         "",
-        "| Case | Drawing | Output PNG | Capture | View | Source | Candidate | Issues |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Case | Drawing | Output PNG | Capture | View | Expected size | Source | Candidate | Issues |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in rows:
         issue_text = ", ".join(f"{item['severity']}:{item['code']}" for item in row["issues"]) or "-"
         lines.append(
             f"| `{row['id']}` | {_str(row.get('drawing_id'))} | "
             f"`{row['recommended_output_name']}` | `{row.get('requested_capture_method') or '-'}` | "
-            f"`{row.get('requested_view_contract') or '-'}` | `{row.get('source_dxf') or '-'}` | "
+            f"`{row.get('requested_view_contract') or '-'}` | "
+            f"`{row.get('requested_expected_size') or '-'}` | "
+            f"`{row.get('source_dxf') or '-'}` | "
             f"`{row.get('candidate_png') or '-'}` | {issue_text} |"
         )
     if global_issues:
