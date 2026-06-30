@@ -232,6 +232,39 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
     assert "recommended next action domain: continue" in stdout
 
 
+def test_batch_generator_escapes_reference_request_validation_markdown_table_cells(tmp_path):
+    source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
+    _png(tmp_path / "ours" / "G11|ours.png", (760, 570))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11|bearing\ncap",
+            "source_dxf": "dxf/G11.dxf",
+            "source_dxf_sha256": _sha256(source),
+            "recommended_output_name": "G11|acad_model_extents.png",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11|ours.png"}]), encoding="utf-8")
+
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--validate-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--out-dir", str(out),
+    ]) == 0
+
+    validation_md = (out / "reference_request_validation.md").read_text(encoding="utf-8")
+    row = next(line for line in validation_md.splitlines() if line.startswith("| `G11` |"))
+    assert "G11\\|bearing cap" in row
+    assert "`G11\\|acad_model_extents.png`" in row
+    assert "G11\\|ours.png" in row
+    assert _unescaped_pipe_count(row) == 10
+
+
 def test_batch_generator_can_require_reference_request_boundary(tmp_path):
     source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
     ours = Path(_png(tmp_path / "ours" / "G11.png", (760, 570)))
