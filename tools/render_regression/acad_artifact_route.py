@@ -239,6 +239,7 @@ def _route_compare(payload: dict[str, Any]) -> dict[str, Any]:
         action = _action(
             "recapture-autocad-or-provide-window",
             "Recapture AutoCAD at matched model extents or provide the real world window; do not tune the renderer.",
+            artifact=_artifact_path(payload, "reference_request_markdown"),
         )
     elif status == "pass":
         action = _action(

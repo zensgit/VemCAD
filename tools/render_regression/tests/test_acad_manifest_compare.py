@@ -330,7 +330,12 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     route_summary = json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
     route_summary_md = (out / "route_summary.md").read_text(encoding="utf-8")
     assert route_summary["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
+    assert route_summary["recommended_next_action"]["artifact"] == str(out / "reference_request.md")
+    assert route_summary["action_artifact_resolved"] == str((out / "reference_request.md").resolve())
+    assert route_summary["action_artifact_exists"] is True
     assert "recapture-autocad-or-provide-window" in route_summary_md
+    assert f"- action_artifact: `{out / 'reference_request.md'}`" in route_summary_md
+    assert "- action_artifact_exists: `True`" in route_summary_md
     assert "route summary" in stdout
     assert "recommended next action: recapture-autocad-or-provide-window" in stdout
     assert "recommended next action domain: input" in stdout
