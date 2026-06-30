@@ -155,6 +155,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert summary["source_request_boundary"] == REQUEST_BOUNDARY
     assert summary["reference_request_validation_status"] == "pass"
     assert summary["reference_request_validation_error_count"] == 0
+    assert summary["reference_request_validation_warning_count"] == 0
     assert summary["reference_request_validation_markdown"].endswith("reference_request_validation.md")
     assert summary["reference_intake_status"] == "pass"
     assert summary["reference_intake_warning_count"] == 0
@@ -197,11 +198,13 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert artifact_index["source_request_boundary"] == REQUEST_BOUNDARY
     assert "recommended next action: review-x3-pass" in stdout
     assert "recommended next action domain: pass-review" in stdout
+    assert "reference request validation issue codes: none" in stdout
     assert "case action domain counts: pass-review=1" in stdout
     assert compare_summary["status"] == "pass"
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
     assert "recommended_next_action: `review-x3-pass`" in summary_md
     assert "recommended_next_action_domain: `pass-review`" in summary_md
+    assert "reference_request_validation_warnings: `0`" in summary_md
     assert "case_action_domain_counts: `pass-review=1`" in summary_md
     assert "source_request_boundary: `autocad_equivalence_claim=False" in summary_md
     assert "requires_returned_autocad_png=True" in summary_md
@@ -575,7 +578,7 @@ def test_reference_request_run_clears_stale_compare_artifacts_on_input_blocked_r
     assert "review-x3-pass" not in case_actions_tsv
 
 
-def test_reference_request_run_surfaces_request_validation_block(tmp_path):
+def test_reference_request_run_surfaces_request_validation_block(tmp_path, capsys):
     _dxf(tmp_path / "dxf" / "B11.dxf")
     _png(tmp_path / "ours" / "G11.png", box=[20, 15, 740, 555])
     _png(
@@ -597,6 +600,7 @@ def test_reference_request_run_surfaces_request_validation_block(tmp_path):
         "--case-id", "G11",
         "--out-dir", str(out),
     ]) == 2
+    stdout = capsys.readouterr().out
 
     summary = json.loads((out / "run_summary.json").read_text(encoding="utf-8"))
     assert summary["status"] == "input_blocked"
@@ -606,6 +610,7 @@ def test_reference_request_run_surfaces_request_validation_block(tmp_path):
     assert summary["reference_request_validation_error_count"] == 1
     assert summary["reference_request_validation_issue_code_counts"] == {"source_dxf_sha256_mismatch": 1}
     assert summary["reference_request_validation_markdown"].endswith("reference_request_validation.md")
+    assert "reference request validation issue codes: source_dxf_sha256_mismatch=1" in stdout
     assert summary["recommended_next_action"]["code"] == "fix-request-package"
     assert summary["recommended_next_action"]["domain"] == "input"
     assert summary["recommended_next_action"]["artifact"].endswith("reference_request_validation.md")

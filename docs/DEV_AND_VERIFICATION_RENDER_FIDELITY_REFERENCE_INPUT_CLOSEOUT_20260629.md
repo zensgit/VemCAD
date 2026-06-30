@@ -3616,3 +3616,46 @@ Verification:
 python3 -m pytest tools/render_regression/tests -q
 # 169 passed
 ```
+
+## Follow-Up Request-Run Validation Warning Visibility
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep `acad_reference_request_run.py`'s Markdown and CLI output aligned with
+  its JSON payload.
+- Surface request-validation warnings and issue-code counts in the operator
+  path before returned-reference intake or compare output can distract from a
+  bad request package.
+
+Changes:
+
+- `run_summary.md` now prints
+  `reference_request_validation_warnings` beside validation errors and
+  validation issue-code counts.
+- The request-run CLI stdout now prints
+  `reference request validation issue codes` on both input-blocked and compare
+  paths.
+- Regression coverage proves:
+  - pass runs show `reference_request_validation_warnings: 0`;
+  - blocked request-validation runs print the concrete
+    `source_dxf_sha256_mismatch=1` issue code in stdout.
+
+Boundary:
+
+- Operator visibility only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
