@@ -283,9 +283,21 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     case_actions_tsv = (out / "case_actions.tsv").read_text(encoding="utf-8").splitlines()
     assert case_actions_tsv[0] == (
         "id\tdrawing_id\tcode\tdomain\tsource\ttriage_bucket\t"
-        "viewspace_status\tx3_band\tissue_count\trecommended_output_name\tartifact"
+        "viewspace_status\tx3_band\tissue_count\trecommended_output_name\t"
+        "artifact\tartifact_resolved\tartifact_exists"
     )
-    assert "G11\tG11/B11\treview-x3-pass\tpass-review\tcompare\tmatched-pass\tmatch\tpass\t\t\t" in case_actions_tsv[1]
+    row = case_actions_tsv[1].split("\t")
+    assert row[:8] == [
+        "G11", "G11/B11", "review-x3-pass", "pass-review", "compare",
+        "matched-pass", "match", "pass",
+    ]
+    assert row[8:] == [
+        "",
+        "",
+        str(out / "compare" / "summary.md"),
+        str((out / "compare" / "summary.md").resolve()),
+        "True",
+    ]
     assert "route summary markdown" in summary_md
     artifact_kinds = _run_artifact_kinds(out)
     assert artifact_kinds >= {
@@ -478,10 +490,18 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert summary["case_actions"][0]["source"] == "compare"
     assert summary["case_actions"][0]["triage_bucket"] == "recapture-required"
     assert summary["case_actions"][0]["artifact"].endswith("compare/reference_request.md")
+    assert summary["case_actions"][0]["artifact_resolved"] == str(
+        (out / "compare" / "reference_request.md").resolve()
+    )
+    assert summary["case_actions"][0]["artifact_exists"] is True
     assert summary["case_actions"][1]["code"] == "review-x3-pass"
     assert summary["case_actions"][1]["domain"] == "pass-review"
     assert summary["case_actions"][1]["triage_bucket"] == "matched-pass"
     assert summary["case_actions"][1]["artifact"].endswith("compare/summary.md")
+    assert summary["case_actions"][1]["artifact_resolved"] == str(
+        (out / "compare" / "summary.md").resolve()
+    )
+    assert summary["case_actions"][1]["artifact_exists"] is True
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
     assert f"recommended next action artifact: `{out / 'compare' / 'reference_request.md'}`" in summary_md
     assert (
@@ -504,21 +524,29 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert "## Case Actions" in summary_md
     assert (
         f"| `G12` | G12/B12 | `recapture-autocad-or-provide-window` | "
-        f"`input` | `compare` | `recapture-required` | `{out / 'compare' / 'reference_request.md'}` |"
+        f"`input` | `compare` | `recapture-required` | "
+        f"`{(out / 'compare' / 'reference_request.md').resolve()}` |"
     ) in summary_md
     assert (
         f"| `G11` | G11/B11 | `review-x3-pass` | "
-        f"`pass-review` | `compare` | `matched-pass` | `{out / 'compare' / 'summary.md'}` |"
+        f"`pass-review` | `compare` | `matched-pass` | "
+        f"`{(out / 'compare' / 'summary.md').resolve()}` |"
     ) in summary_md
     case_actions_tsv = (out / "case_actions.tsv").read_text(encoding="utf-8").splitlines()
     assert case_actions_tsv[1].startswith(
         "G12\tG12/B12\trecapture-autocad-or-provide-window\tinput\tcompare\trecapture-required\tmismatch\tpass\t"
     )
-    assert case_actions_tsv[1].endswith(f"\t{out / 'compare' / 'reference_request.md'}")
+    assert case_actions_tsv[1].endswith(
+        f"\t{out / 'compare' / 'reference_request.md'}"
+        f"\t{(out / 'compare' / 'reference_request.md').resolve()}\tTrue"
+    )
     assert case_actions_tsv[2].startswith(
         "G11\tG11/B11\treview-x3-pass\tpass-review\tcompare\tmatched-pass\tmatch\tpass\t"
     )
-    assert case_actions_tsv[2].endswith(f"\t{out / 'compare' / 'summary.md'}")
+    assert case_actions_tsv[2].endswith(
+        f"\t{out / 'compare' / 'summary.md'}"
+        f"\t{(out / 'compare' / 'summary.md').resolve()}\tTrue"
+    )
     route_summary = json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
     assert route_summary["recommended_action_counts"] == {
         "continue-to-request-run": 1,
@@ -735,6 +763,7 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
     assert route_summary["recommended_action_domain_counts"] == {"input": 2}
     case_actions_tsv = (out / "case_actions.tsv").read_text(encoding="utf-8")
     assert "G11\tG11/B11\tprovide-returned-autocad-pngs\tinput\tmissing_references" in case_actions_tsv
+    assert f"{(out / 'input' / 'missing_references.md').resolve()}\tTrue" in case_actions_tsv
 
 
 def test_reference_request_run_clears_stale_compare_artifacts_on_input_blocked_rerun(tmp_path):
