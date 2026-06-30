@@ -142,6 +142,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert summary["compare_summary_markdown"].endswith("summary.md")
     assert summary["route_summary_json"].endswith("route_summary.json")
     assert summary["route_summary_markdown"].endswith("route_summary.md")
+    assert summary["case_actions_tsv"].endswith("case_actions.tsv")
     assert summary["recommended_next_action"]["code"] == "review-x3-pass"
     assert summary["recommended_next_action"]["domain"] == "pass-review"
     assert summary["recommended_next_action"]["artifact"].endswith("summary.md")
@@ -166,10 +167,18 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert "recommended_next_action: `review-x3-pass`" in summary_md
     assert "recommended_next_action_domain: `pass-review`" in summary_md
     assert "case_action_domain_counts: `pass-review=1`" in summary_md
+    assert "case actions tsv" in summary_md
+    case_actions_tsv = (out / "case_actions.tsv").read_text(encoding="utf-8").splitlines()
+    assert case_actions_tsv[0] == (
+        "id\tdrawing_id\tcode\tdomain\tsource\ttriage_bucket\t"
+        "viewspace_status\tx3_band\tissue_count\trecommended_output_name\tartifact"
+    )
+    assert "G11\tG11/B11\treview-x3-pass\tpass-review\tcompare\tmatched-pass\tmatch\tpass\t\t\t" in case_actions_tsv[1]
     assert "route summary markdown" in summary_md
     assert _run_artifact_kinds(out) >= {
         "run_summary_json",
         "run_summary_markdown",
+        "case_actions_tsv",
         "route_summary_json",
         "route_summary_markdown",
         "input_artifact_index",
@@ -244,6 +253,13 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert "## Case Actions" in summary_md
     assert "| `G12` | G12/B12 | `recapture-autocad-or-provide-window`" in summary_md
     assert "| `G11` | G11/B11 | `review-x3-pass`" in summary_md
+    case_actions_tsv = (out / "case_actions.tsv").read_text(encoding="utf-8").splitlines()
+    assert case_actions_tsv[1].startswith(
+        "G12\tG12/B12\trecapture-autocad-or-provide-window\tinput\tcompare\trecapture-required\tmismatch\tpass\t"
+    )
+    assert case_actions_tsv[2].startswith(
+        "G11\tG11/B11\treview-x3-pass\tpass-review\tcompare\tmatched-pass\tmatch\tpass\t"
+    )
     route_summary = json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
     assert route_summary["recommended_action_counts"] == {
         "continue-to-request-run": 1,
@@ -373,6 +389,7 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
     assert _run_artifact_kinds(out) >= {
         "run_summary_json",
         "run_summary_markdown",
+        "case_actions_tsv",
         "route_summary_json",
         "route_summary_markdown",
         "input_artifact_index",
@@ -387,6 +404,8 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
         "provide-returned-autocad-pngs": 2,
     }
     assert route_summary["recommended_action_domain_counts"] == {"input": 2}
+    case_actions_tsv = (out / "case_actions.tsv").read_text(encoding="utf-8")
+    assert "G11\tG11/B11\tprovide-returned-autocad-pngs\tinput\tmissing_references" in case_actions_tsv
 
 
 def test_reference_request_run_surfaces_request_validation_block(tmp_path):

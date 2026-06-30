@@ -1821,6 +1821,43 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Request-Run Case Actions TSV
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Add a spreadsheet-friendly per-case action artifact to request-run outputs.
+- Let operators sort/filter cases by action code, action domain, source,
+  triage bucket, view-space status, and X3 band without scraping Markdown or
+  manually reshaping JSON.
+
+Changes:
+
+- `acad_reference_request_run.py` now writes `case_actions.tsv` beside
+  `run_summary.json/md`.
+- `run_summary.json` includes `case_actions_tsv`.
+- The run-level `artifact_index.json` includes a `case_actions_tsv` artifact.
+- `run_summary.md` links the TSV in the artifact list.
+
+Boundary:
+
+- Reporting artifact only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up CLI Action Domain Logs
 
 Status: implemented in this branch.
