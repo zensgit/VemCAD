@@ -77,6 +77,9 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path):
     assert summary["batch_exit_code"] == 0
     assert summary["compare_exit_code"] == 0
     assert summary["boundary"]["autocad_equivalence_claim"] is False
+    assert summary["reference_request_validation_status"] == "pass"
+    assert summary["reference_request_validation_error_count"] == 0
+    assert summary["reference_request_validation_markdown"].endswith("reference_request_validation.md")
     assert summary["reference_intake_status"] == "pass"
     assert summary["reference_intake_warning_count"] == 0
     assert summary["reference_intake_markdown"].endswith("reference_intake.md")
@@ -104,6 +107,7 @@ def test_reference_request_run_preserves_viewspace_mismatch_exit(tmp_path):
     summary = json.loads((out / "run_summary.json").read_text(encoding="utf-8"))
     compare_summary = json.loads((out / "compare" / "summary.json").read_text(encoding="utf-8"))
     assert summary["status"] == "viewspace_mismatch"
+    assert summary["reference_request_validation_status"] == "pass"
     assert summary["batch_exit_code"] == 0
     assert summary["compare_exit_code"] == 2
     assert compare_summary["status"] == "viewspace_mismatch"
@@ -132,6 +136,7 @@ def test_reference_request_run_surfaces_intake_review_warnings(tmp_path):
 
     summary = json.loads((out / "run_summary.json").read_text(encoding="utf-8"))
     assert summary["status"] == "viewspace_mismatch"
+    assert summary["reference_request_validation_status"] == "pass"
     assert summary["reference_intake_status"] == "review"
     assert summary["reference_intake_warning_count"] == 2
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
@@ -158,8 +163,43 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path):
     assert summary["status"] == "input_blocked"
     assert summary["batch_exit_code"] == 2
     assert summary["compare_exit_code"] is None
+    assert summary["reference_request_validation_status"] == "pass"
     assert summary["missing_references_markdown"].endswith("missing_references.md")
     assert summary["reference_intake_status"] == ""
     assert summary["reference_intake_warning_count"] is None
     assert summary["compare_summary_markdown"] == ""
+    assert not (out / "compare" / "summary.json").exists()
+
+
+def test_reference_request_run_surfaces_request_validation_block(tmp_path):
+    _dxf(tmp_path / "dxf" / "B11.dxf")
+    _png(tmp_path / "ours" / "G11.png", box=[20, 15, 740, 555])
+    _png(
+        tmp_path / "returned" / "G11_autocad_model_extents.png",
+        size=(1600, 1131),
+        box=[40, 30, 1560, 1100],
+    )
+    request = _request(tmp_path / "reference_request.json")
+    payload = json.loads(request.read_text(encoding="utf-8"))
+    payload["cases"][0]["source_dxf_sha256"] = "0" * 64
+    request.write_text(json.dumps(payload), encoding="utf-8")
+    candidates = _candidates(tmp_path / "candidate_cases.json")
+    out = tmp_path / "run"
+
+    assert runner.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--case-id", "G11",
+        "--out-dir", str(out),
+    ]) == 2
+
+    summary = json.loads((out / "run_summary.json").read_text(encoding="utf-8"))
+    assert summary["status"] == "input_blocked"
+    assert summary["batch_exit_code"] == 2
+    assert summary["compare_exit_code"] is None
+    assert summary["reference_request_validation_status"] == "blocked"
+    assert summary["reference_request_validation_error_count"] == 1
+    assert summary["reference_request_validation_markdown"].endswith("reference_request_validation.md")
+    assert summary["reference_intake_status"] == ""
     assert not (out / "compare" / "summary.json").exists()

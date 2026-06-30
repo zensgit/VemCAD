@@ -140,9 +140,11 @@ python3 tools/render_regression/acad_reference_batch.py \
 
 The helper resolves the original candidate artifacts, opens every returned PNG
 to record `expected_size`, and fails closed if any requested PNG is missing or
-unreadable. It also writes a returned-reference preflight beside the generated
-inputs:
+unreadable. It first writes and enforces a request-package validation report,
+then writes a returned-reference preflight beside the generated inputs:
 
+- `$NEXT_DIR/input/reference_request_validation.json`
+- `$NEXT_DIR/input/reference_request_validation.md`
 - `$NEXT_DIR/input/reference_intake.json`
 - `$NEXT_DIR/input/reference_intake.md`
 - `$NEXT_DIR/input/artifact_index.json`
@@ -206,6 +208,11 @@ The wrapper writes:
 It returns the comparison exit code, so `viewspace_mismatch` still exits `2`.
 The wrapper is only an orchestration convenience; it does not render DXFs and
 does not replace the X3 gate.
+
+The wrapper summary also surfaces
+`reference_request_validation_status/error_count/warning_count`, so a blocked
+request package is visible from the run root without opening the input
+directory first.
 
 Generated requests may include source-DXF and candidate-PNG provenance
 (`sha256` + byte size). When present, `acad_reference_batch.py --from-request`
