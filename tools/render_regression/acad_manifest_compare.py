@@ -622,14 +622,15 @@ def _write_reference_request(
         "",
         "These cases failed the view-space contract. They need fresh AutoCAD model-extents exports before X3 can be interpreted as render fidelity.",
         "",
-        "| Rank | Case | Drawing | Requested PNG | Source DXF |",
-        "| ---: | --- | --- | --- | --- |",
+        "| Rank | Case | Drawing | Requested PNG | Source DXF | Source SHA256 | Candidate SHA256 |",
+        "| ---: | --- | --- | --- | --- | --- | --- |",
     ]
     for case in cases:
         lines.append(
             f"| {_md_table_cell(case['triage_rank'])} | {_md_code_cell(case['id'])} | "
             f"{_md_table_cell(case['drawing_id'])} | "
-            f"{_md_code_cell(case['recommended_output_name'])} | {_md_code_cell(case['source_dxf'])} |"
+            f"{_md_code_cell(case['recommended_output_name'])} | {_md_code_cell(case['source_dxf'])} | "
+            f"{_md_code_cell(case.get('source_dxf_sha256'))} | {_md_code_cell(case.get('candidate_png_sha256'))} |"
         )
     lines.extend([
         "",

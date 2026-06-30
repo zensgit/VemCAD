@@ -219,6 +219,9 @@ handoff safe for unusual drawing IDs or output paths.
 The manifest-compare summary and generated recapture request tables use the
 same safe Markdown table/code-cell formatting for case IDs, drawing IDs, and
 requested output names.
+Generated recapture request Markdown also surfaces the source DXF and candidate
+PNG SHA256 values already stored in `reference_request.json`, so handoffs can
+verify identity without opening the JSON first.
 Route Markdown reports also use safe code spans for action artifacts and count
 summaries, so unusual artifact paths remain readable in the top-level route
 handoff.
