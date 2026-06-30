@@ -1,3 +1,4 @@
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -30,6 +31,17 @@ def _run_artifact_index(out: Path) -> dict:
 def _run_artifact_kinds(out: Path) -> set[str]:
     payload = _run_artifact_index(out)
     return {item["kind"] for item in payload["artifacts"]}
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _tsv_record(header: str, row: str) -> dict[str, str]:
+    keys = header.split("\t")
+    values = row.split("\t")
+    assert len(keys) == len(values)
+    return dict(zip(keys, values))
 
 
 def _unescaped_pipe_count(line: str) -> int:
@@ -363,21 +375,27 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert case_actions_tsv[0] == (
         "id\tdrawing_id\tcode\tdomain\tsource\ttriage_bucket\t"
         "viewspace_status\tx3_band\tissue_count\tissue_codes\trecommended_output_name\t"
+        "source_dxf_sha256\tsource_dxf_size_bytes\tcandidate_png_sha256\t"
+        "candidate_png_size_bytes\treturned_png_sha256\treturned_png_size_bytes\t"
+        "returned_png_size\tidentity_advisory\tevidence\t"
         "artifact\tartifact_resolved\tartifact_exists"
     )
-    row = case_actions_tsv[1].split("\t")
-    assert row[:8] == [
+    row = _tsv_record(case_actions_tsv[0], case_actions_tsv[1])
+    assert [row[key] for key in (
+        "id", "drawing_id", "code", "domain", "source",
+        "triage_bucket", "viewspace_status", "x3_band",
+    )] == [
         "G11", "G11/B11", "review-x3-pass", "pass-review", "compare",
         "matched-pass", "match", "pass",
     ]
-    assert row[8:] == [
-        "",
-        "",
-        "",
-        str(out / "compare" / "summary.md"),
-        str((out / "compare" / "summary.md").resolve()),
-        "True",
-    ]
+    assert row["source_dxf_sha256"] == _sha256(tmp_path / "dxf" / "B11.dxf")
+    assert row["candidate_png_sha256"] == _sha256(tmp_path / "ours" / "G11.png")
+    assert row["returned_png_sha256"] == _sha256(tmp_path / "returned" / "G11_autocad_model_extents.png")
+    assert row["returned_png_size"] == "1600x1131"
+    assert "identity=status=available returned=available candidate=available" in row["evidence"]
+    assert row["artifact"] == str(out / "compare" / "summary.md")
+    assert row["artifact_resolved"] == str((out / "compare" / "summary.md").resolve())
+    assert row["artifact_exists"] == "True"
     assert "route summary markdown" in summary_md
     artifact_kinds = _run_artifact_kinds(out)
     assert artifact_kinds >= {
@@ -460,7 +478,7 @@ def test_reference_request_run_escapes_markdown_case_action_cells(tmp_path):
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
     row = next(line for line in summary_md.splitlines() if line.startswith("| `G11` |"))
     assert "G11\\|bearing cap" in row
-    assert _unescaped_pipe_count(row) == 9
+    assert _unescaped_pipe_count(row) == 10
     assert "run\\|markdown" in summary_md
 
 
@@ -580,6 +598,13 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
         (out / "compare" / "reference_request.md").resolve()
     )
     assert summary["case_actions"][0]["artifact_exists"] is True
+    assert summary["case_actions"][0]["source_dxf_sha256"] == _sha256(tmp_path / "dxf" / "B12.dxf")
+    assert summary["case_actions"][0]["candidate_png_sha256"] == _sha256(tmp_path / "ours" / "G12.png")
+    assert summary["case_actions"][0]["returned_png_sha256"] == _sha256(
+        tmp_path / "returned" / "G12_autocad_model_extents.png"
+    )
+    assert summary["case_actions"][0]["returned_png_size"] == "1600x1200"
+    assert summary["case_actions"][0]["identity_advisory"].startswith("status=available")
     assert summary["case_actions"][1]["code"] == "review-x3-pass"
     assert summary["case_actions"][1]["domain"] == "pass-review"
     assert summary["case_actions"][1]["triage_bucket"] == "matched-pass"
@@ -609,22 +634,28 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert "route_viewspace_status_counts: `match=1, mismatch=1`" in summary_md
     assert "route_x3_band_counts: `pass=2`" in summary_md
     assert "## Case Actions" in summary_md
-    assert (
-        f"| `G12` | G12/B12 | `recapture-autocad-or-provide-window` | "
-        f"`input` | `compare` | `recapture-required` | "
-        f"`-` | "
-        f"`{(out / 'compare' / 'reference_request.md').resolve()}` |"
-    ) in summary_md
-    assert (
-        f"| `G11` | G11/B11 | `review-x3-pass` | "
-        f"`pass-review` | `compare` | `matched-pass` | "
-        f"`-` | "
-        f"`{(out / 'compare' / 'summary.md').resolve()}` |"
-    ) in summary_md
+    g12_md_row = next(line for line in summary_md.splitlines() if line.startswith("| `G12` |"))
+    assert "`recapture-autocad-or-provide-window`" in g12_md_row
+    assert "`recapture-required`" in g12_md_row
+    assert "`source=" in g12_md_row
+    assert "candidate=" in g12_md_row
+    assert "returned=" in g12_md_row
+    assert "identity=status=available" in g12_md_row
+    assert f"`{(out / 'compare' / 'reference_request.md').resolve()}`" in g12_md_row
+    g11_md_row = next(line for line in summary_md.splitlines() if line.startswith("| `G11` |"))
+    assert "`review-x3-pass`" in g11_md_row
+    assert "`matched-pass`" in g11_md_row
+    assert f"`{(out / 'compare' / 'summary.md').resolve()}`" in g11_md_row
     case_actions_tsv = (out / "case_actions.tsv").read_text(encoding="utf-8").splitlines()
     assert case_actions_tsv[1].startswith(
         "G12\tG12/B12\trecapture-autocad-or-provide-window\tinput\tcompare\trecapture-required\tmismatch\tpass\t"
     )
+    g12_tsv = _tsv_record(case_actions_tsv[0], case_actions_tsv[1])
+    assert g12_tsv["source_dxf_sha256"] == _sha256(tmp_path / "dxf" / "B12.dxf")
+    assert g12_tsv["candidate_png_sha256"] == _sha256(tmp_path / "ours" / "G12.png")
+    assert g12_tsv["returned_png_sha256"] == _sha256(tmp_path / "returned" / "G12_autocad_model_extents.png")
+    assert g12_tsv["returned_png_size"] == "1600x1200"
+    assert "identity=status=available" in g12_tsv["evidence"]
     assert case_actions_tsv[1].endswith(
         f"\t{out / 'compare' / 'reference_request.md'}"
         f"\t{(out / 'compare' / 'reference_request.md').resolve()}\tTrue"
@@ -632,6 +663,11 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert case_actions_tsv[2].startswith(
         "G11\tG11/B11\treview-x3-pass\tpass-review\tcompare\tmatched-pass\tmatch\tpass\t"
     )
+    g11_tsv = _tsv_record(case_actions_tsv[0], case_actions_tsv[2])
+    assert g11_tsv["source_dxf_sha256"] == _sha256(tmp_path / "dxf" / "B11.dxf")
+    assert g11_tsv["candidate_png_sha256"] == _sha256(tmp_path / "ours" / "G11.png")
+    assert g11_tsv["returned_png_sha256"] == _sha256(tmp_path / "returned" / "G11_autocad_model_extents.png")
+    assert g11_tsv["returned_png_size"] == "1600x1131"
     assert case_actions_tsv[2].endswith(
         f"\t{out / 'compare' / 'summary.md'}"
         f"\t{(out / 'compare' / 'summary.md').resolve()}\tTrue"
@@ -846,6 +882,11 @@ def test_reference_request_run_routes_intake_blocked_to_fix_returned_input(tmp_p
     assert summary["case_actions"][0]["issue_codes"] == (
         "error:returned_png_size_mismatch, warning:long_edge_below_requested"
     )
+    assert summary["case_actions"][0]["returned_png_sha256"] == _sha256(
+        tmp_path / "returned" / "G11_autocad_model_extents.png"
+    )
+    assert summary["case_actions"][0]["returned_png_size"] == "1200x900"
+    assert "returned_size=1200x900" in summary["case_actions"][0]["evidence"]
     assert artifact_index["recommended_next_action"] == summary["recommended_next_action"]
     assert artifact_index["case_actions"] == summary["case_actions"]
     assert "reference_intake_tsv" in {item["kind"] for item in artifact_index["artifacts"]}
