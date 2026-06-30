@@ -234,6 +234,9 @@ when that request exists.
 The batch, compare, and request-run CLIs also print the recommended action
 domain next to the action code, so CI logs can show the route class without
 opening JSON artifacts.
+When a recommended action has a handoff artifact, those CLIs also print the
+artifact path; route-backed CLIs additionally print the resolved path and
+whether it exists.
 `acad_manifest_compare.py` also writes per-case `recommended_action_domain`
 values into `summary.json`, `summary.tsv`, `summary.md`, and the compare
 artifact index counts. A `viewspace_mismatch` case therefore remains an

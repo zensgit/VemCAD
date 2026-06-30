@@ -224,6 +224,14 @@ def _action(code: str, message: str, *, artifact: str = "") -> dict[str, str]:
     }
 
 
+def _compare_reference_request_markdown(summary: dict[str, Any]) -> str:
+    compare_dir = str(summary.get("compare_dir") or "")
+    if not compare_dir:
+        return ""
+    path = Path(compare_dir) / "reference_request.md"
+    return str(path) if path.is_file() else ""
+
+
 def _recommended_next_action(summary: dict[str, Any]) -> dict[str, str]:
     validation_status = str(summary.get("reference_request_validation_status") or "")
     validation_errors = summary.get("reference_request_validation_error_count")
@@ -258,7 +266,7 @@ def _recommended_next_action(summary: dict[str, Any]) -> dict[str, str]:
         return _action(
             "recapture-autocad-or-provide-window",
             "Recapture AutoCAD at matched model extents or provide the real world window; do not tune the renderer.",
-            artifact=str(summary.get("compare_summary_markdown") or ""),
+            artifact=_compare_reference_request_markdown(summary) or str(summary.get("compare_summary_markdown") or ""),
         )
     if status == "pass":
         return _action(
@@ -696,6 +704,8 @@ def _print_run_summary(summary: dict[str, Any], out_dir: Path) -> None:
     print(f"AutoCAD reference request run: {summary['status']}")
     print(f"  recommended next action: {summary['recommended_next_action']['code']}")
     print(f"  recommended next action domain: {summary['recommended_next_action']['domain']}")
+    if summary["recommended_next_action"].get("artifact"):
+        print(f"  recommended next action artifact: {summary['recommended_next_action']['artifact']}")
     print(f"  case action counts: {_format_case_action_counts(summary['case_action_counts'])}")
     print(f"  case action domain counts: {_format_case_action_counts(summary['case_action_domain_counts'])}")
     print(

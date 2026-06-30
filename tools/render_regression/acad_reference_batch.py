@@ -1131,6 +1131,17 @@ def _print_route_summary(out_dir: Path, route_payload: dict[str, Any] | None, *,
     print(f"  route summary  : {out_dir / 'route_summary.md'}", file=target)
     print(f"  recommended next action: {action.get('code', '')}", file=target)
     print(f"  recommended next action domain: {action.get('domain', '')}", file=target)
+    if action.get("artifact"):
+        print(f"  recommended next action artifact: {action.get('artifact', '')}", file=target)
+    if route_payload.get("action_artifact_resolved"):
+        print(
+            f"  recommended next action artifact resolved: {route_payload['action_artifact_resolved']}",
+            file=target,
+        )
+        print(
+            f"  recommended next action artifact exists: {bool(route_payload.get('action_artifact_exists'))}",
+            file=target,
+        )
 
 
 def _batch_index_metadata(out_dir: Path, batch_validation: dict[str, Any] | None = None) -> dict[str, Any]:

@@ -339,6 +339,9 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert "route summary" in stdout
     assert "recommended next action: recapture-autocad-or-provide-window" in stdout
     assert "recommended next action domain: input" in stdout
+    assert f"recommended next action artifact: {out / 'reference_request.md'}" in stdout
+    assert f"recommended next action artifact resolved: {(out / 'reference_request.md').resolve()}" in stdout
+    assert "recommended next action artifact exists: True" in stdout
     request = json.loads((out / "reference_request.json").read_text(encoding="utf-8"))
     assert request["schema"] == "vemcad.acad_reference_request/v1"
     assert request["reason"] == "recapture-required"
