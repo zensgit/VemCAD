@@ -28,6 +28,16 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def _read_json(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
 def _maybe_artifact(kind: str, path: str) -> dict[str, str] | None:
     if not path or not Path(path).is_file():
         return None
@@ -115,6 +125,144 @@ def _recommended_next_action(summary: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def _case_action_counts(case_actions: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for action in case_actions:
+        code = str(action.get("code") or "")
+        if code:
+            counts[code] = counts.get(code, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _put_case_action(
+    actions: dict[str, dict[str, Any]],
+    case_id: str,
+    *,
+    drawing_id: str = "",
+    code: str,
+    message: str,
+    source: str,
+    artifact: str = "",
+    extra: dict[str, Any] | None = None,
+) -> None:
+    if not case_id or case_id in actions:
+        return
+    payload: dict[str, Any] = {
+        "id": case_id,
+        "drawing_id": drawing_id,
+        "code": code,
+        "message": message,
+        "source": source,
+        "artifact": artifact,
+    }
+    if extra:
+        payload.update(extra)
+    actions[case_id] = payload
+
+
+def _compare_case_action(row: dict[str, Any]) -> tuple[str, str]:
+    bucket = str(row.get("triage_bucket") or "")
+    if bucket == "renderer-candidate":
+        return (
+            "inspect-renderer-candidate",
+            "Matched-view X3 failed; inspect artifacts and isolate a concrete renderer defect before changing renderer code.",
+        )
+    if bucket == "recapture-required":
+        return (
+            "recapture-autocad-or-provide-window",
+            "Recapture AutoCAD at matched model extents or provide the real world window; do not tune the renderer.",
+        )
+    if bucket == "matched-pass":
+        return (
+            "review-x3-pass",
+            "Matched-view X3 passed; no renderer work unless manual review finds a concrete defect.",
+        )
+    return (
+        "inspect-compare-case",
+        "Inspect this case's compare artifacts before choosing the next action.",
+    )
+
+
+def _case_actions(summary: dict[str, Any]) -> list[dict[str, Any]]:
+    actions: dict[str, dict[str, Any]] = {}
+
+    validation = _read_json(Path(str(summary.get("reference_request_validation_json") or "")))
+    validation_artifact = str(summary.get("reference_request_validation_markdown") or "")
+    for row in validation.get("cases") or []:
+        issues = [item for item in row.get("issues") or [] if item.get("severity") in {"error", "warning"}]
+        if issues:
+            _put_case_action(
+                actions,
+                str(row.get("id") or ""),
+                drawing_id=str(row.get("drawing_id") or ""),
+                code="fix-request-package",
+                message="Fix request-package provenance or structure before exporting or returning AutoCAD PNGs.",
+                source="request_validation",
+                artifact=validation_artifact,
+                extra={"issue_count": len(issues)},
+            )
+
+    missing = _read_json(Path(str(summary.get("missing_references_json") or "")))
+    missing_artifact = str(summary.get("missing_references_markdown") or "")
+    for row in missing.get("missing") or []:
+        _put_case_action(
+            actions,
+            str(row.get("id") or ""),
+            drawing_id=str(row.get("drawing_id") or ""),
+            code="provide-returned-autocad-pngs",
+            message="Place the returned AutoCAD PNG using the requested filename, then rerun the wrapper.",
+            source="missing_references",
+            artifact=missing_artifact,
+            extra={"recommended_output_name": str(row.get("recommended_output_name") or "")},
+        )
+
+    intake = _read_json(Path(str(summary.get("reference_intake_json") or "")))
+    intake_artifact = str(summary.get("reference_intake_markdown") or "")
+    for row in intake.get("cases") or []:
+        issues = [item for item in row.get("issues") or [] if item.get("severity") in {"error", "warning"}]
+        if issues:
+            _put_case_action(
+                actions,
+                str(row.get("id") or ""),
+                drawing_id=str(row.get("drawing_id") or ""),
+                code="inspect-returned-reference-warnings",
+                message="Inspect returned-reference intake warnings before trusting visual conclusions.",
+                source="reference_intake",
+                artifact=intake_artifact,
+                extra={"issue_count": len(issues)},
+            )
+
+    compare_summary = _read_json(Path(str(summary.get("compare_summary_json") or "")))
+    compare_artifact = str(summary.get("compare_summary_markdown") or "")
+    for row in compare_summary.get("rows") or []:
+        case_id = str(row.get("id") or "")
+        code, message = _compare_case_action(row)
+        x3 = row.get("x3_summary") or {}
+        _put_case_action(
+            actions,
+            case_id,
+            drawing_id=str(row.get("drawing_id") or ""),
+            code=code,
+            message=message,
+            source="compare",
+            artifact=compare_artifact,
+            extra={
+                "triage_rank": row.get("triage_rank"),
+                "triage_bucket": str(row.get("triage_bucket") or ""),
+                "viewspace_status": str(row.get("viewspace_status") or ""),
+                "x3_band": str(x3.get("band") or ""),
+            },
+        )
+
+    return sorted(
+        actions.values(),
+        key=lambda item: (
+            item.get("triage_rank") if isinstance(item.get("triage_rank"), int) else 9999,
+            str(item.get("id") or ""),
+        ),
+    )
+
+
 def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
     next_action = summary["recommended_next_action"]
     lines = [
@@ -156,6 +304,23 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
             lines.append(f"- {label}: `{value}`")
     if next_action.get("artifact"):
         lines.append(f"- recommended next action artifact: `{next_action['artifact']}`")
+    case_actions = summary.get("case_actions") or []
+    if case_actions:
+        lines.extend([
+            "",
+            "## Case Actions",
+            "",
+            "| Case | Drawing | Action | Source | Triage | Artifact |",
+            "| --- | --- | --- | --- | --- | --- |",
+        ])
+        for action in case_actions:
+            triage = action.get("triage_bucket") or action.get("issue_count") or "-"
+            artifact = action.get("artifact") or ""
+            lines.append(
+                f"| `{action.get('id', '')}` | {action.get('drawing_id', '')} | "
+                f"`{action.get('code', '')}` | `{action.get('source', '')}` | "
+                f"`{triage}` | `{artifact}` |"
+            )
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
 
@@ -206,6 +371,8 @@ def _write_run_summary(
         },
     }
     payload["recommended_next_action"] = _recommended_next_action(payload)
+    payload["case_actions"] = _case_actions(payload)
+    payload["case_action_counts"] = _case_action_counts(payload["case_actions"])
     _write_json(out_dir / "run_summary.json", payload)
     _write_markdown(out_dir / "run_summary.md", payload)
     artifacts = [
@@ -231,6 +398,7 @@ def _write_run_summary(
         "schema": RUN_ARTIFACT_INDEX_SCHEMA,
         "status": payload["status"],
         "recommended_next_action": payload["recommended_next_action"],
+        "case_action_counts": payload["case_action_counts"],
         "count": len(artifacts),
         "artifacts": artifacts,
     })

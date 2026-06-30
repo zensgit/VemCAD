@@ -558,6 +558,58 @@ python3 tools/render_regression/acad_reference_request_run.py \
 # artifact_index.recommended_next_action.code=recapture-autocad-or-provide-window
 ```
 
+## Follow-Up Per-Case Action Summary
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make multi-drawing unattended runs reviewable without opening each per-case
+  compare row first.
+- Separate cases that need recapture, request-package repair, intake review,
+  matched-view renderer investigation, or no immediate renderer work.
+
+Changes:
+
+- `run_summary.json` now includes:
+  - `case_actions`
+  - `case_action_counts`
+- The run-level `artifact_index.json` also includes `case_action_counts`.
+- `run_summary.md` prints a "Case Actions" table when case-level actions are
+  available.
+- Case-action priority is fail-closed:
+  request validation issues > missing returned PNGs > intake warnings >
+  compare triage.
+
+Boundary:
+
+- Summary/reporting only.
+- No renderer change.
+- No AutoCAD PNG equivalence claim.
+- Does not turn `viewspace_mismatch` into renderer work.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 6 passed
+```
+
+Private compatibility smoke:
+
+```bash
+python3 tools/render_regression/acad_reference_request_run.py \
+  --from-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir /private/tmp/vemcad-provenance-compat-smoke-20260629/returned \
+  --case-id G11 \
+  --out-dir /private/tmp/vemcad-run-case-actions-smoke-20260629
+# AutoCAD reference request run: viewspace_mismatch
+# case_action_counts={'recapture-autocad-or-provide-window': 1}
+# case_actions[0].source=compare
+# case_actions[0].triage_bucket=recapture-required
+```
+
 Private compatibility smoke:
 
 ```bash

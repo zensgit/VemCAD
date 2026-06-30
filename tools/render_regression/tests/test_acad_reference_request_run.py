@@ -61,6 +61,48 @@ def _candidates(path: Path, *, case_id="G11") -> Path:
     return path
 
 
+def _batch_request(path: Path) -> Path:
+    path.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "reason": "recapture-required",
+        "cases": [
+            {
+                "id": "G11",
+                "drawing_id": "G11/B11",
+                "source_dxf": "dxf/B11.dxf",
+                "recommended_output_name": "G11_autocad_model_extents.png",
+                "requested_capture_method": "plot-export",
+                "requested_view_contract": "model-extents",
+            },
+            {
+                "id": "G12",
+                "drawing_id": "G12/B12",
+                "source_dxf": "dxf/B12.dxf",
+                "recommended_output_name": "G12_autocad_model_extents.png",
+                "requested_capture_method": "plot-export",
+                "requested_view_contract": "model-extents",
+            },
+        ],
+    }), encoding="utf-8")
+    return path
+
+
+def _batch_candidates(path: Path) -> Path:
+    path.write_text(json.dumps([
+        {
+            "id": "G11",
+            "ours": "ours/G11.png",
+            "diagnostics": {"window_source": "content_bbox"},
+        },
+        {
+            "id": "G12",
+            "ours": "ours/G12.png",
+            "diagnostics": {"window_source": "content_bbox"},
+        },
+    ]), encoding="utf-8")
+    return path
+
+
 def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     _dxf(tmp_path / "dxf" / "B11.dxf")
     _png(tmp_path / "ours" / "G11.png", size=(1600, 1131), box=[40, 30, 1560, 1100])
@@ -118,6 +160,45 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
         "compare_summary_markdown",
         "compare_artifact_index",
     }
+
+
+def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path):
+    _dxf(tmp_path / "dxf" / "B11.dxf")
+    _dxf(tmp_path / "dxf" / "B12.dxf")
+    _png(tmp_path / "ours" / "G11.png", size=(1600, 1131), box=[40, 30, 1560, 1100])
+    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", size=(1600, 1131), box=[40, 30, 1560, 1100])
+    _png(tmp_path / "ours" / "G12.png", size=(760, 570), box=[20, 15, 740, 555])
+    _png(tmp_path / "returned" / "G12_autocad_model_extents.png", size=(1600, 1200), box=[400, 300, 1200, 900])
+    request = _batch_request(tmp_path / "reference_request.json")
+    candidates = _batch_candidates(tmp_path / "candidate_cases.json")
+    out = tmp_path / "run"
+
+    assert runner.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--out-dir", str(out),
+    ]) == 2
+
+    summary = json.loads((out / "run_summary.json").read_text(encoding="utf-8"))
+    artifact_index = _run_artifact_index(out)
+    assert summary["status"] == "viewspace_mismatch"
+    assert summary["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
+    assert summary["case_action_counts"] == {
+        "recapture-autocad-or-provide-window": 1,
+        "review-x3-pass": 1,
+    }
+    assert artifact_index["case_action_counts"] == summary["case_action_counts"]
+    assert [item["id"] for item in summary["case_actions"]] == ["G12", "G11"]
+    assert summary["case_actions"][0]["code"] == "recapture-autocad-or-provide-window"
+    assert summary["case_actions"][0]["source"] == "compare"
+    assert summary["case_actions"][0]["triage_bucket"] == "recapture-required"
+    assert summary["case_actions"][1]["code"] == "review-x3-pass"
+    assert summary["case_actions"][1]["triage_bucket"] == "matched-pass"
+    summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
+    assert "## Case Actions" in summary_md
+    assert "| `G12` | G12/B12 | `recapture-autocad-or-provide-window`" in summary_md
+    assert "| `G11` | G11/B11 | `review-x3-pass`" in summary_md
 
 
 def test_reference_request_run_preserves_viewspace_mismatch_exit(tmp_path):
