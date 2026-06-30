@@ -5600,3 +5600,42 @@ python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
 python3 -m pytest tools/render_regression/tests -q
 # 190 passed
 ```
+
+## Follow-Up README Request-Run Guard Example
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep the README's post-return `acad_reference_request_run.py` example
+  test-covered alongside the route example.
+- Prevent drift where the wrapper example loses its request-boundary checks or
+  the `--fail-on-input-review` hardening flag while the generated handoff
+  remains stricter.
+
+Changes:
+
+- `test_acad_manifest_compare.py` now extracts the README
+  `acad_reference_request_run.py` example block and asserts it documents the
+  three request-boundary guards plus `--fail-on-input-review`.
+
+Boundary:
+
+- Operator documentation/test hardening only.
+- No README text change.
+- No wrapper default behavior change.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 10 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 191 passed
+```
