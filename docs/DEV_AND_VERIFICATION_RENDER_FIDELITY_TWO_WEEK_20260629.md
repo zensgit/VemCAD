@@ -961,7 +961,8 @@ also recorded in:
 
 Current additional closure:
 
-- standalone compare and request-run paths both emit route reports;
+- batch/input-prep, standalone compare, and request-run paths all emit route
+  reports;
 - artifact indexes route batch/request/compare outputs without changing X3;
 - request-package validation now catches diagnostic capture methods and
   unmatched view contracts before AutoCAD PNG fulfilment.

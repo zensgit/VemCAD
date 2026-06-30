@@ -15,6 +15,7 @@ from PIL import Image
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import acad_reference_manifest as arm  # noqa: E402
+import acad_artifact_route as artifact_route  # noqa: E402
 
 INTAKE_SCHEMA = "vemcad.acad_reference_intake/v1"
 BATCH_ARTIFACT_INDEX_SCHEMA = "vemcad.acad_reference_batch_artifact_index/v1"
@@ -824,6 +825,8 @@ def _existing_batch_artifacts(out_dir: Path) -> list[dict[str, str]]:
         ("missing_references.md", "missing_references_markdown"),
         ("reference_request_validation.json", "reference_request_validation_json"),
         ("reference_request_validation.md", "reference_request_validation_markdown"),
+        ("route_summary.json", "route_summary_json"),
+        ("route_summary.md", "route_summary_markdown"),
     )
     artifacts: list[dict[str, str]] = []
     for name, kind in known:
@@ -843,6 +846,8 @@ def _clear_batch_outputs(out_dir: Path) -> None:
         ("missing_references.md", "missing_references_markdown"),
         ("reference_request_validation.json", "reference_request_validation_json"),
         ("reference_request_validation.md", "reference_request_validation_markdown"),
+        ("route_summary.json", "route_summary_json"),
+        ("route_summary.md", "route_summary_markdown"),
         ("artifact_index.json", "artifact_index"),
     ):
         path = out_dir / name
@@ -854,6 +859,13 @@ def _write_batch_artifact_index(out_dir: Path, validation: dict[str, Any] | None
     artifacts = _existing_batch_artifacts(out_dir)
     if not artifacts:
         return None
+    route_summary_json = out_dir / "route_summary.json"
+    route_summary_md = out_dir / "route_summary.md"
+    existing_kinds = {item["kind"] for item in artifacts}
+    if "route_summary_json" not in existing_kinds:
+        artifacts.append({"kind": "route_summary_json", "path": str(route_summary_json)})
+    if "route_summary_markdown" not in existing_kinds:
+        artifacts.append({"kind": "route_summary_markdown", "path": str(route_summary_md)})
     path = out_dir / "artifact_index.json"
     metadata = _batch_index_metadata(out_dir, batch_validation=validation)
     payload = {
@@ -864,6 +876,17 @@ def _write_batch_artifact_index(out_dir: Path, validation: dict[str, Any] | None
     }
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return path
+
+
+def _write_batch_route_report(index_path: Path | None) -> None:
+    if index_path is None:
+        return
+    route_payload = artifact_route.route_artifact_index(index_path)
+    artifact_route.write_route_report_files(
+        route_payload,
+        out_json=index_path.parent / "route_summary.json",
+        out_md=index_path.parent / "route_summary.md",
+    )
 
 
 def _batch_index_metadata(out_dir: Path, batch_validation: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -1115,6 +1138,7 @@ def main(argv: list[str] | None = None) -> int:
                 case_ids=set(args.case_id or []) or None,
             )
             index_path = _write_batch_artifact_index(args.out_dir, validation=validation)
+            _write_batch_route_report(index_path)
             print(f"AutoCAD reference request validation: {validation['status']} ({validation['case_count']} cases)")
             print(f"  validation     : {args.out_dir / 'reference_request_validation.json'}")
             if index_path is not None:
@@ -1137,12 +1161,14 @@ def main(argv: list[str] | None = None) -> int:
             manifest_path, candidates_path, validation = build_files(args.cases, args.out_dir)
     except Exception as exc:
         index_path = _write_batch_artifact_index(args.out_dir)
+        _write_batch_route_report(index_path)
         print(f"AutoCAD reference batch: blocked ({exc})", file=sys.stderr)
         if index_path is not None:
             print(f"  artifact index : {index_path}", file=sys.stderr)
         return 2
 
     index_path = _write_batch_artifact_index(args.out_dir, validation=validation)
+    _write_batch_route_report(index_path)
     print(f"AutoCAD reference batch: {validation['status']} ({validation['case_count']} cases)")
     print(f"  manifest       : {manifest_path}")
     print(f"  candidate cases: {candidates_path}")
