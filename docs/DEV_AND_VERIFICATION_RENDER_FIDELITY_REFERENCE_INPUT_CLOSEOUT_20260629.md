@@ -423,3 +423,38 @@ python3 tools/render_regression/acad_reference_batch.py \
   --out-dir /private/tmp/vemcad-request-validation-smoke-20260629
 # AutoCAD reference request validation: pass (1 cases)
 ```
+
+## Follow-Up Generated Handoff Validation Command
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make newly generated `reference_request.md` files self-contained for the
+  request-package validation step.
+- Keep operators from jumping directly from recapture request to AutoCAD export
+  without first checking source/candidate drift.
+
+Changes:
+
+- `reference_request.md` now includes a "Before Capture Or Fulfilment" section.
+- The section prints the exact validation command:
+  `acad_reference_batch.py --validate-request ... --candidate-cases ...`.
+- The existing "After The PNGs Are Returned" runner handoff remains unchanged.
+
+Boundary:
+
+- Handoff/documentation only.
+- No renderer change.
+- No AutoCAD PNG required.
+- No X3 semantics change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 6 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 100 passed
+```
