@@ -42,20 +42,26 @@ def _unescaped_pipe_count(line: str) -> int:
     return count
 
 
+def _markdown_block_after(markdown: str, marker: str) -> str:
+    start = markdown.index(marker)
+    end = markdown.index("```", start)
+    return markdown[start:end]
+
+
 def _readme_route_example_block() -> str:
     readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
-    marker = "python3 tools/render_regression/acad_artifact_route.py <run-dir> \\"
-    start = readme.index(marker)
-    end = readme.index("```", start)
-    return readme[start:end]
+    return _markdown_block_after(
+        readme,
+        "python3 tools/render_regression/acad_artifact_route.py <run-dir> \\",
+    )
 
 
 def _readme_request_run_example_block() -> str:
     readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
-    marker = "python3 tools/render_regression/acad_reference_request_run.py \\"
-    start = readme.index(marker)
-    end = readme.index("```", start)
-    return readme[start:end]
+    return _markdown_block_after(
+        readme,
+        "python3 tools/render_regression/acad_reference_request_run.py \\",
+    )
 
 
 def _manifest(
@@ -415,8 +421,16 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert "--validate-request" in request_md
     assert "acad_reference_request_run.py" in request_md
     assert "acad_artifact_route.py <next-run-dir>" in request_md
-    assert "--recursive" in request_md
-    assert "--text" in request_md
+    request_run_block = _markdown_block_after(
+        request_md,
+        "python3 tools/render_regression/acad_reference_request_run.py \\",
+    )
+    route_block = _markdown_block_after(
+        request_md,
+        "python3 tools/render_regression/acad_artifact_route.py <next-run-dir> \\",
+    )
+    assert "--recursive" in route_block
+    assert "--text" in route_block
     assert "--require-source-boundary autocad_equivalence_claim=false" in request_md
     assert request_md.count("--require-request-boundary autocad_equivalence_claim=false") == 3
     assert request_md.count("--require-request-boundary requires_returned_autocad_png=true") == 3
@@ -428,6 +442,26 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert request_md.count("--require-kind request_run") == 1
     assert request_md.count("--require-route-count 3") == 1
     assert request_md.count("--require-action-artifact-exists") == 1
+    for expected in [
+        "--require-request-boundary autocad_equivalence_claim=false",
+        "--require-request-boundary requires_returned_autocad_png=true",
+        "--require-request-boundary requires_viewspace_match=true",
+        "--fail-on-input-review",
+    ]:
+        assert expected in request_run_block
+    for expected in [
+        "--require-source-boundary autocad_equivalence_claim=false",
+        "--require-request-boundary autocad_equivalence_claim=false",
+        "--require-request-boundary requires_returned_autocad_png=true",
+        "--require-request-boundary requires_viewspace_match=true",
+        "--forbid-action-domain input-review",
+        "--require-kind batch",
+        "--require-kind compare",
+        "--require-kind request_run",
+        "--require-route-count 3",
+        "--require-action-artifact-exists",
+    ]:
+        assert expected in route_block
     assert f"--candidate-cases {candidates}" in request_md
     assert "viewspace_mismatch` still exits `2`" in request_md
     assert "`mismatch`" in request_md
