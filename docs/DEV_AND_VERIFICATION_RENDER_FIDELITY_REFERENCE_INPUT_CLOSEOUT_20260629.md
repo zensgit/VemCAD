@@ -1638,6 +1638,47 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Route Source Boundary Passthrough
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Preserve the source `artifact_index.json` boundary inside route payloads.
+- Let CI and reviewers inspect both boundaries from one route report:
+  - the route report's own read-only/no-equivalence boundary;
+  - the underlying artifact index boundary, such as whether that artifact
+    actually compared renders.
+
+Changes:
+
+- `acad_artifact_route.py` single-route JSON now includes
+  `artifact_index_boundary` copied from the source artifact index when present.
+- Multi-route payloads preserve `artifact_index_boundary` on each child route.
+- Text output prints `source_artifact_boundary` when the source index has a
+  boundary object.
+- Markdown route sections print:
+  - `source_compares_renders`
+  - `source_autocad_equivalence_claim`
+
+Boundary:
+
+- Route/report metadata only.
+- No routing-rule change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 Private compatibility smoke:
 
 ```bash

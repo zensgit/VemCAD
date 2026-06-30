@@ -15,6 +15,10 @@ def _write(path: Path, payload: dict) -> Path:
 def test_routes_batch_missing_references(tmp_path):
     index = _write(tmp_path / "artifact_index.json", {
         "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "boundary": {
+            "compares_renders": False,
+            "autocad_equivalence_claim": False,
+        },
         "stage": "missing_references",
         "status": "blocked",
         "case_count": 2,
@@ -27,6 +31,8 @@ def test_routes_batch_missing_references(tmp_path):
     assert payload["schema"] == "vemcad.acad_artifact_route/v1"
     assert payload["boundary"]["read_only_routing"] is True
     assert payload["boundary"]["autocad_equivalence_claim"] is False
+    assert payload["artifact_index_boundary"]["compares_renders"] is False
+    assert payload["artifact_index_boundary"]["autocad_equivalence_claim"] is False
     assert payload["kind"] == "batch"
     assert payload["status"] == "blocked"
     assert payload["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
@@ -81,6 +87,7 @@ def test_routes_multiple_directories_as_batch(tmp_path):
     compare_dir.mkdir()
     _write(input_dir / "artifact_index.json", {
         "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "boundary": {"compares_renders": False, "autocad_equivalence_claim": False},
         "stage": "reference_intake",
         "status": "pass",
         "case_count": 1,
@@ -88,6 +95,7 @@ def test_routes_multiple_directories_as_batch(tmp_path):
     })
     _write(compare_dir / "artifact_index.json", {
         "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "boundary": {"compares_renders": True, "autocad_equivalence_claim": False},
         "status": "viewspace_mismatch",
         "case_count": 1,
         "compared_count": 1,
@@ -115,6 +123,8 @@ def test_routes_multiple_directories_as_batch(tmp_path):
     assert [item["kind"] for item in payload["routes"]] == ["batch", "compare"]
     assert payload["routes"][0]["recommended_next_action"]["code"] == "continue-to-request-run"
     assert payload["routes"][1]["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
+    assert payload["routes"][0]["artifact_index_boundary"]["compares_renders"] is False
+    assert payload["routes"][1]["artifact_index_boundary"]["compares_renders"] is True
 
 
 def test_cli_multiple_directories_text(tmp_path, capsys):
@@ -124,6 +134,7 @@ def test_cli_multiple_directories_text(tmp_path, capsys):
     compare_dir.mkdir()
     _write(input_dir / "artifact_index.json", {
         "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "boundary": {"compares_renders": False, "autocad_equivalence_claim": False},
         "stage": "reference_intake",
         "status": "pass",
         "case_count": 1,
@@ -131,6 +142,7 @@ def test_cli_multiple_directories_text(tmp_path, capsys):
     })
     _write(compare_dir / "artifact_index.json", {
         "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "boundary": {"compares_renders": True, "autocad_equivalence_claim": False},
         "status": "viewspace_mismatch",
         "case_count": 1,
         "compared_count": 1,
@@ -152,6 +164,7 @@ def test_cli_multiple_directories_text(tmp_path, capsys):
     ) in output
     assert "recommended_next_action: recapture-autocad-or-provide-window" in output
     assert "autocad_equivalence_claim: false" in output
+    assert "source_artifact_boundary: autocad_equivalence_claim=false,compares_renders=true" in output
     assert "route: 1" in output
     assert "route: 2" in output
     assert "recommended_next_action: continue-to-request-run" in output
@@ -173,6 +186,7 @@ def test_cli_recursive_discovers_nested_artifact_indexes(tmp_path, capsys):
     })
     _write(compare_dir / "artifact_index.json", {
         "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "boundary": {"compares_renders": True, "autocad_equivalence_claim": False},
         "status": "viewspace_mismatch",
         "case_count": 1,
         "compared_count": 1,
@@ -209,6 +223,7 @@ def test_cli_writes_json_and_markdown_reports(tmp_path):
     })
     _write(compare_dir / "artifact_index.json", {
         "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "boundary": {"compares_renders": True, "autocad_equivalence_claim": False},
         "status": "viewspace_mismatch",
         "case_count": 1,
         "compared_count": 1,
@@ -244,6 +259,8 @@ def test_cli_writes_json_and_markdown_reports(tmp_path):
     assert "- recommended_next_action: `recapture-autocad-or-provide-window`" in markdown
     assert "- read_only_routing: `True`" in markdown
     assert "- autocad_equivalence_claim: `False`" in markdown
+    assert "- source_compares_renders: `True`" in markdown
+    assert "- source_autocad_equivalence_claim: `False`" in markdown
     assert "recapture-autocad-or-provide-window=1" in markdown
 
 
