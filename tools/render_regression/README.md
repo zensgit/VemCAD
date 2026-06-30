@@ -192,6 +192,7 @@ one-command wrapper can use the same opt-in hard gate.
 The run summary and run-level
 artifact index also surface route-level `route_count`, `route_kind_counts`,
 `route_status_counts`,
+`route_final_exit_code_counts`,
 `route_recommended_action_counts`, and
 `route_recommended_action_domain_counts`, so operators can inspect the routed
 artifact topology without opening `route_summary.json`. When compare artifacts
@@ -293,6 +294,9 @@ inside these generated output directories if they need to survive a rerun.
   `fix-request-package`, `provide-returned-autocad-pngs`,
   `fix-returned-reference-input`, `recapture-autocad-or-provide-window`,
   `inspect-renderer-candidate`, and `review-x3-pass`.
+- route summaries also surface `final_exit_code_counts` for directly routed
+  batch/request-run artifacts, so uploaded directory-level reports show where
+  an opt-in input-review hard failure returned exit `2`.
 - when the routed source artifact already contains a human-readable action
   report, route reports also surface it as `action_artifact`.
 - every recommended action also carries `domain`, such as `input`,

@@ -141,6 +141,7 @@ def _run_artifact_index_payload(
             "route_count": summary.get("route_count"),
             "route_kind_counts": summary.get("route_kind_counts") or {},
             "route_status_counts": summary.get("route_status_counts") or {},
+            "route_final_exit_code_counts": summary.get("route_final_exit_code_counts") or {},
             "route_recommended_action_counts": summary.get("route_recommended_action_counts") or {},
             "route_recommended_action_domain_counts": (
                 summary.get("route_recommended_action_domain_counts") or {}
@@ -560,6 +561,8 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
             f"- route_count: `{summary['route_count']}`",
             f"- route_kind_counts: `{_format_case_action_counts(summary.get('route_kind_counts') or {})}`",
             f"- route_status_counts: `{_format_case_action_counts(summary.get('route_status_counts') or {})}`",
+            "- route_final_exit_code_counts: "
+            f"`{_format_case_action_counts(summary.get('route_final_exit_code_counts') or {})}`",
             "- route_recommended_action_counts: "
             f"`{_format_case_action_counts(summary.get('route_recommended_action_counts') or {})}`",
             "- route_recommended_action_domain_counts: "
@@ -759,6 +762,7 @@ def _write_run_summary(
         "route_count": route_payload.get("count"),
         "route_kind_counts": route_payload.get("kind_counts") or {},
         "route_status_counts": route_payload.get("status_counts") or {},
+        "route_final_exit_code_counts": route_payload.get("final_exit_code_counts") or {},
         "route_recommended_action_counts": route_payload.get("recommended_action_counts") or {},
         "route_recommended_action_domain_counts": (
             route_payload.get("recommended_action_domain_counts") or {}
@@ -823,6 +827,11 @@ def _print_run_summary(summary: dict[str, Any], out_dir: Path) -> None:
         print(
             "  route viewspace statuses: "
             f"{_format_case_action_counts(summary['route_viewspace_status_counts'])}"
+        )
+    if summary.get("route_final_exit_code_counts"):
+        print(
+            "  route final exit codes: "
+            f"{_format_case_action_counts(summary['route_final_exit_code_counts'])}"
         )
     if summary.get("route_x3_band_counts"):
         print(

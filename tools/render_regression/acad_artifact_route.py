@@ -111,6 +111,16 @@ def _route_action(route: dict[str, Any]) -> dict[str, str]:
     return {"code": "", "message": "", "artifact": "", "domain": ""}
 
 
+def _optional_int_value(payload: dict[str, Any], key: str) -> int | None:
+    value = payload.get(key)
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+
 def _normalize_recommended_action(action: Any, fallback: dict[str, str]) -> dict[str, str]:
     if isinstance(action, dict):
         code = str(action.get("code") or "")
@@ -161,7 +171,7 @@ def _route_batch(payload: dict[str, Any]) -> dict[str, Any]:
             "inspect-artifact-index",
             "Inspect the batch artifact index before choosing the next action.",
         )
-    return {
+    route = {
         "kind": "batch",
         "status": status,
         "stage": stage,
@@ -175,6 +185,10 @@ def _route_batch(payload: dict[str, Any]) -> dict[str, Any]:
         "reference_intake_issue_code_counts": payload.get("reference_intake_issue_code_counts") or {},
         "recommended_next_action": action,
     }
+    final_exit_code = _optional_int_value(payload, "final_exit_code")
+    if final_exit_code is not None:
+        route["final_exit_code"] = final_exit_code
+    return route
 
 
 def _route_run(payload: dict[str, Any]) -> dict[str, Any]:
@@ -203,17 +217,22 @@ def _route_run(payload: dict[str, Any]) -> dict[str, Any]:
             ),
         ),
     }
+    final_exit_code = _optional_int_value(payload, "final_exit_code")
+    if final_exit_code is not None:
+        route["final_exit_code"] = final_exit_code
     if (
         payload.get("route_count") is not None
         or payload.get("route_compare_case_count") is not None
         or payload.get("route_triage_bucket_counts")
         or payload.get("route_viewspace_status_counts")
         or payload.get("route_x3_band_counts")
+        or payload.get("route_final_exit_code_counts")
     ):
         route.update({
             "route_count": payload.get("route_count"),
             "route_kind_counts": payload.get("route_kind_counts") or {},
             "route_status_counts": payload.get("route_status_counts") or {},
+            "route_final_exit_code_counts": payload.get("route_final_exit_code_counts") or {},
             "route_recommended_action_counts": payload.get("route_recommended_action_counts") or {},
             "route_recommended_action_domain_counts": (
                 payload.get("route_recommended_action_domain_counts") or {}
@@ -303,6 +322,17 @@ def _count_values(values: list[str]) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
+def _count_final_exit_codes(routes: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for route in routes:
+        final_exit_code = _optional_int_value(route, "final_exit_code")
+        if final_exit_code is None:
+            continue
+        key = str(final_exit_code)
+        counts[key] = counts.get(key, 0) + 1
+    return dict(sorted(counts.items()))
+
+
 def _sum_count_maps(routes: list[dict[str, Any]], key: str) -> dict[str, int]:
     counts: dict[str, int] = {}
     for route in routes:
@@ -342,6 +372,7 @@ def _route_batch_summary(routes: list[dict[str, Any]]) -> dict[str, Any]:
     summary = {
         "kind_counts": _count_values([str(route.get("kind") or "") for route in routes]),
         "status_counts": _count_values([str(route.get("status") or "") for route in routes]),
+        "final_exit_code_counts": _count_final_exit_codes(routes),
         "recommended_action_counts": _count_values([
             str((route.get("recommended_next_action") or {}).get("code") or "") for route in routes
         ]),
@@ -524,6 +555,8 @@ def _write_text(route: dict[str, Any]) -> str:
         lines.append(f"case_count: {route.get('case_count')}")
     if route.get("compared_count") is not None:
         lines.append(f"compared_count: {route.get('compared_count')}")
+    if route.get("final_exit_code") is not None:
+        lines.append(f"final_exit_code: {route.get('final_exit_code')}")
     if route.get("error_count") is not None:
         lines.append(f"errors: {route.get('error_count')}")
     if route.get("warning_count") is not None:
@@ -551,6 +584,10 @@ def _write_text(route: dict[str, Any]) -> str:
         lines.append(f"route_kind_counts: {_format_counts(route['route_kind_counts'])}")
     if route.get("route_status_counts"):
         lines.append(f"route_status_counts: {_format_counts(route['route_status_counts'])}")
+    if route.get("route_final_exit_code_counts"):
+        lines.append(
+            f"route_final_exit_code_counts: {_format_counts(route['route_final_exit_code_counts'])}"
+        )
     if route.get("route_recommended_action_counts"):
         lines.append(
             "route_recommended_action_counts: "
@@ -624,6 +661,8 @@ def _write_batch_text(payload: dict[str, Any]) -> str:
         f"message: {action.get('message', '')}",
         f"action_artifact: {action.get('artifact', '')}",
     ]
+    if payload.get("final_exit_code_counts"):
+        summary.append("final_exit_code_counts: " + _format_counts(payload["final_exit_code_counts"]))
     if payload.get("compare_case_count") is not None:
         summary.append(f"compare_case_count: {payload.get('compare_case_count')}")
     if payload.get("compared_count") is not None:
@@ -682,6 +721,8 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         lines.append(f"- case_count: {_md_code_cell(route.get('case_count'))}")
     if route.get("compared_count") is not None:
         lines.append(f"- compared_count: {_md_code_cell(route.get('compared_count'))}")
+    if route.get("final_exit_code") is not None:
+        lines.append(f"- final_exit_code: {_md_code_cell(route.get('final_exit_code'))}")
     if route.get("error_count") is not None:
         lines.append(f"- errors: {_md_code_cell(route.get('error_count'))}")
     if route.get("warning_count") is not None:
@@ -711,6 +752,11 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         lines.append(f"- route_kind_counts: {_md_code_cell(_format_counts(route['route_kind_counts']))}")
     if route.get("route_status_counts"):
         lines.append(f"- route_status_counts: {_md_code_cell(_format_counts(route['route_status_counts']))}")
+    if route.get("route_final_exit_code_counts"):
+        lines.append(
+            "- route_final_exit_code_counts: "
+            f"{_md_code_cell(_format_counts(route['route_final_exit_code_counts']))}"
+        )
     if route.get("route_recommended_action_counts"):
         lines.append(
             "- route_recommended_action_counts: "
@@ -796,6 +842,11 @@ def _write_markdown(payload: dict[str, Any]) -> str:
             f"- autocad_equivalence_claim: {_md_code_cell(bool(boundary.get('autocad_equivalence_claim')))}",
             "",
         ])
+        if payload.get("final_exit_code_counts"):
+            lines.append(
+                "- final_exit_code_counts: "
+                f"{_md_code_cell(_format_counts(payload['final_exit_code_counts']))}"
+            )
         if payload.get("compare_case_count") is not None:
             lines.append(f"- compare_case_count: {_md_code_cell(payload.get('compare_case_count'))}")
         if payload.get("compared_count") is not None:
