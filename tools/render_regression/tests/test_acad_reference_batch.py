@@ -1,9 +1,9 @@
-import json
 import hashlib
+import json
 import sys
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -11,9 +11,13 @@ import acad_manifest_compare as harness  # noqa: E402
 import acad_reference_batch as batch  # noqa: E402
 
 
-def _png(path: Path, size=(320, 240), color=(255, 255, 255)) -> str:
+def _png(path: Path, size=(320, 240), color=(255, 255, 255), box=None) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
-    Image.new("RGB", size, color).save(path)
+    image = Image.new("RGB", size, color)
+    if box is not None:
+        draw = ImageDraw.Draw(image)
+        draw.rectangle(box, outline=(0, 0, 0), width=3)
+    image.save(path)
     return str(path)
 
 
@@ -419,3 +423,38 @@ def test_batch_generator_intake_warns_on_low_resolution_or_non_white_png(tmp_pat
     intake_md = (out / "reference_intake.md").read_text(encoding="utf-8")
     assert "warning:long_edge_below_requested" in intake_md
     assert "warning:corner_background_not_white" in intake_md
+
+
+def test_batch_generator_intake_warns_on_candidate_returned_ink_aspect_divergence(tmp_path):
+    _dxf(tmp_path / "dxf" / "G11.dxf")
+    _png(tmp_path / "ours" / "G11.png", (1600, 1131), box=[720, 100, 880, 1030])
+    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1600, 1131), box=[100, 500, 1500, 650])
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "recommended_output_name": "G11_autocad_model_extents.png",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--out-dir", str(out),
+    ]) == 0
+
+    intake = json.loads((out / "reference_intake.json").read_text(encoding="utf-8"))
+    assert intake["status"] == "review"
+    assert intake["warning_count"] == 1
+    row = intake["cases"][0]
+    assert row["issues"][0]["code"] == "ink_bbox_aspect_divergence"
+    advisory = row["inspection"]["identity_advisory"]
+    assert advisory["diagnostic_only"] is True
+    assert advisory["ink_bbox_aspect_delta"] > 0.25

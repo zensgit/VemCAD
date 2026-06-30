@@ -117,9 +117,9 @@ Private workflow smoke:
 These smokes prove the workflow behavior. They do not convert the old G11 PNG
 into valid ground truth.
 
-## Current State
+## State At Initial Closeout
 
-- VemCAD `origin/main`: `544cf2c`.
+- VemCAD `origin/main` at the initial closeout: `544cf2c`.
 - Open VemCAD PRs at closeout: pre-existing draft `#1` only.
 - The returned-reference loop is now:
 
@@ -308,3 +308,47 @@ Boundary:
 - No renderer change.
 - No private drawing or AutoCAD PNG committed.
 - Does not change X3 semantics or AutoCAD-equivalence wording.
+
+## Follow-Up Identity Advisory Diagnostics
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Add a cheap content-shape sanity check for returned AutoCAD PNGs without
+  pretending the tool can prove the PNG depicts the right drawing.
+- Surface likely "wrong drawing" or "wrong capture window" cases earlier than
+  the full X3 comparison.
+
+Changes:
+
+- `reference_intake.json` now records
+  `inspection.identity_advisory`.
+- The advisory compares the returned AutoCAD PNG ink bounding box with the
+  candidate VemCAD PNG ink bounding box.
+- If both ink profiles are available and their bbox aspect differs by more than
+  `0.25`, the intake adds a warning:
+  `ink_bbox_aspect_divergence`.
+
+Boundary:
+
+- Diagnostic only.
+- Not a pass/fail gate.
+- Not a semantic mask.
+- Not a proof of drawing identity.
+- Not a renderer change.
+- Does not replace `viewspace_status=match` before interpreting X3.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 11 passed
+
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py \
+  tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 10 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 98 passed
+```

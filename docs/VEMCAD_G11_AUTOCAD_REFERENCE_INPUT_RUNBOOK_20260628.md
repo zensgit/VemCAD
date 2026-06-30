@@ -163,6 +163,12 @@ against VemCAD and does not claim AutoCAD equivalence. A `review` result means
 the PNG exists and the workflow can continue, but the operator should inspect
 the warning before trusting any visual conclusion.
 
+The intake also records `inspection.identity_advisory`, a diagnostic-only
+comparison between the returned AutoCAD PNG ink bbox and the candidate VemCAD
+PNG ink bbox. A large aspect divergence warns about possible wrong-drawing or
+wrong-window input. It is not a semantic mask, not a pass/fail gate, and not
+evidence of AutoCAD equivalence.
+
 Then run the matched-view harness with:
 
 To process only the first returned case, repeat `--case-id`:
