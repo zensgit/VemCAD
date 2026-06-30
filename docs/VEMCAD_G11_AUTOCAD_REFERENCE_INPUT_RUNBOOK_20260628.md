@@ -293,6 +293,8 @@ Expected outputs:
 - `$CASE_DIR/compare/summary.json`
 - `$CASE_DIR/compare/summary.tsv`
 - `$CASE_DIR/compare/artifact_index.json`
+- `$CASE_DIR/compare/route_summary.json`
+- `$CASE_DIR/compare/route_summary.md`
 - `$CASE_DIR/compare/contact_sheet.png`
 - `$CASE_DIR/compare/viewspace/G11_viewspace.json`
 - `$CASE_DIR/compare/overlays/G11_overlay.png` when comparable
@@ -311,6 +313,10 @@ authoritative.
 `viewspace_status_counts`, and `x3_band_counts`, so artifact consumers can route
 `renderer-candidate` versus `recapture-required` runs before opening
 `summary.json`.
+
+`acad_manifest_compare.py` also writes `route_summary.json/md` beside the
+compare summary. These files are generated from the same artifact-route logic as
+the standalone helper and are safe to upload directly from CI.
 
 To route any batch/run/compare artifact index through one command:
 

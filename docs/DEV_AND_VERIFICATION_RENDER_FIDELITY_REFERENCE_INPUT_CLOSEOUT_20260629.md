@@ -499,6 +499,57 @@ python3 -m pytest tools/render_regression/tests -q
 # 101 passed
 ```
 
+## Follow-Up Standalone Compare Route Reports
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Give standalone `acad_manifest_compare.py` runs the same stable route report
+  artifacts that request-run already emits.
+- Let CI upload compare-level `route_summary.json/md` without a second
+  post-processing command.
+
+Changes:
+
+- `acad_manifest_compare.py` now writes:
+  - `<compare-dir>/route_summary.json`
+  - `<compare-dir>/route_summary.md`
+- `compare/artifact_index.json` includes both route report files.
+- Route reports are generated from the shared `acad_artifact_route.py` logic,
+  so compare and request-run routing cannot drift.
+
+Boundary:
+
+- Reporting/indexing only.
+- No routing-rule change.
+- No renderer change.
+- No X3 scoring change.
+- No AutoCAD PNG equivalence claim.
+- `viewspace_mismatch` remains recapture/window input work.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 6 passed
+
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# 11 passed
+```
+
+Private compatibility smoke:
+
+```bash
+python3 tools/render_regression/acad_manifest_compare.py \
+  --manifest /private/tmp/vemcad-autocad-batch-current/input/acad_manifest.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --out-dir /private/tmp/vemcad-compare-route-report-smoke-20260629
+# AutoCAD manifest compare: viewspace_mismatch (12/12 compared, 0 issues)
+# route_summary.json.recommended_next_action.code=recapture-autocad-or-provide-window
+# route_summary.md includes the read-only/no-equivalence boundary statement
+```
+
 Private compatibility smoke:
 
 ```bash
