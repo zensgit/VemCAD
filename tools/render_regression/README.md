@@ -164,8 +164,8 @@ work before a separate route report is generated. It also writes
 action code, domain, source, triage bucket, view-space status, and X3 band.
 When returned AutoCAD PNGs are still missing, `acad_reference_batch.py` writes
 `missing_references.tsv` beside the JSON/Markdown report so the expected
-filenames, paths, capture method, view contract, and expected size can be
-handed off without scraping Markdown. The
+source DXF, optional source hash, output filenames, paths, capture method, view
+contract, and expected size can be handed off without scraping Markdown. The
 `acad_reference_request_run.py` wrapper also surfaces that TSV in its run
 summary and artifact index when the request is input-blocked.
 The batch, compare, and request-run CLIs also print the recommended action

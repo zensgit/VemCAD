@@ -250,7 +250,7 @@ def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(t
 
 
 def test_batch_generator_fulfills_reference_request(tmp_path):
-    _dxf(tmp_path / "dxf" / "G11.dxf")
+    source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
     _png(tmp_path / "ours" / "G11.png", (760, 570))
     _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1600, 1131))
     request = tmp_path / "reference_request.json"
@@ -262,6 +262,7 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
             "id": "G11",
             "drawing_id": "G11/B11",
             "source_dxf": "dxf/G11.dxf",
+            "source_dxf_sha256": _sha256(source),
             "recommended_output_name": "G11_autocad_model_extents.png",
             "requested_capture_method": "plot-export",
             "requested_view_contract": "model-extents",
@@ -487,7 +488,7 @@ def test_batch_generator_blocks_returned_png_size_mismatch_when_request_declares
 
 
 def test_batch_generator_blocks_request_without_returned_png(tmp_path, capsys):
-    _dxf(tmp_path / "dxf" / "G11.dxf")
+    source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
     _png(tmp_path / "ours" / "G11.png", (760, 570))
     request = tmp_path / "reference_request.json"
     request.write_text(json.dumps({
@@ -496,6 +497,7 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path, capsys):
             "id": "G11",
             "drawing_id": "G11/B11",
             "source_dxf": "dxf/G11.dxf",
+            "source_dxf_sha256": _sha256(source),
             "recommended_output_name": "G11_autocad_model_extents.png",
             "requested_capture_method": "plot-export",
             "requested_view_contract": "model-extents",
@@ -518,12 +520,15 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path, capsys):
     assert missing["schema"] == "vemcad.acad_reference_missing/v1"
     assert missing["missing_count"] == 1
     assert missing["missing"][0]["id"] == "G11"
+    assert missing["missing"][0]["source_dxf"].endswith("dxf/G11.dxf")
+    assert missing["missing"][0]["source_dxf_sha256"] == _sha256(source)
     assert missing["missing"][0]["recommended_output_name"] == "G11_autocad_model_extents.png"
     assert missing["missing"][0]["requested_capture_method"] == "plot-export"
     assert missing["missing"][0]["requested_view_contract"] == "model-extents"
     assert missing["missing"][0]["requested_expected_size"] == "1600x1131"
     missing_md = (out / "missing_references.md").read_text(encoding="utf-8")
     assert "Missing AutoCAD Reference PNGs" in missing_md
+    assert "dxf/G11.dxf" in missing_md
     assert "G11_autocad_model_extents.png" in missing_md
     assert "`plot-export`" in missing_md
     assert "`model-extents`" in missing_md
@@ -531,10 +536,13 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path, capsys):
     assert "missing_references_tsv" in missing_md
     missing_tsv = (out / "missing_references.tsv").read_text(encoding="utf-8").splitlines()
     assert missing_tsv[0] == (
-        "id\tdrawing_id\trecommended_output_name\texpected_path\t"
+        "id\tdrawing_id\tsource_dxf\tsource_dxf_sha256\trecommended_output_name\texpected_path\t"
         "requested_capture_method\trequested_view_contract\trequested_expected_size"
     )
-    assert missing_tsv[1].startswith("G11\tG11/B11\tG11_autocad_model_extents.png\t")
+    assert missing_tsv[1].startswith("G11\tG11/B11\t")
+    assert "dxf/G11.dxf" in missing_tsv[1]
+    assert f"\t{_sha256(source)}\t" in missing_tsv[1]
+    assert "\tG11_autocad_model_extents.png\t" in missing_tsv[1]
     assert missing_tsv[1].endswith("\tplot-export\tmodel-extents\t1600x1131")
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["stage"] == "missing_references"
