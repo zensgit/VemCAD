@@ -358,12 +358,101 @@ def _artifact_resolution(artifact: str) -> dict[str, Any]:
     }
 
 
+def _provenance_fields(prefix: str, provenance: Any) -> dict[str, Any]:
+    if not isinstance(provenance, dict):
+        return {}
+    fields: dict[str, Any] = {}
+    sha = str(provenance.get("sha256") or "")
+    if sha:
+        fields[f"{prefix}_sha256"] = sha
+    size = provenance.get("size_bytes")
+    if isinstance(size, int):
+        fields[f"{prefix}_size_bytes"] = size
+    return fields
+
+
+def _case_evidence_text(action: dict[str, Any]) -> str:
+    parts: list[str] = []
+    for label, prefix in (
+        ("source", "source_dxf"),
+        ("candidate", "candidate_png"),
+        ("returned", "returned_png"),
+    ):
+        sha = str(action.get(f"{prefix}_sha256") or "")
+        size = action.get(f"{prefix}_size_bytes")
+        if sha and isinstance(size, int):
+            parts.append(f"{label}={sha[:12]}:{size}")
+        elif sha:
+            parts.append(f"{label}={sha[:12]}")
+        elif isinstance(size, int):
+            parts.append(f"{label}=size:{size}")
+    returned_size = str(action.get("returned_png_size") or "")
+    if returned_size:
+        parts.append(f"returned_size={returned_size}")
+    advisory = str(action.get("identity_advisory") or "")
+    if advisory:
+        parts.append(f"identity={advisory}")
+    return "; ".join(parts)
+
+
+def _case_evidence(validation_row: Any, intake_row: Any) -> dict[str, Any]:
+    evidence: dict[str, Any] = {}
+    if isinstance(validation_row, dict):
+        evidence.update(_provenance_fields("source_dxf", validation_row.get("source_dxf_provenance")))
+        evidence.update(_provenance_fields("candidate_png", validation_row.get("candidate_png_provenance")))
+        output_name = str(validation_row.get("recommended_output_name") or "")
+        if output_name:
+            evidence["recommended_output_name"] = output_name
+    if isinstance(intake_row, dict):
+        output_name = str(intake_row.get("recommended_output_name") or "")
+        if output_name:
+            evidence.setdefault("recommended_output_name", output_name)
+        inspection = intake_row.get("inspection")
+        if isinstance(inspection, dict):
+            sha = str(inspection.get("sha256") or "")
+            if sha:
+                evidence["returned_png_sha256"] = sha
+            size_bytes = inspection.get("size_bytes")
+            if isinstance(size_bytes, int):
+                evidence["returned_png_size_bytes"] = size_bytes
+            width = inspection.get("width")
+            height = inspection.get("height")
+            if isinstance(width, int) and isinstance(height, int):
+                evidence["returned_png_size"] = f"{width}x{height}"
+            advisory = batch._identity_advisory_text(inspection.get("identity_advisory") or {})
+            if advisory and advisory != "-":
+                evidence["identity_advisory"] = advisory
+    evidence_text = _case_evidence_text(evidence)
+    if evidence_text:
+        evidence["evidence"] = evidence_text
+    return evidence
+
+
+def _case_evidence_maps(summary: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+    validation = _read_json(Path(str(summary.get("reference_request_validation_json") or "")))
+    intake = _read_json(Path(str(summary.get("reference_intake_json") or "")))
+    validation_by_id = {
+        str(row.get("id") or ""): row
+        for row in validation.get("cases") or []
+        if isinstance(row, dict) and str(row.get("id") or "")
+    }
+    intake_by_id = {
+        str(row.get("id") or ""): row
+        for row in intake.get("cases") or []
+        if isinstance(row, dict) and str(row.get("id") or "")
+    }
+    return validation_by_id, intake_by_id
+
+
 def _write_case_actions_tsv(path: Path, case_actions: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         handle.write(
             "id\tdrawing_id\tcode\tdomain\tsource\ttriage_bucket\t"
             "viewspace_status\tx3_band\tissue_count\tissue_codes\trecommended_output_name\t"
+            "source_dxf_sha256\tsource_dxf_size_bytes\tcandidate_png_sha256\t"
+            "candidate_png_size_bytes\treturned_png_sha256\treturned_png_size_bytes\t"
+            "returned_png_size\tidentity_advisory\tevidence\t"
             "artifact\tartifact_resolved\tartifact_exists\n"
         )
         for action in case_actions:
@@ -379,6 +468,15 @@ def _write_case_actions_tsv(path: Path, case_actions: list[dict[str, Any]]) -> N
                 f"{_tsv(action.get('issue_count'))}\t"
                 f"{_tsv(action.get('issue_codes'))}\t"
                 f"{_tsv(action.get('recommended_output_name'))}\t"
+                f"{_tsv(action.get('source_dxf_sha256'))}\t"
+                f"{_tsv(action.get('source_dxf_size_bytes'))}\t"
+                f"{_tsv(action.get('candidate_png_sha256'))}\t"
+                f"{_tsv(action.get('candidate_png_size_bytes'))}\t"
+                f"{_tsv(action.get('returned_png_sha256'))}\t"
+                f"{_tsv(action.get('returned_png_size_bytes'))}\t"
+                f"{_tsv(action.get('returned_png_size'))}\t"
+                f"{_tsv(action.get('identity_advisory'))}\t"
+                f"{_tsv(action.get('evidence'))}\t"
                 f"{_tsv(action.get('artifact'))}\t"
                 f"{_tsv(action.get('artifact_resolved'))}\t"
                 f"{_tsv(action.get('artifact_exists'))}\n"
@@ -410,6 +508,7 @@ def _put_case_action(
     source: str,
     artifact: str = "",
     extra: dict[str, Any] | None = None,
+    evidence: dict[str, Any] | None = None,
 ) -> None:
     if not case_id or case_id in actions:
         return
@@ -423,6 +522,8 @@ def _put_case_action(
         "artifact": artifact,
     }
     payload.update(_artifact_resolution(artifact))
+    if evidence:
+        payload.update(evidence)
     if extra:
         payload.update(extra)
     actions[case_id] = payload
@@ -453,20 +554,23 @@ def _compare_case_action(row: dict[str, Any]) -> tuple[str, str]:
 
 def _case_actions(summary: dict[str, Any]) -> list[dict[str, Any]]:
     actions: dict[str, dict[str, Any]] = {}
+    validation_by_id, intake_by_id = _case_evidence_maps(summary)
 
     validation = _read_json(Path(str(summary.get("reference_request_validation_json") or "")))
     validation_artifact = str(summary.get("reference_request_validation_markdown") or "")
     for row in validation.get("cases") or []:
+        case_id = str(row.get("id") or "")
         issues = [item for item in row.get("issues") or [] if item.get("severity") in {"error", "warning"}]
         if issues:
             _put_case_action(
                 actions,
-                str(row.get("id") or ""),
+                case_id,
                 drawing_id=str(row.get("drawing_id") or ""),
                 code="fix-request-package",
                 message="Fix request-package provenance or structure before exporting or returning AutoCAD PNGs.",
                 source="request_validation",
                 artifact=validation_artifact,
+                evidence=_case_evidence(row, intake_by_id.get(case_id)),
                 extra={
                     "issue_count": len(issues),
                     "issue_codes": ", ".join(_issue_code_labels(issues)),
@@ -476,20 +580,23 @@ def _case_actions(summary: dict[str, Any]) -> list[dict[str, Any]]:
     missing = _read_json(Path(str(summary.get("missing_references_json") or "")))
     missing_artifact = str(summary.get("missing_references_markdown") or "")
     for row in missing.get("missing") or []:
+        case_id = str(row.get("id") or "")
         _put_case_action(
             actions,
-            str(row.get("id") or ""),
+            case_id,
             drawing_id=str(row.get("drawing_id") or ""),
             code="provide-returned-autocad-pngs",
             message="Place the returned AutoCAD PNG using the requested filename, then rerun the wrapper.",
             source="missing_references",
             artifact=missing_artifact,
+            evidence=_case_evidence(validation_by_id.get(case_id), intake_by_id.get(case_id)),
             extra={"recommended_output_name": str(row.get("recommended_output_name") or "")},
         )
 
     intake = _read_json(Path(str(summary.get("reference_intake_json") or "")))
     intake_artifact = str(summary.get("reference_intake_markdown") or "")
     for row in intake.get("cases") or []:
+        case_id = str(row.get("id") or "")
         issues = [item for item in row.get("issues") or [] if item.get("severity") in {"error", "warning"}]
         if issues:
             has_error = any(item.get("severity") == "error" for item in issues)
@@ -501,12 +608,13 @@ def _case_actions(summary: dict[str, Any]) -> list[dict[str, Any]]:
             )
             _put_case_action(
                 actions,
-                str(row.get("id") or ""),
+                case_id,
                 drawing_id=str(row.get("drawing_id") or ""),
                 code=code,
                 message=message,
                 source="reference_intake",
                 artifact=intake_artifact,
+                evidence=_case_evidence(validation_by_id.get(case_id), row),
                 extra={
                     "issue_count": len(issues),
                     "issue_codes": ", ".join(_issue_code_labels(issues)),
@@ -533,6 +641,7 @@ def _case_actions(summary: dict[str, Any]) -> list[dict[str, Any]]:
             message=message,
             source="compare",
             artifact=artifact,
+            evidence=_case_evidence(validation_by_id.get(case_id), intake_by_id.get(case_id)),
             extra={
                 "triage_rank": row.get("triage_rank"),
                 "triage_bucket": str(row.get("triage_bucket") or ""),
@@ -665,18 +774,20 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
             "",
             "## Case Actions",
             "",
-            "| Case | Drawing | Action | Domain | Source | Triage | Issue codes | Artifact |",
-            "| --- | --- | --- | --- | --- | --- | --- | --- |",
+            "| Case | Drawing | Action | Domain | Source | Triage | Issue codes | Evidence | Artifact |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
         ])
         for action in case_actions:
             triage = action.get("triage_bucket") or action.get("issue_count") or "-"
             issue_codes = action.get("issue_codes") or "-"
+            evidence = action.get("evidence") or "-"
             artifact = action.get("artifact_resolved") or action.get("artifact") or ""
             lines.append(
                 f"| {_md_code_cell(action.get('id', ''))} | {_md_table_cell(action.get('drawing_id', ''))} | "
                 f"{_md_code_cell(action.get('code', ''))} | {_md_code_cell(action.get('domain', ''))} | "
                 f"{_md_code_cell(action.get('source', ''))} | "
-                f"{_md_code_cell(triage)} | {_md_code_cell(issue_codes)} | {_md_code_cell(artifact)} |"
+                f"{_md_code_cell(triage)} | {_md_code_cell(issue_codes)} | "
+                f"{_md_code_cell(evidence)} | {_md_code_cell(artifact)} |"
             )
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 

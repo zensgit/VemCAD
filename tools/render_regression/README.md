@@ -233,6 +233,13 @@ actions also include per-case `issue_codes` such as
 `error:returned_png_size_mismatch` or
 `warning:long_edge_below_requested`, so spreadsheet triage can identify the
 input defect class without opening nested JSON or Markdown.
+Case-action rows also carry diagnostic evidence copied from the request
+validation and returned-reference intake reports: source DXF SHA/size,
+candidate PNG SHA/size, returned AutoCAD PNG SHA/size, returned PNG dimensions,
+and the identity-advisory text. This keeps the per-case action spreadsheet
+self-contained for operator routing. These fields identify the files that were
+checked; they are not an AutoCAD-equivalence proof and do not replace
+matched-view/X3.
 When returned AutoCAD PNGs are still missing, `acad_reference_batch.py` writes
 `missing_references.tsv` beside the JSON/Markdown report so the expected
 source DXF, optional source hash, output filenames, paths, capture method, view
