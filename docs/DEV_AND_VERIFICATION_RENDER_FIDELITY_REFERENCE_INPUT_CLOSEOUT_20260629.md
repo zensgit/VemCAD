@@ -392,6 +392,44 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Route Kind Guards
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let unattended route steps assert artifact topology directly.
+- Catch incomplete recursive route inputs where a workflow accidentally uploads
+  only input artifacts but omits compare or request-run artifact indexes.
+
+Changes:
+
+- `acad_artifact_route.py` adds repeatable `--require-kind <kind>`.
+- `acad_artifact_route.py` adds repeatable `--forbid-kind <kind>`.
+- Single-route payloads derive counts from their own `kind`.
+- Batch-route payloads use aggregated `kind_counts`.
+- Failure messages print current kind counts for operator diagnosis.
+- `tools/render_regression/README.md` documents the operator-facing behavior.
+
+Boundary:
+
+- Route topology assertion only.
+- No route priority change.
+- No renderer change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Route Status Guards
 
 Status: implemented in this branch.

@@ -656,6 +656,14 @@ def _status_counts(payload: dict[str, Any]) -> dict[str, int]:
     return {status: 1} if status else {}
 
 
+def _kind_counts(payload: dict[str, Any]) -> dict[str, int]:
+    counts = payload.get("kind_counts")
+    if isinstance(counts, dict):
+        return {str(key): int(value) for key, value in counts.items() if str(key)}
+    kind = str(payload.get("kind") or "")
+    return {kind: 1} if kind else {}
+
+
 def _issue_code_counts(payload: dict[str, Any]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for key in (
@@ -743,6 +751,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="exit 2 unless the routed status counts include this status; may repeat")
     parser.add_argument("--forbid-status", action="append", default=[],
                         help="exit 2 if the routed status counts include this status; may repeat")
+    parser.add_argument("--require-kind", action="append", default=[],
+                        help="exit 2 unless the routed kind counts include this kind; may repeat")
+    parser.add_argument("--forbid-kind", action="append", default=[],
+                        help="exit 2 if the routed kind counts include this kind; may repeat")
     parser.add_argument("--require-action-artifact", default="",
                         help=(
                             "exit 2 unless the top-level recommended_next_action.artifact "
@@ -855,6 +867,34 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(
                 "acad_artifact_route: status counts: "
+                + _format_counts(counts),
+                file=sys.stderr,
+            )
+            return 2
+    if args.require_kind or args.forbid_kind:
+        counts = _kind_counts(payload)
+        missing = [kind for kind in args.require_kind if not counts.get(kind, 0)]
+        if missing:
+            print(
+                "acad_artifact_route: required kind missing: "
+                + ", ".join(missing),
+                file=sys.stderr,
+            )
+            print(
+                "acad_artifact_route: kind counts: "
+                + _format_counts(counts),
+                file=sys.stderr,
+            )
+            return 2
+        forbidden_kinds = [kind for kind in args.forbid_kind if counts.get(kind, 0)]
+        if forbidden_kinds:
+            print(
+                "acad_artifact_route: forbidden kind present: "
+                + ", ".join(f"{kind}={counts.get(kind, 0)}" for kind in forbidden_kinds),
+                file=sys.stderr,
+            )
+            print(
+                "acad_artifact_route: kind counts: "
                 + _format_counts(counts),
                 file=sys.stderr,
             )
