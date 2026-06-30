@@ -813,6 +813,9 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path, capsys):
     assert "route summary" in stderr
     assert "recommended next action: provide-returned-autocad-pngs" in stderr
     assert "recommended next action domain: input" in stderr
+    assert f"recommended next action artifact: {out / 'missing_references.md'}" in stderr
+    assert f"recommended next action artifact resolved: {(out / 'missing_references.md').resolve()}" in stderr
+    assert "recommended next action artifact exists: True" in stderr
 
 
 def test_batch_generator_escapes_missing_reference_markdown_table_cells(tmp_path):

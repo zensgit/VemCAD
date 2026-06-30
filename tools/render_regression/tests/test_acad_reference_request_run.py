@@ -391,6 +391,7 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert summary["status"] == "viewspace_mismatch"
     assert summary["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
     assert summary["recommended_next_action"]["domain"] == "input"
+    assert summary["recommended_next_action"]["artifact"].endswith("compare/reference_request.md")
     assert summary["case_action_counts"] == {
         "recapture-autocad-or-provide-window": 1,
         "review-x3-pass": 1,
@@ -441,6 +442,7 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert artifact_index["route_x3_band_counts"] == {"pass": 2}
     assert "case action counts: recapture-autocad-or-provide-window=1, review-x3-pass=1" in stdout
     assert "case action domain counts: input=1, pass-review=1" in stdout
+    assert f"recommended next action artifact: {out / 'compare' / 'reference_request.md'}" in stdout
     assert "route compare cases: 2" in stdout
     assert "route compared cases: 2" in stdout
     assert "route triage buckets: matched-pass=1, recapture-required=1" in stdout
@@ -458,6 +460,7 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert summary["case_actions"][1]["domain"] == "pass-review"
     assert summary["case_actions"][1]["triage_bucket"] == "matched-pass"
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
+    assert f"recommended next action artifact: `{out / 'compare' / 'reference_request.md'}`" in summary_md
     assert "route_status_counts: `pass=1, viewspace_mismatch=2`" in summary_md
     assert (
         "route_recommended_action_counts: "
@@ -517,6 +520,7 @@ def test_reference_request_run_preserves_viewspace_mismatch_exit(tmp_path):
     assert summary["compare_exit_code"] == 2
     assert summary["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
     assert summary["recommended_next_action"]["domain"] == "input"
+    assert summary["recommended_next_action"]["artifact"].endswith("compare/reference_request.md")
     assert "do not tune the renderer" in summary["recommended_next_action"]["message"]
     assert summary["case_action_domain_counts"] == {"input": 1}
     assert compare_summary["status"] == "viewspace_mismatch"

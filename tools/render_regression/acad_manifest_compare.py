@@ -170,6 +170,11 @@ def _print_route_summary(out_dir: Path, route_payload: dict[str, Any]) -> None:
     print(f"  route summary  : {out_dir / 'route_summary.md'}")
     print(f"  recommended next action: {action.get('code', '')}")
     print(f"  recommended next action domain: {action.get('domain', '')}")
+    if action.get("artifact"):
+        print(f"  recommended next action artifact: {action.get('artifact', '')}")
+    if route_payload.get("action_artifact_resolved"):
+        print(f"  recommended next action artifact resolved: {route_payload['action_artifact_resolved']}")
+        print(f"  recommended next action artifact exists: {bool(route_payload.get('action_artifact_exists'))}")
 
 
 def _write_tsv(path: Path, rows: list[dict[str, Any]]) -> None:

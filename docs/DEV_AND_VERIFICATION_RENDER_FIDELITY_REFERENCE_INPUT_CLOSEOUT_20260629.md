@@ -1109,6 +1109,51 @@ python3 -m pytest \
 # 72 passed
 ```
 
+## Follow-Up Recommended Action Artifact Stdout
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make CI/stdout logs show the concrete recommended handoff artifact instead
+  of requiring operators to open route JSON/Markdown first.
+- Align the one-command request runner's recapture top-level action with the
+  generated recapture request, not just the compare summary.
+
+Changes:
+
+- `acad_manifest_compare.py` route stdout now prints the recommended action
+  artifact, resolved artifact path, and whether the artifact exists when the
+  route provides one.
+- `acad_reference_batch.py` route stdout/stderr now prints the same artifact
+  details for input-prep routes such as missing returned AutoCAD PNGs.
+- `acad_reference_request_run.py` now prefers `compare/reference_request.md`
+  as the top-level `recapture-autocad-or-provide-window` action artifact when
+  that file exists, falling back to `compare/summary.md` only when no generated
+  request exists.
+- The one-command runner stdout now prints
+  `recommended next action artifact` when the selected action has one.
+- `tools/render_regression/README.md` documents the action-artifact stdout
+  behavior.
+
+Boundary:
+
+- Operator logging/reporting only.
+- No renderer change.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- No private drawing or AutoCAD PNG committed.
+- No generated request JSON schema/content change.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_manifest_compare.py \
+  tools/render_regression/tests/test_acad_reference_batch.py \
+  tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 39 passed
+```
+
 ## Follow-Up Legacy Batch Compare Optional Report Cleanup
 
 Status: implemented in this branch.
