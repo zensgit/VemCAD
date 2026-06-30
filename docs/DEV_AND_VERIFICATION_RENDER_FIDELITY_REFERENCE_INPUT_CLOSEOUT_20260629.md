@@ -5639,3 +5639,47 @@ python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
 python3 -m pytest tools/render_regression/tests -q
 # 191 passed
 ```
+
+## Follow-Up Generated Handoff Block Assertions
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Strengthen the generated `reference_request.md` tests so guard flags must
+  appear inside the intended fenced command blocks, not merely somewhere in the
+  Markdown.
+- Preserve the existing single-occurrence checks while preventing a future
+  false green where explanatory prose mentions a guard but the command omits it.
+
+Changes:
+
+- `test_acad_manifest_compare.py` now has a shared
+  `_markdown_block_after()` helper used by README and generated handoff tests.
+- The generated `reference_request.md` test extracts the post-return
+  `acad_reference_request_run.py` block and asserts the request-boundary guards
+  plus `--fail-on-input-review` are present there.
+- The same test extracts the post-return `acad_artifact_route.py` block and
+  asserts the source/request boundary, input-review, topology, route-count, and
+  action-artifact guards are present there.
+
+Boundary:
+
+- Test hardening only.
+- No generated handoff text change.
+- No wrapper default behavior change.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 10 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 191 passed
+```
