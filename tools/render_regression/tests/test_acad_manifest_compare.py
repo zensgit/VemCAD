@@ -225,6 +225,7 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert request["cases"][0]["id"] == "G11"
     assert request["cases"][0]["requested_view_contract"] == "model-extents"
     assert request["cases"][0]["recommended_output_name"] == "G11_autocad_model_extents.png"
+    assert request["cases"][0]["requested_expected_size"] == {"width": 800, "height": 600}
     request_md = (out / "reference_request.md").read_text(encoding="utf-8")
     assert "AutoCAD Reference Recapture Request" in request_md
     assert "G11_autocad_model_extents.png" in request_md

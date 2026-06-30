@@ -429,6 +429,17 @@ def _recapture_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [row for row in _triage_rows(rows) if _triage_bucket(row) == "recapture-required"]
 
 
+def _png_size(path: str) -> dict[str, int] | None:
+    if not path:
+        return None
+    try:
+        with Image.open(path) as image:
+            width, height = image.size
+    except Exception:
+        return None
+    return {"width": width, "height": height}
+
+
 def _write_reference_request(
     out_dir: Path,
     rows: list[dict[str, Any]],
@@ -443,7 +454,7 @@ def _write_reference_request(
     cases: list[dict[str, Any]] = []
     for row in recaptures:
         case_id = _str(row.get("id"))
-        cases.append({
+        case = {
             "id": case_id,
             "drawing_id": row.get("drawing_id", ""),
             "source_dxf": row.get("source_dxf", ""),
@@ -460,7 +471,11 @@ def _write_reference_request(
                 "Export from AutoCAD model space at drawing extents, white background, "
                 "monochrome off, no toolbar/chrome, long edge >= 1600px."
             ),
-        })
+        }
+        expected_size = _png_size(_str(row.get("acad_png")))
+        if expected_size is not None:
+            case["requested_expected_size"] = expected_size
+        cases.append(case)
     payload = {
         "schema": "vemcad.acad_reference_request/v1",
         "reason": "recapture-required",
