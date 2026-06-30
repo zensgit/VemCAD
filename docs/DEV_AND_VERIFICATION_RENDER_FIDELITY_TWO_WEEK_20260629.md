@@ -240,6 +240,59 @@ Boundary:
 - No renderer change.
 - No private drawing or AutoCAD PNG committed.
 
+## Continuation Closeout — Routeable Evidence Loop (2026-06-29)
+
+Status: merged through VemCAD `origin/main=a6ba8d2`.
+
+The post-slice continuation closed the operator/routing side of the
+AutoCAD-reference evidence loop without crossing the matched-view ground-truth
+boundary.
+
+Delivered:
+
+| Area | PRs | Result |
+| --- | --- | --- |
+| Returned-reference / request-run routing | #192-#195 | Request fulfilment writes validation, intake, run summary, and per-case next actions. |
+| Provenance / input hardening | follow-ups in `docs/DEV_AND_VERIFICATION_RENDER_FIDELITY_REFERENCE_INPUT_CLOSEOUT_20260629.md` | Request packages preserve expected size, source/candidate hashes, and identity advisories. |
+| Artifact indexes | #212-#215 | Batch/run/compare indexes can be routed by file, directory, multiple paths, or recursive artifact root; multi-route output has aggregate counts. |
+| Route report files | #216-#218 | Standalone route, request-run, and compare flows all emit `route_summary.json/md` for CI upload and review. |
+
+Current evidence outputs:
+
+- `acad_reference_batch.py` writes input-prep `artifact_index.json`.
+- `acad_reference_request_run.py` writes `run_summary.json/md`,
+  `artifact_index.json`, and `route_summary.json/md`.
+- `acad_manifest_compare.py` writes `summary.json/md`, optional `summary.tsv`,
+  `artifact_index.json`, `contact_sheet.png`, and `route_summary.json/md`.
+- `acad_artifact_route.py` can inspect any artifact index, directory, multiple
+  indexes, or a recursive unpacked artifact root.
+
+Validation:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+python3 -m pytest tools/render_regression/tests -q
+```
+
+Private compatibility smoke:
+
+- Existing G11/private batch still routes to
+  `recapture-autocad-or-provide-window`.
+- No route report produced a `renderer-candidate` from `viewspace_mismatch`.
+- Route Markdown reports include the read-only/no-AutoCAD-equivalence boundary.
+
+Boundary:
+
+- No renderer change.
+- No GUI AutoCAD automation.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+- Renderer work remains gated on fresh matched-view AutoCAD PNG or an explicit
+  AutoCAD world window.
+
 ## Current Closeout (2026-06-29)
 
 Landed in this goal so far:
