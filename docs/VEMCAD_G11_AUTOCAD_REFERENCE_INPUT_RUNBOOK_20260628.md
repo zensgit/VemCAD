@@ -319,6 +319,10 @@ python3 tools/render_regression/acad_artifact_route.py \
   <run-directory>/input <run-directory> <run-directory>/compare --text
 python3 tools/render_regression/acad_artifact_route.py \
   <unpacked-artifact-root> --recursive --text
+python3 tools/render_regression/acad_artifact_route.py \
+  <unpacked-artifact-root> --recursive \
+  --out-json <unpacked-artifact-root>/route_summary.json \
+  --out-md <unpacked-artifact-root>/route_summary.md
 ```
 
 The route helper is read-only. It does not compare renders, does not change
@@ -335,6 +339,10 @@ Use `--recursive` only when pointing at an unpacked CI artifact root or run
 directory that may contain several nested `artifact_index.json` files. Without
 `--recursive`, directory inputs still require an `artifact_index.json` directly
 inside that directory and fail closed otherwise.
+
+Use `--out-json` and `--out-md` when CI should upload the route result as stable
+artifacts. These options are write-only reporting conveniences; they do not
+change the route decision, comparison result, or exit semantics.
 
 ## Interpret The Result
 
