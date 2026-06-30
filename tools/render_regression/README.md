@@ -226,8 +226,8 @@ inside these generated output directories if they need to survive a rerun.
   prep, compare output, or a one-command run summary.
 - route reports carry top-level `recommended_next_action`, including
   `fix-request-package`, `provide-returned-autocad-pngs`,
-  `recapture-autocad-or-provide-window`, `inspect-renderer-candidate`, and
-  `review-x3-pass`.
+  `fix-returned-reference-input`, `recapture-autocad-or-provide-window`,
+  `inspect-renderer-candidate`, and `review-x3-pass`.
 - when the routed source artifact already contains a human-readable action
   report, route reports also surface it as `action_artifact`.
 - every recommended action also carries `domain`, such as `input`,

@@ -24,6 +24,7 @@ BOUNDARY = {
 ACTION_DOMAINS = {
     "fix-request-package": "input",
     "provide-returned-autocad-pngs": "input",
+    "fix-returned-reference-input": "input",
     "inspect-input-block": "input",
     "inspect-compare-input-block": "input",
     "recapture-autocad-or-provide-window": "input",
@@ -132,6 +133,12 @@ def _route_batch(payload: dict[str, Any]) -> dict[str, Any]:
             "provide-returned-autocad-pngs",
             "Place the returned AutoCAD PNGs using the requested filenames, then rerun the wrapper.",
             artifact=_artifact_path(payload, "missing_references_markdown"),
+        )
+    elif status == "blocked" and stage == "reference_intake":
+        action = _action(
+            "fix-returned-reference-input",
+            "Fix returned AutoCAD PNG input before matched-view comparison.",
+            artifact=_artifact_path(payload, "reference_intake_markdown"),
         )
     elif status == "blocked":
         action = _action(

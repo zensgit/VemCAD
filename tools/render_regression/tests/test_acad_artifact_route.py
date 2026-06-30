@@ -92,6 +92,32 @@ def test_routes_directory_containing_artifact_index(tmp_path):
     assert payload["recommended_next_action"]["code"] == "inspect-returned-reference-warnings"
 
 
+def test_routes_batch_reference_intake_blocked(tmp_path):
+    index = _write(tmp_path / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "blocked",
+        "case_count": 1,
+        "reference_intake_issue_code_counts": {
+            "returned_png_size_mismatch": 1,
+        },
+        "artifacts": [
+            {"kind": "reference_intake_markdown", "path": "input/reference_intake.md"},
+        ],
+    })
+
+    payload = route.route_artifact_index(index)
+
+    assert payload["kind"] == "batch"
+    assert payload["status"] == "blocked"
+    assert payload["recommended_next_action"]["code"] == "fix-returned-reference-input"
+    assert payload["recommended_next_action"]["domain"] == "input"
+    assert payload["recommended_next_action"]["artifact"] == "input/reference_intake.md"
+    assert payload["reference_intake_issue_code_counts"] == {
+        "returned_png_size_mismatch": 1,
+    }
+
+
 def test_routes_run_case_actions(tmp_path):
     index = _write(tmp_path / "artifact_index.json", {
         "schema": "vemcad.acad_reference_request_run_artifact_index/v1",
