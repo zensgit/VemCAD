@@ -5556,3 +5556,47 @@ python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
 python3 -m pytest tools/render_regression/tests -q
 # 189 passed
 ```
+
+## Follow-Up README Recapture Guard Example
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep the README's post-return route example aligned with the generated
+  `reference_request.md` handoff guard suite.
+- Avoid an operator copying the README example and missing the stricter
+  input-review, route topology, route count, and action-artifact checks.
+- Make the README example itself test-covered so future guard additions do not
+  silently drift from the generated handoff.
+
+Changes:
+
+- `tools/render_regression/README.md` now includes the same generated
+  post-return route guards: `--forbid-action-domain input-review`,
+  `--require-kind batch`, `--require-kind compare`,
+  `--require-kind request_run`, `--require-route-count 3`, and
+  `--require-action-artifact-exists`.
+- `test_acad_manifest_compare.py` now extracts the README `<run-dir>` route
+  example block and asserts the guard list is present there, avoiding a false
+  pass from later explanatory sections.
+
+Boundary:
+
+- Operator documentation/test hardening only.
+- No wrapper default behavior change.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 9 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 190 passed
+```

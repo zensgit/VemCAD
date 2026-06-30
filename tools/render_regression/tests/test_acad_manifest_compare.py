@@ -42,6 +42,14 @@ def _unescaped_pipe_count(line: str) -> int:
     return count
 
 
+def _readme_route_example_block() -> str:
+    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
+    marker = "python3 tools/render_regression/acad_artifact_route.py <run-dir> \\"
+    start = readme.index(marker)
+    end = readme.index("```", start)
+    return readme[start:end]
+
+
 def _manifest(
     path: Path,
     *,
@@ -64,6 +72,23 @@ def _manifest(
         }],
     }), encoding="utf-8")
     return path
+
+
+def test_readme_recapture_route_example_documents_handoff_guards():
+    block = _readme_route_example_block()
+    for expected in [
+        "--require-source-boundary autocad_equivalence_claim=false",
+        "--require-request-boundary autocad_equivalence_claim=false",
+        "--require-request-boundary requires_returned_autocad_png=true",
+        "--require-request-boundary requires_viewspace_match=true",
+        "--forbid-action-domain input-review",
+        "--require-kind batch",
+        "--require-kind compare",
+        "--require-kind request_run",
+        "--require-route-count 3",
+        "--require-action-artifact-exists",
+    ]:
+        assert expected in block
 
 
 def _candidates(path: Path, ours: str, **extra) -> Path:
