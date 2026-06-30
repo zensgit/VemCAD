@@ -171,7 +171,12 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --require-request-boundary autocad_equivalence_claim=false \
   --require-request-boundary requires_returned_autocad_png=true \
   --require-request-boundary requires_viewspace_match=true \
+  --forbid-action-domain input \
   --forbid-action-domain input-review \
+  --forbid-action-domain renderer-candidate \
+  --forbid-viewspace-status mismatch \
+  --forbid-x3-band review \
+  --forbid-x3-band fallback \
   --require-kind batch \
   --require-kind compare \
   --require-kind request_run \
