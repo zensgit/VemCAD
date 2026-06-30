@@ -139,6 +139,25 @@ def _manifest_issue_dict(issue: dict[str, Any]) -> dict[str, str]:
     }
 
 
+def _issue_code_counts(issues: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for issue in issues:
+        code = _str(issue.get("code") if isinstance(issue, dict) else "")
+        if not code:
+            continue
+        counts[code] = counts.get(code, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _format_counts(counts: dict[str, Any]) -> str:
+    if not counts:
+        return ""
+    parts: list[str] = []
+    for key in sorted(counts):
+        parts.append(f"{key}={counts[key]}")
+    return ", ".join(parts)
+
+
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -361,6 +380,7 @@ def _artifact_index(
             "case_count": report.get("case_count"),
             "compared_count": report.get("compared_count"),
             "issue_count": len(report.get("issues") or []),
+            "issue_code_counts": report.get("issue_code_counts") or {},
             "triage_bucket_counts": _count_values(rows, "triage_bucket"),
             "recommended_action_domain_counts": _count_values(rows, "recommended_action_domain"),
             "viewspace_status_counts": _count_values(rows, "viewspace_status"),
@@ -432,6 +452,7 @@ def _write_markdown_summary(path: Path, report: dict[str, Any], *, contact_sheet
         f"- status: `{_md(report.get('status'))}`",
         f"- cases: `{report.get('compared_count', 0)}/{report.get('case_count', 0)}` compared",
         f"- issues: `{len(report.get('issues') or [])}`",
+        f"- issue_code_counts: `{_md(_format_counts(report.get('issue_code_counts') or {}))}`",
         f"- dry_run: `{bool(report.get('dry_run'))}`",
         "",
         "## Boundary",
@@ -887,6 +908,7 @@ def build_report(
         "compared_count": len(rows) if not dry_run else 0,
         "dry_run": dry_run,
         "issues": issues,
+        "issue_code_counts": _issue_code_counts(issues),
         "validation": validation,
         "rows": rows,
         "recommended_action_domain_counts": _count_values(rows, "recommended_action_domain"),

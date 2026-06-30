@@ -280,6 +280,7 @@ def _route_compare(payload: dict[str, Any]) -> dict[str, Any]:
         "status": status,
         "case_count": payload.get("case_count"),
         "compared_count": payload.get("compared_count"),
+        "compare_issue_code_counts": payload.get("issue_code_counts") or {},
         "triage_bucket_counts": triage,
         "viewspace_status_counts": payload.get("viewspace_status_counts") or {},
         "x3_band_counts": payload.get("x3_band_counts") or {},
@@ -386,6 +387,10 @@ def _route_batch_summary(routes: list[dict[str, Any]]) -> dict[str, Any]:
         "reference_intake_issue_code_counts": _sum_count_maps(
             routes,
             "reference_intake_issue_code_counts",
+        ),
+        "compare_issue_code_counts": _sum_count_maps(
+            routes,
+            "compare_issue_code_counts",
         ),
     }
     if compare_routes:
@@ -637,6 +642,11 @@ def _write_text(route: dict[str, Any]) -> str:
             "reference_intake_issue_code_counts: "
             + _format_counts(route["reference_intake_issue_code_counts"])
         )
+    if route.get("compare_issue_code_counts"):
+        lines.append(
+            "compare_issue_code_counts: "
+            + _format_counts(route["compare_issue_code_counts"])
+        )
     if route.get("triage_bucket_counts"):
         lines.append(f"triage_bucket_counts: {_format_counts(route['triage_bucket_counts'])}")
     if route.get("viewspace_status_counts"):
@@ -682,6 +692,11 @@ def _write_batch_text(payload: dict[str, Any]) -> str:
         summary.append(
             "reference_intake_issue_code_counts: "
             + _format_counts(payload["reference_intake_issue_code_counts"])
+        )
+    if payload.get("compare_issue_code_counts"):
+        summary.append(
+            "compare_issue_code_counts: "
+            + _format_counts(payload["compare_issue_code_counts"])
         )
     if payload.get("action_artifact_resolved"):
         summary.extend([
@@ -805,6 +820,11 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
             "- reference_intake_issue_code_counts: "
             f"{_md_code_cell(_format_counts(route['reference_intake_issue_code_counts']))}"
         )
+    if route.get("compare_issue_code_counts"):
+        lines.append(
+            "- compare_issue_code_counts: "
+            f"{_md_code_cell(_format_counts(route['compare_issue_code_counts']))}"
+        )
     if route.get("triage_bucket_counts"):
         lines.append(f"- triage_bucket_counts: {_md_code_cell(_format_counts(route['triage_bucket_counts']))}")
     if route.get("viewspace_status_counts"):
@@ -875,9 +895,15 @@ def _write_markdown(payload: dict[str, Any]) -> str:
                 "- reference_intake_issue_code_counts: "
                 f"{_md_code_cell(_format_counts(payload['reference_intake_issue_code_counts']))}",
             ])
+        if payload.get("compare_issue_code_counts"):
+            lines.extend([
+                "- compare_issue_code_counts: "
+                f"{_md_code_cell(_format_counts(payload['compare_issue_code_counts']))}",
+            ])
         if (
             payload.get("reference_request_validation_issue_code_counts")
             or payload.get("reference_intake_issue_code_counts")
+            or payload.get("compare_issue_code_counts")
         ):
             lines.append("")
         if action["artifact"]:
@@ -1030,6 +1056,7 @@ def _issue_code_counts(payload: dict[str, Any]) -> dict[str, int]:
     for key in (
         "reference_request_validation_issue_code_counts",
         "reference_intake_issue_code_counts",
+        "compare_issue_code_counts",
     ):
         values = payload.get(key)
         if not isinstance(values, dict):
@@ -1254,12 +1281,12 @@ def main(argv: list[str] | None = None) -> int:
                         ))
     parser.add_argument("--require-issue-code", action="append", default=[],
                         help=(
-                            "exit 2 unless the routed request/intake issue-code counts "
+                            "exit 2 unless the routed request/intake/compare issue-code counts "
                             "include this code; may repeat"
                         ))
     parser.add_argument("--forbid-issue-code", action="append", default=[],
                         help=(
-                            "exit 2 if the routed request/intake issue-code counts "
+                            "exit 2 if the routed request/intake/compare issue-code counts "
                             "include this code; may repeat"
                         ))
     parser.add_argument("--require-triage-bucket", action="append", default=[],

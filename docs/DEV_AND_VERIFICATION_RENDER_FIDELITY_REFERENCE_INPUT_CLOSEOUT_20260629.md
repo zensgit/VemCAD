@@ -5206,3 +5206,52 @@ python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
 python3 -m pytest tools/render_regression/tests -q
 # 187 passed
 ```
+
+## Follow-Up Compare Issue Code Counts
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make compare manifest/candidate input problems visible as issue-code
+  distributions, not just a raw `issue_count`.
+- Let `acad_artifact_route.py --require-issue-code/--forbid-issue-code` fail
+  closed on compare-layer issues such as `diagnostic_capture_method`,
+  `missing_candidate_cases`, or `candidate_case_missing`.
+- Preserve the existing routing discipline: issue-code counts do not change
+  action priority, do not turn `viewspace_mismatch` into renderer work, and do
+  not claim AutoCAD equivalence.
+
+Changes:
+
+- `acad_manifest_compare.py` now writes `issue_code_counts` into
+  `summary.json`, `summary.md`, and `artifact_index.json`.
+- `acad_artifact_route.py` preserves those counts as
+  `compare_issue_code_counts`.
+- Multi-route summaries aggregate `compare_issue_code_counts` alongside
+  request-validation and returned-reference intake issue-code counts.
+- Existing `--require-issue-code` and `--forbid-issue-code` guards now inspect
+  compare issue-code counts too.
+- `tools/render_regression/README.md` documents the expanded guard scope.
+
+Boundary:
+
+- Evidence and operator-routing hardening only.
+- No route priority change.
+- No default exit-code behavior change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_manifest_compare.py \
+  tools/render_regression/tests/test_acad_artifact_route.py -q
+# 77 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 188 passed
+```
