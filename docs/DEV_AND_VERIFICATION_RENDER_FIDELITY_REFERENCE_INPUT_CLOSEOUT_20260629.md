@@ -4020,3 +4020,48 @@ python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
 python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
+
+## Follow-Up Request-Run Route Compare Distribution Summary
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make the one-command `run_summary.json/md` show the same compare distribution
+  evidence that `route_summary.json/md` already carries.
+- Let operators inspect a request-run artifact without opening the nested route
+  summary just to learn whether the compare portion is `matched-pass`,
+  `viewspace_mismatch`, or an X3 failure distribution.
+
+Changes:
+
+- `acad_reference_request_run.py` now copies these route-summary aggregates
+  into `run_summary.json`:
+  - `route_compare_case_count`;
+  - `route_compared_count`;
+  - `route_triage_bucket_counts`;
+  - `route_viewspace_status_counts`;
+  - `route_x3_band_counts`.
+- `run_summary.md` prints the same fields when route summary evidence exists.
+- Regression coverage proves:
+  - a pass run shows `matched-pass=1`, `match=1`, `pass=1`;
+  - a mixed `viewspace_mismatch` run shows both `matched-pass` and
+    `recapture-required`, plus `match=1, mismatch=1`.
+
+Boundary:
+
+- Run-summary evidence only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```

@@ -420,6 +420,25 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
             "- route_recommended_action_domain_counts: "
             f"`{_format_case_action_counts(summary.get('route_recommended_action_domain_counts') or {})}`",
         ])
+        if summary.get("route_compare_case_count") is not None:
+            lines.append(f"- route_compare_case_count: `{summary['route_compare_case_count']}`")
+        if summary.get("route_compared_count") is not None:
+            lines.append(f"- route_compared_count: `{summary['route_compared_count']}`")
+        if summary.get("route_triage_bucket_counts"):
+            lines.append(
+                "- route_triage_bucket_counts: "
+                f"`{_format_case_action_counts(summary.get('route_triage_bucket_counts') or {})}`"
+            )
+        if summary.get("route_viewspace_status_counts"):
+            lines.append(
+                "- route_viewspace_status_counts: "
+                f"`{_format_case_action_counts(summary.get('route_viewspace_status_counts') or {})}`"
+            )
+        if summary.get("route_x3_band_counts"):
+            lines.append(
+                "- route_x3_band_counts: "
+                f"`{_format_case_action_counts(summary.get('route_x3_band_counts') or {})}`"
+            )
     lines.extend([
         "",
         "## Boundary",
@@ -595,6 +614,11 @@ def _write_run_summary(
         "route_recommended_action_domain_counts": (
             route_payload.get("recommended_action_domain_counts") or {}
         ),
+        "route_compare_case_count": route_payload.get("compare_case_count"),
+        "route_compared_count": route_payload.get("compared_count"),
+        "route_triage_bucket_counts": route_payload.get("triage_bucket_counts") or {},
+        "route_viewspace_status_counts": route_payload.get("viewspace_status_counts") or {},
+        "route_x3_band_counts": route_payload.get("x3_band_counts") or {},
     })
     _write_json(out_dir / "run_summary.json", payload)
     _write_markdown(out_dir / "run_summary.md", payload)
