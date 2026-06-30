@@ -298,6 +298,9 @@ When the request package also includes a readable `current_acad_png` path,
 request validation checks its declared SHA/size before fulfilment, so a hand
 edited or stale recapture request cannot silently weaken that rejected-reference
 reuse guard.
+If `reference_request.json` declares `case_count`, request validation checks it
+against the full unfiltered `cases[]` list before any `--case-id` selection, so
+stale or hand-edited request metadata cannot silently misstate the handoff size.
 It also shows the current view-space status, current X3 band, and requested
 expected size for each recapture case, so the handoff explains why a fresh
 AutoCAD export is needed and what size contract it should satisfy.
