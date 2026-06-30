@@ -856,6 +856,56 @@ python3 -m pytest tools/render_regression/tests -q
 # 101 passed
 ```
 
+## Follow-Up Request-Run Stale Compare Cleanup
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Prevent repeated `acad_reference_request_run.py` executions against the same
+  `--out-dir` from carrying stale compare artifacts into a later
+  input-blocked run.
+- Keep operator route evidence current when a previously successful run is
+  rerun after returned AutoCAD PNGs are removed or missing.
+
+Bug reproduced:
+
+- First run succeeds and writes `compare/summary.json`.
+- Second run reuses the same `--out-dir` but is blocked before compare because
+  a returned AutoCAD PNG is missing.
+- Before this fix, `run_summary.json`, `artifact_index.json`, and
+  `route_summary.json` could still reference the stale compare output and stale
+  `review-x3-pass` action.
+
+Changes:
+
+- `acad_reference_request_run.py` now clears run-level artifacts and the stale
+  `compare/` directory before each run.
+- The wrapper deliberately leaves `input/` ownership with
+  `acad_reference_batch.py`, which already clears and rewrites its own batch
+  artifacts.
+- A regression test now proves the second input-blocked run has:
+  - no `compare_summary_json`, `compare_summary_markdown`, or
+    `compare_artifact_index`;
+  - no stale `review-x3-pass` case action;
+  - route counts derived only from the current missing-reference state.
+
+Boundary:
+
+- Wrapper artifact hygiene only.
+- No renderer change.
+- No X3 scoring change.
+- No compare behavior change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# passed
+```
+
 ## Follow-Up Reference Request Boundary Metadata
 
 Status: implemented in this branch.
