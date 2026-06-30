@@ -878,15 +878,25 @@ def _write_batch_artifact_index(out_dir: Path, validation: dict[str, Any] | None
     return path
 
 
-def _write_batch_route_report(index_path: Path | None) -> None:
+def _write_batch_route_report(index_path: Path | None) -> dict[str, Any] | None:
     if index_path is None:
-        return
+        return None
     route_payload = artifact_route.route_artifact_index(index_path)
     artifact_route.write_route_report_files(
         route_payload,
         out_json=index_path.parent / "route_summary.json",
         out_md=index_path.parent / "route_summary.md",
     )
+    return route_payload
+
+
+def _print_route_summary(out_dir: Path, route_payload: dict[str, Any] | None, *, stream: Any = None) -> None:
+    if route_payload is None:
+        return
+    action = route_payload.get("recommended_next_action") or {}
+    target = stream or sys.stdout
+    print(f"  route summary  : {out_dir / 'route_summary.md'}", file=target)
+    print(f"  recommended next action: {action.get('code', '')}", file=target)
 
 
 def _batch_index_metadata(out_dir: Path, batch_validation: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -1138,11 +1148,12 @@ def main(argv: list[str] | None = None) -> int:
                 case_ids=set(args.case_id or []) or None,
             )
             index_path = _write_batch_artifact_index(args.out_dir, validation=validation)
-            _write_batch_route_report(index_path)
+            route_payload = _write_batch_route_report(index_path)
             print(f"AutoCAD reference request validation: {validation['status']} ({validation['case_count']} cases)")
             print(f"  validation     : {args.out_dir / 'reference_request_validation.json'}")
             if index_path is not None:
                 print(f"  artifact index : {index_path}")
+            _print_route_summary(args.out_dir, route_payload)
             if validation["issues"]:
                 for issue in validation["issues"]:
                     print(f"  {issue['severity']} {issue.get('case_id', '')} {issue['code']}: {issue['message']}")
@@ -1161,19 +1172,21 @@ def main(argv: list[str] | None = None) -> int:
             manifest_path, candidates_path, validation = build_files(args.cases, args.out_dir)
     except Exception as exc:
         index_path = _write_batch_artifact_index(args.out_dir)
-        _write_batch_route_report(index_path)
+        route_payload = _write_batch_route_report(index_path)
         print(f"AutoCAD reference batch: blocked ({exc})", file=sys.stderr)
         if index_path is not None:
             print(f"  artifact index : {index_path}", file=sys.stderr)
+        _print_route_summary(args.out_dir, route_payload, stream=sys.stderr)
         return 2
 
     index_path = _write_batch_artifact_index(args.out_dir, validation=validation)
-    _write_batch_route_report(index_path)
+    route_payload = _write_batch_route_report(index_path)
     print(f"AutoCAD reference batch: {validation['status']} ({validation['case_count']} cases)")
     print(f"  manifest       : {manifest_path}")
     print(f"  candidate cases: {candidates_path}")
     if index_path is not None:
         print(f"  artifact index : {index_path}")
+    _print_route_summary(args.out_dir, route_payload)
     if validation["issues"]:
         for issue in validation["issues"]:
             print(f"  {issue['severity']} {issue['case_id']} {issue['code']}: {issue['message']}")

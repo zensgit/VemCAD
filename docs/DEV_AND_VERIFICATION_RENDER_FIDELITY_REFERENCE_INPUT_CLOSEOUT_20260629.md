@@ -1341,6 +1341,44 @@ python3 -m pytest tools/render_regression/tests -q
 # 114 passed
 ```
 
+## Follow-Up Batch Route Stdout
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make `acad_reference_batch.py` logs self-directing in CI and unattended
+  shells.
+- Avoid requiring an operator to open `route_summary.json` just to see the next
+  safe action after input-prep.
+
+Changes:
+
+- After writing the batch route report, `acad_reference_batch.py` now prints:
+  - `route summary  : <out-dir>/route_summary.md`;
+  - `recommended next action: <code>`.
+- Successful manifest/request-validation/reference-intake paths print the
+  route on stdout.
+- Blocked input-prep paths print the route on stderr alongside the blocking
+  message and artifact index.
+
+Boundary:
+
+- CLI/log surfacing only.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 14 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 114 passed
+```
+
 Private compatibility smoke:
 
 ```bash
