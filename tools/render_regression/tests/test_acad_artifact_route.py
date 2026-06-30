@@ -1356,6 +1356,96 @@ def test_cli_require_source_boundary_fails_on_mismatch(tmp_path, capsys):
     assert "source boundary compares_renders=True != False" in stderr
 
 
+def test_cli_require_request_boundary_passes_when_exposed_routes_match(tmp_path):
+    input_dir = tmp_path / "input"
+    compare_dir = tmp_path / "compare"
+    input_dir.mkdir()
+    compare_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "boundary": {"compares_renders": False, "autocad_equivalence_claim": False},
+        "source_request_boundary": {
+            "requires_returned_autocad_png": True,
+            "requires_viewspace_match": True,
+            "autocad_equivalence_claim": False,
+        },
+        "stage": "reference_intake",
+        "status": "pass",
+        "case_count": 1,
+        "artifacts": [],
+    })
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "boundary": {"compares_renders": True, "autocad_equivalence_claim": False},
+        "status": "viewspace_mismatch",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"recapture-required": 1},
+        "viewspace_status_counts": {"mismatch": 1},
+        "x3_band_counts": {"fallback": 1},
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        str(compare_dir),
+        "--require-request-boundary",
+        "requires_returned_autocad_png=true",
+        "--require-request-boundary",
+        "autocad_equivalence_claim=false",
+    ]) == 0
+
+
+def test_cli_require_request_boundary_fails_when_no_route_exposes_it(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "boundary": {"compares_renders": False, "autocad_equivalence_claim": False},
+        "stage": "reference_intake",
+        "status": "pass",
+        "case_count": 1,
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--require-request-boundary",
+        "autocad_equivalence_claim=false",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "source request boundary requirement failed" in stderr
+    assert "no routed artifact exposed source_request_boundary" in stderr
+
+
+def test_cli_require_request_boundary_fails_on_mismatch(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "boundary": {"compares_renders": False, "autocad_equivalence_claim": False},
+        "source_request_boundary": {
+            "requires_returned_autocad_png": True,
+            "autocad_equivalence_claim": False,
+        },
+        "stage": "reference_intake",
+        "status": "pass",
+        "case_count": 1,
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--require-request-boundary",
+        "requires_returned_autocad_png=false",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "source request boundary requirement failed" in stderr
+    assert "source request boundary requires_returned_autocad_png=True != False" in stderr
+
+
 def test_recursive_rejects_directory_without_artifact_indexes(tmp_path):
     assert route.main([str(tmp_path), "--recursive"]) == 2
 
