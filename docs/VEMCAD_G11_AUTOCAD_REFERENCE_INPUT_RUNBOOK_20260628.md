@@ -231,6 +231,12 @@ routed without opening the summary first:
 | `review-x3-pass` | The matched-view gate passed. Review X3 and artifacts before opening renderer work. |
 | `inspect-compare-failure` | Inputs reached compare, but compare failed. Inspect compare artifacts and per-case logs. |
 
+For multi-drawing runs, inspect `case_actions` and `case_action_counts` in
+`run_summary.json`. `run_summary.md` also prints a "Case Actions" table. The
+case-level priority is intentionally fail-closed: request validation issues,
+missing returned PNGs, and intake warnings are listed before compare triage, so
+a suspicious input is not routed as a renderer defect.
+
 Generated requests may include source-DXF and candidate-PNG provenance
 (`sha256` + byte size). When present, `acad_reference_batch.py --from-request`
 checks those files before building the next manifest. A mismatch means the
