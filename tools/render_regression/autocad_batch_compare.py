@@ -92,6 +92,35 @@ def _load_cases(path: Path) -> list[dict[str, Any]]:
     return cases
 
 
+def _clear_batch_outputs(out_dir: Path) -> None:
+    for name in (
+        "summary.json",
+        "summary.tsv",
+        "semantic_summary.json",
+        "semantic_summary.tsv",
+        "tile_summary.json",
+        "tile_summary.tsv",
+        "semantic_tile_summary.json",
+        "semantic_tile_summary.tsv",
+        "contact_autocad.png",
+        "contact_vemcad.png",
+        "contact_overlay.png",
+    ):
+        path = out_dir / name
+        if path.is_file():
+            path.unlink()
+    for name in (
+        "overlays",
+        "styled_candidates",
+        "framed_candidates",
+        "framed_semantic_masks",
+        "tile_heatmaps",
+    ):
+        path = out_dir / name
+        if path.is_dir():
+            shutil.rmtree(path)
+
+
 def _thumb(path: Path, size: tuple[int, int]) -> Image.Image:
     img = Image.open(path).convert("RGB")
     thumb = ImageOps.contain(img, size)
@@ -535,6 +564,7 @@ def main(argv: list[str] | None = None) -> int:
 
     cases = _load_cases(args.cases)
     tile_grid = _parse_tile_grid(args.tile_grid) if args.tile_grid else None
+    _clear_batch_outputs(args.out_dir)
     args.out_dir.mkdir(parents=True, exist_ok=True)
     overlay_dir = args.out_dir / "overlays"
     overlay_dir.mkdir(parents=True, exist_ok=True)
