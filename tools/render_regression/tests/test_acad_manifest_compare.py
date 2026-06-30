@@ -136,17 +136,20 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path, capsys):
     assert row["diagnostics"]["X-Diff-Window-Source"] == "content_bbox"
     assert row["triage_rank"] == 1
     assert row["triage_bucket"] == "matched-pass"
+    assert row["recommended_action_domain"] == "pass-review"
+    assert summary["recommended_action_domain_counts"] == {"pass-review": 1}
     assert Path(row["viewspace_report"]).is_file()
     assert Path(row["overlay"]).is_file()
     assert (out / "summary.tsv").is_file()
     tsv_lines = (out / "summary.tsv").read_text(encoding="utf-8").splitlines()
-    assert "triage_rank\ttriage_bucket" in tsv_lines[0]
-    assert "\t1\tmatched-pass\t" in tsv_lines[1]
+    assert "triage_rank\ttriage_bucket\trecommended_action_domain" in tsv_lines[0]
+    assert "\t1\tmatched-pass\tpass-review\t" in tsv_lines[1]
     summary_md = (out / "summary.md").read_text(encoding="utf-8")
     assert "AutoCAD Manifest Compare Summary" in summary_md
     assert "status: `pass`" in summary_md
     assert "autocad_equivalence_claim: `False`" in summary_md
     assert "| `G11` | G11/B11 | `match` | `pass` |" in summary_md
+    assert "`pass-review`" in summary_md
     assert "viewspace_mismatch" in summary_md
     assert "## Triage Priority" in summary_md
     assert "| 1 | `G11` | `matched-pass` | `match` | `pass` |" in summary_md
@@ -166,6 +169,7 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path, capsys):
     assert artifact_index["compared_count"] == 1
     assert artifact_index["issue_count"] == 0
     assert artifact_index["triage_bucket_counts"] == {"matched-pass": 1}
+    assert artifact_index["recommended_action_domain_counts"] == {"pass-review": 1}
     assert artifact_index["viewspace_status_counts"] == {"match": 1}
     assert artifact_index["x3_band_counts"] == {"pass": 1}
     assert {item["kind"] for item in artifact_index["artifacts"]} >= {
@@ -243,6 +247,8 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert row["compare_exit_code"] == 2
     assert row["triage_rank"] == 1
     assert row["triage_bucket"] == "recapture-required"
+    assert row["recommended_action_domain"] == "input"
+    assert summary["recommended_action_domain_counts"] == {"input": 1}
     assert row["recommended_action"].startswith("recapture AutoCAD")
     assert summary["boundary"]["autocad_equivalence_claim"] is False
     summary_md = (out / "summary.md").read_text(encoding="utf-8")
@@ -250,12 +256,14 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert "It is not an AutoCAD-equivalence result" in summary_md
     assert "| `G11` | G11/B11 | `mismatch` | `fallback` |" in summary_md
     assert "| 1 | `G11` | `recapture-required` | `mismatch` | `fallback` |" in summary_md
+    assert "`input` | recapture AutoCAD" in summary_md
     assert (out / "contact_sheet.png").stat().st_size > 1000
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["status"] == "viewspace_mismatch"
     assert artifact_index["case_count"] == 1
     assert artifact_index["compared_count"] == 1
     assert artifact_index["triage_bucket_counts"] == {"recapture-required": 1}
+    assert artifact_index["recommended_action_domain_counts"] == {"input": 1}
     assert artifact_index["viewspace_status_counts"] == {"mismatch": 1}
     assert artifact_index["x3_band_counts"] == {"fallback": 1}
     route_summary = json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
@@ -358,4 +366,9 @@ def test_triage_rows_prioritize_matched_fail_then_recapture_then_pass():
         "renderer-candidate",
         "recapture-required",
         "matched-pass",
+    ]
+    assert [harness._recommended_action_domain(row) for row in ordered] == [
+        "renderer-candidate",
+        "input",
+        "pass-review",
     ]
