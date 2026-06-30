@@ -247,7 +247,11 @@ request-declared size; in that case the run stops before writing a compare
 manifest. The intake Markdown table also prints a compact diagnostic-only
 identity advisory (`returned=...`, `candidate=...`, optional
 `aspect_delta=...`) so operators can spot likely wrong-file, blank-export, or
-capture-window issues without opening `reference_intake.json`.
+capture-window issues without opening `reference_intake.json`. The same intake
+pass writes `reference_intake.tsv`, with one row per returned PNG and columns
+for actual/requested size, returned PNG SHA256+size, corner/alpha diagnostics,
+identity advisory, and per-case issue codes, so review/fail-closed jobs can
+upload the intake evidence without parsing Markdown.
 The request-validation, missing-reference, and intake Markdown tables escape
 operator-supplied cells (`|`, newlines, and code-span edge cases), so drawing
 IDs and output filenames cannot silently corrupt the table shape.

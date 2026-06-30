@@ -474,7 +474,21 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
     assert "AutoCAD Reference Intake Preflight" in intake_md
     assert "G11_autocad_model_extents.png" in intake_md
     assert "1600x1131" in intake_md
+    assert "reference_intake_tsv" in intake_md
     assert "issue_code_counts: `none`" in intake_md
+    intake_tsv = (out / "reference_intake.tsv").read_text(encoding="utf-8").splitlines()
+    assert intake_tsv[0] == (
+        "id\tdrawing_id\trecommended_output_name\treturned_png\twidth\theight\t"
+        "requested_expected_size\tlong_edge\tmode\thas_alpha\tcorner_white_ratio\t"
+        "sha256\tsize_bytes\tidentity_advisory\tissue_codes"
+    )
+    returned = tmp_path / "returned" / "G11_autocad_model_extents.png"
+    assert intake_tsv[1].startswith("G11\tG11/B11\tG11_autocad_model_extents.png\t")
+    assert "\t1600\t1131\t1600x1131\t1600\tRGB\tFalse\t1.0\t" in intake_tsv[1]
+    assert f"\t{_sha256(returned)}\t{returned.stat().st_size}\t" in intake_tsv[1]
+    assert "status=available returned=available candidate=available" in intake_tsv[1]
+    assert "diagnostic-only" in intake_tsv[1]
+    assert intake_tsv[1].endswith("\t")
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["boundary"]["compares_renders"] is False
     assert artifact_index["boundary"]["autocad_equivalence_claim"] is False
@@ -490,6 +504,7 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
         "candidate_cases",
         "reference_intake_json",
         "reference_intake_markdown",
+        "reference_intake_tsv",
         "reference_request_validation_json",
         "reference_request_validation_markdown",
         "reference_request_validation_tsv",
@@ -745,12 +760,16 @@ def test_batch_generator_blocks_returned_png_size_mismatch_when_request_declares
     assert "returned_png_size_mismatch" in intake_md
     assert "1200x900" in intake_md
     assert "1600x1131" in intake_md
+    intake_tsv = (out / "reference_intake.tsv").read_text(encoding="utf-8").splitlines()
+    assert "returned_png_size_mismatch" in intake_tsv[1]
+    assert "\t1200\t900\t1600x1131\t" in intake_tsv[1]
     artifact_kinds = {item["kind"] for item in artifact_index["artifacts"]}
     assert "acad_manifest" not in artifact_kinds
     assert "candidate_cases" not in artifact_kinds
     assert artifact_kinds >= {
         "reference_intake_json",
         "reference_intake_markdown",
+        "reference_intake_tsv",
         "reference_request_validation_json",
         "reference_request_validation_markdown",
     }
@@ -1024,6 +1043,9 @@ def test_batch_generator_intake_warns_on_low_resolution_or_non_white_png(tmp_pat
     assert "long_edge_below_requested=1" in intake_md
     assert "warning:long_edge_below_requested" in intake_md
     assert "warning:corner_background_not_white" in intake_md
+    intake_tsv = (out / "reference_intake.tsv").read_text(encoding="utf-8").splitlines()
+    assert "warning:long_edge_below_requested" in intake_tsv[1]
+    assert "warning:corner_background_not_white" in intake_tsv[1]
 
 
 def test_batch_generator_can_fail_closed_on_input_review_warnings(tmp_path):
@@ -1063,6 +1085,7 @@ def test_batch_generator_can_fail_closed_on_input_review_warnings(tmp_path):
     assert artifact_index["final_exit_code"] == 2
     assert artifact_index["fail_on_input_review"] is True
     assert artifact_index["reference_intake_issue_code_counts"] == {"long_edge_below_requested": 1}
+    assert "reference_intake_tsv" in {item["kind"] for item in artifact_index["artifacts"]}
 
 
 def test_batch_generator_intake_warns_on_candidate_returned_ink_aspect_divergence(tmp_path):

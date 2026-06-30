@@ -108,6 +108,21 @@ def _provenance_text(provenance: Any) -> str:
     return " ".join(parts)
 
 
+def _issue_code_labels(issues: Any) -> str:
+    if not isinstance(issues, list):
+        return ""
+    labels: list[str] = []
+    for item in issues:
+        if not isinstance(item, dict):
+            continue
+        code = _str(item.get("code"))
+        if not code:
+            continue
+        severity = _str(item.get("severity"))
+        labels.append(f"{severity}:{code}" if severity else code)
+    return ",".join(labels)
+
+
 def _image_size(path: Path) -> tuple[int, int]:
     with Image.open(path) as image:
         return image.size
@@ -898,11 +913,7 @@ def _write_reference_request_validation_report(
             candidate_prov = row.get("candidate_png_provenance")
             if not isinstance(candidate_prov, dict):
                 candidate_prov = {}
-            issue_codes = ",".join(
-                f"{_str(item.get('severity'))}:{_str(item.get('code'))}"
-                for item in row.get("issues") or []
-                if _str(item.get("code"))
-            )
+            issue_codes = _issue_code_labels(row.get("issues"))
             handle.write(
                 f"{_tsv(row.get('id'))}\t"
                 f"{_tsv(row.get('drawing_id'))}\t"
@@ -1107,6 +1118,7 @@ def _existing_batch_artifacts(out_dir: Path) -> list[dict[str, str]]:
         ("candidate_cases.json", "candidate_cases"),
         ("reference_intake.json", "reference_intake_json"),
         ("reference_intake.md", "reference_intake_markdown"),
+        ("reference_intake.tsv", "reference_intake_tsv"),
         ("missing_references.json", "missing_references_json"),
         ("missing_references.md", "missing_references_markdown"),
         ("missing_references.tsv", "missing_references_tsv"),
@@ -1130,6 +1142,7 @@ def _clear_batch_outputs(out_dir: Path) -> None:
         ("candidate_cases.json", "candidate_cases"),
         ("reference_intake.json", "reference_intake_json"),
         ("reference_intake.md", "reference_intake_markdown"),
+        ("reference_intake.tsv", "reference_intake_tsv"),
         ("missing_references.json", "missing_references_json"),
         ("missing_references.md", "missing_references_markdown"),
         ("missing_references.tsv", "missing_references_tsv"),
@@ -1379,13 +1392,40 @@ def _write_reference_intake_report(
     out_dir.mkdir(parents=True, exist_ok=True)
     json_path = out_dir / "reference_intake.json"
     md_path = out_dir / "reference_intake.md"
+    tsv_path = out_dir / "reference_intake.tsv"
     json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    with tsv_path.open("w", encoding="utf-8") as handle:
+        handle.write(
+            "id\tdrawing_id\trecommended_output_name\treturned_png\twidth\theight\t"
+            "requested_expected_size\tlong_edge\tmode\thas_alpha\tcorner_white_ratio\t"
+            "sha256\tsize_bytes\tidentity_advisory\tissue_codes\n"
+        )
+        for row in rows:
+            inspection = row["inspection"]
+            handle.write(
+                f"{_tsv(row.get('id'))}\t"
+                f"{_tsv(row.get('drawing_id'))}\t"
+                f"{_tsv(row.get('recommended_output_name'))}\t"
+                f"{_tsv(inspection.get('path'))}\t"
+                f"{_tsv(inspection.get('width'))}\t"
+                f"{_tsv(inspection.get('height'))}\t"
+                f"{_tsv(inspection.get('requested_expected_size'))}\t"
+                f"{_tsv(inspection.get('long_edge'))}\t"
+                f"{_tsv(inspection.get('mode'))}\t"
+                f"{_tsv(inspection.get('has_alpha'))}\t"
+                f"{_tsv(inspection.get('corner_white_ratio'))}\t"
+                f"{_tsv(inspection.get('sha256'))}\t"
+                f"{_tsv(inspection.get('size_bytes'))}\t"
+                f"{_tsv(_identity_advisory_text(inspection.get('identity_advisory') or {}))}\t"
+                f"{_tsv(_issue_code_labels(row.get('issues')))}\n"
+            )
     lines = [
         "# AutoCAD Reference Intake Preflight",
         "",
         f"- status: `{status}`",
         f"- request: `{request_json.resolve()}`",
         f"- reference_dir: `{reference_dir.resolve()}`",
+        f"- reference_intake_tsv: `{tsv_path}`",
         f"- cases: `{len(rows)}`",
         f"- errors: `{error_count}`",
         f"- warnings: `{warning_count}`",

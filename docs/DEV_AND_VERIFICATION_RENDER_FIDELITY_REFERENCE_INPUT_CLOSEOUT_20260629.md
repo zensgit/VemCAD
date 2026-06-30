@@ -1343,6 +1343,55 @@ python3 -m pytest tools/render_regression/tests -q
 # 192 passed
 ```
 
+## Follow-Up Reference Intake TSV
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make returned AutoCAD PNG intake preflight evidence machine-readable.
+- Let unattended CI, fail-closed review jobs, and spreadsheet handoff inspect
+  actual/requested size, returned PNG provenance, capture-quality warnings, and
+  identity-advisory hints without parsing `reference_intake.md`.
+
+Changes:
+
+- `acad_reference_batch.py --from-request` now writes
+  `reference_intake.tsv` beside `reference_intake.json/md` whenever returned
+  reference intake runs.
+- The TSV has one row per returned reference and records:
+  - case id / drawing id / recommended output name;
+  - returned PNG path, width, height, requested expected size, long edge, mode,
+    alpha flag, and corner white ratio;
+  - returned PNG SHA256 and file size;
+  - compact diagnostic-only identity advisory text;
+  - per-case `severity:issue_code` values.
+- Batch artifact indexes include `reference_intake_tsv`.
+- `_clear_batch_outputs()` removes stale `reference_intake.tsv`.
+- `reference_intake.md` now points at the sibling TSV.
+- The README documents the TSV as the machine-readable companion to the intake
+  Markdown preflight table.
+
+Boundary:
+
+- Returned-reference intake evidence surface only.
+- No intake rule change.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 22 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 192 passed
+```
+
 ## Follow-Up Route Case Action Issue-Code Counts
 
 Status: implemented in this branch.
