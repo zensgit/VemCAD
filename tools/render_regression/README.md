@@ -159,9 +159,13 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> --recursive --t
 `artifact_index.json`. These carry both `case_action_counts` and
 `case_action_domain_counts`, plus `recommended_next_action.domain`, so the run
 summary itself distinguishes input/recapture gates from renderer-candidate
-work before a separate route report is generated. It also writes
-`case_actions.tsv` for spreadsheet-friendly per-case sorting/filtering by
-action code, domain, source, triage bucket, view-space status, and X3 band.
+work before a separate route report is generated. The run summary also surfaces
+route-level `route_count`, `route_kind_counts`, `route_status_counts`,
+`route_recommended_action_counts`, and
+`route_recommended_action_domain_counts`, so operators can inspect the routed
+artifact topology without opening `route_summary.json`. It also writes
+`case_actions.tsv` for spreadsheet-friendly per-case sorting/filtering by action
+code, domain, source, triage bucket, view-space status, and X3 band.
 When returned AutoCAD PNGs are still missing, `acad_reference_batch.py` writes
 `missing_references.tsv` beside the JSON/Markdown report so the expected
 source DXF, optional source hash, output filenames, paths, capture method, view

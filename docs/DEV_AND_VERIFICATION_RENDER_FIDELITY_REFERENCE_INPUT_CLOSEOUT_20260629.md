@@ -509,6 +509,48 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Request-Run Route Distribution Summary
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make `run_summary.json/md` a complete operator summary for request-run route
+  topology and action distribution.
+- Avoid requiring operators to open `route_summary.json` just to see whether
+  the run routed the expected input, request-run, and compare artifact indexes.
+
+Changes:
+
+- `acad_reference_request_run.py` now copies route-level distribution fields
+  into `run_summary.json` after generating the route summary:
+  - `route_count`
+  - `route_kind_counts`
+  - `route_status_counts`
+  - `route_recommended_action_counts`
+  - `route_recommended_action_domain_counts`
+- `run_summary.md` prints the same fields near the top-level recommendation.
+- `tools/render_regression/README.md` documents the operator-facing behavior.
+
+Boundary:
+
+- Request-run report surfacing only.
+- No route priority change.
+- No renderer change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Route Status Guards
 
 Status: implemented in this branch.
