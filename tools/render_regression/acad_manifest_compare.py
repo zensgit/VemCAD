@@ -730,6 +730,7 @@ def _write_reference_request(
         "  --require-request-boundary autocad_equivalence_claim=false \\",
         "  --require-request-boundary requires_returned_autocad_png=true \\",
         "  --require-request-boundary requires_viewspace_match=true \\",
+        "  --require-route-count 3 \\",
         "  --require-action-artifact-exists",
         "```",
         "",

@@ -5389,3 +5389,45 @@ python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
 python3 -m pytest tools/render_regression/tests -q
 # 189 passed
 ```
+
+## Follow-Up Recapture Route Count Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make generated `reference_request.md` post-return handoff commands prove the
+  full request-run route shape before operators interpret pixels.
+- Fail closed when the recursive route did not produce the expected
+  `batch + compare + request_run` evidence chain.
+- Keep partial-return support intact: operators can repeat `--case-id <ID>` for
+  returned cases only; a successful selected run still produces the same three
+  route entries.
+
+Changes:
+
+- `acad_manifest_compare.py` now adds `--require-route-count 3` to the
+  generated post-return `acad_artifact_route.py <next-run-dir> --recursive`
+  command in `reference_request.md`.
+- The generated handoff test asserts the route-count guard appears exactly once
+  beside the existing boundary and action-artifact guards.
+
+Boundary:
+
+- Generated operator handoff hardening only.
+- No route priority change.
+- No default exit-code behavior change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 8 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 189 passed
+```
