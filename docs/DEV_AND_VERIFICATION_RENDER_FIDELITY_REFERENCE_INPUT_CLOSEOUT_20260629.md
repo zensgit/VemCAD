@@ -4407,3 +4407,43 @@ Verification:
 python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
 # passed
 ```
+
+## Follow-Up Request-Run Markdown Case Action Escaping
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Extend Markdown table escaping to the top-level unattended run summary.
+- Keep `run_summary.md` reliable when case action rows inherit drawing IDs,
+  output paths, or artifact paths containing Markdown table metacharacters.
+
+Changes:
+
+- `acad_reference_request_run.py` now formats run-summary artifact links and
+  Case Actions table cells through local Markdown-safe helpers.
+- The Case Actions table escapes case IDs, drawing IDs, action code/domain,
+  source, triage/issue cells, and artifact paths.
+- Regression coverage runs the full request-run pipeline with a drawing ID
+  containing `|` plus a newline and returned/candidate/output paths containing
+  `|`, then asserts the top-level Case Actions table keeps the expected number
+  of unescaped Markdown delimiters.
+- `tools/render_regression/README.md` now states that request-run summaries use
+  the same operator-cell escaping for case-action rows and artifact links.
+
+Boundary:
+
+- Operator report formatting only.
+- JSON and TSV payloads remain unchanged structured sources of truth.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# passed
+```

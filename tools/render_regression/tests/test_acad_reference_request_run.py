@@ -32,6 +32,19 @@ def _run_artifact_kinds(out: Path) -> set[str]:
     return {item["kind"] for item in payload["artifacts"]}
 
 
+def _unescaped_pipe_count(line: str) -> int:
+    count = 0
+    escaped = False
+    for char in line:
+        if char == "\\" and not escaped:
+            escaped = True
+            continue
+        if char == "|" and not escaped:
+            count += 1
+        escaped = False
+    return count
+
+
 def _png(path: Path, size=(760, 570), box=None, color=(255, 255, 255)) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
     image = Image.new("RGB", size, color)
@@ -306,6 +319,52 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     }
     assert "AutoCAD Artifact Route Report" in route_summary_md
     assert "claim AutoCAD equivalence" in route_summary_md
+
+
+def test_reference_request_run_escapes_markdown_case_action_cells(tmp_path):
+    _dxf(tmp_path / "dxf" / "B11.dxf")
+    _png(tmp_path / "ours" / "G11|ours.png", size=(1600, 1131), box=[40, 30, 1560, 1100])
+    _png(
+        tmp_path / "returned" / "G11|acad_model_extents.png",
+        size=(1600, 1131),
+        box=[40, 30, 1560, 1100],
+    )
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "reason": "recapture-required",
+        "boundary": dict(REQUEST_BOUNDARY),
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11|bearing\ncap",
+            "source_dxf": "dxf/B11.dxf",
+            "recommended_output_name": "G11|acad_model_extents.png",
+            "requested_capture_method": "plot-export",
+            "requested_view_contract": "model-extents",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{
+        "id": "G11",
+        "ours": "ours/G11|ours.png",
+        "diagnostics": {"window_source": "content_bbox"},
+    }]), encoding="utf-8")
+
+    out = tmp_path / "run|markdown"
+
+    assert runner.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--case-id", "G11",
+        "--out-dir", str(out),
+    ]) == 0
+
+    summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
+    row = next(line for line in summary_md.splitlines() if line.startswith("| `G11` |"))
+    assert "G11\\|bearing cap" in row
+    assert _unescaped_pipe_count(row) == 8
+    assert "run\\|markdown" in summary_md
 
 
 def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsys):
