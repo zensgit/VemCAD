@@ -1112,6 +1112,49 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 10 passed
 ```
 
+## Follow-Up Missing Reference Markdown Source SHA
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep the human-readable missing-reference handoff as self-contained as the
+  JSON/TSV artifacts.
+- Let an operator verify the source DXF identity directly from
+  `missing_references.md` before exporting the requested AutoCAD PNG.
+- Avoid forcing a Markdown-only handoff reader to open TSV/JSON just to inspect
+  `source_dxf_sha256`.
+
+Changes:
+
+- `missing_references.md` now includes a `Source SHA256` table column.
+- The value is sourced from the existing `source_dxf_sha256` already carried in
+  `missing_references.json` and `missing_references.tsv`.
+- Regression coverage asserts:
+  - the Markdown header includes `Source SHA256`;
+  - the expected hash appears in the normal missing-reference handoff;
+  - table escaping still preserves shape after the new column.
+- `tools/render_regression/README.md` now documents that Markdown also surfaces
+  the source SHA column.
+
+Boundary:
+
+- Missing-input handoff evidence only.
+- No JSON/TSV schema change.
+- No route priority change.
+- No renderer change.
+- No compare metric change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 21 passed
+```
+
 ## Follow-Up Request-Run Route Summary Stdout
 
 Status: implemented in this branch.

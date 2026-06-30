@@ -776,7 +776,9 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path, capsys):
     assert missing["missing"][0]["requested_expected_size"] == "1600x1131"
     missing_md = (out / "missing_references.md").read_text(encoding="utf-8")
     assert "Missing AutoCAD Reference PNGs" in missing_md
+    assert "Source SHA256" in missing_md
     assert "dxf/G11.dxf" in missing_md
+    assert _sha256(source) in missing_md
     assert "G11_autocad_model_extents.png" in missing_md
     assert "`plot-export`" in missing_md
     assert "`model-extents`" in missing_md
@@ -847,8 +849,9 @@ def test_batch_generator_escapes_missing_reference_markdown_table_cells(tmp_path
     missing_md = (out / "missing_references.md").read_text(encoding="utf-8")
     row = next(line for line in missing_md.splitlines() if line.startswith("| `G11` |"))
     assert "G11\\|bearing cap" in row
+    assert _sha256(source) in row
     assert "`G11\\|acad_model_extents.png`" in row
-    assert _unescaped_pipe_count(row) == 9
+    assert _unescaped_pipe_count(row) == 10
 
 
 def test_batch_generator_clears_stale_missing_reports_on_successful_rerun(tmp_path):
