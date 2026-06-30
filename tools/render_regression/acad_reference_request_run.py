@@ -375,6 +375,7 @@ def _case_evidence_text(action: dict[str, Any]) -> str:
     parts: list[str] = []
     for label, prefix in (
         ("source", "source_dxf"),
+        ("current_acad", "current_acad_png"),
         ("candidate", "candidate_png"),
         ("returned", "returned_png"),
     ):
@@ -399,6 +400,10 @@ def _case_evidence(validation_row: Any, intake_row: Any) -> dict[str, Any]:
     evidence: dict[str, Any] = {}
     if isinstance(validation_row, dict):
         evidence.update(_provenance_fields("source_dxf", validation_row.get("source_dxf_provenance")))
+        evidence.update(_provenance_fields(
+            "current_acad_png",
+            validation_row.get("current_acad_png_provenance"),
+        ))
         evidence.update(_provenance_fields("candidate_png", validation_row.get("candidate_png_provenance")))
         output_name = str(validation_row.get("recommended_output_name") or "")
         if output_name:
@@ -450,7 +455,8 @@ def _write_case_actions_tsv(path: Path, case_actions: list[dict[str, Any]]) -> N
         handle.write(
             "id\tdrawing_id\tcode\tdomain\tsource\ttriage_bucket\t"
             "viewspace_status\tx3_band\tissue_count\tissue_codes\trecommended_output_name\t"
-            "source_dxf_sha256\tsource_dxf_size_bytes\tcandidate_png_sha256\t"
+            "source_dxf_sha256\tsource_dxf_size_bytes\tcurrent_acad_png_sha256\t"
+            "current_acad_png_size_bytes\tcandidate_png_sha256\t"
             "candidate_png_size_bytes\treturned_png_sha256\treturned_png_size_bytes\t"
             "returned_png_size\tidentity_advisory\tevidence\t"
             "artifact\tartifact_resolved\tartifact_exists\n"
@@ -470,6 +476,8 @@ def _write_case_actions_tsv(path: Path, case_actions: list[dict[str, Any]]) -> N
                 f"{_tsv(action.get('recommended_output_name'))}\t"
                 f"{_tsv(action.get('source_dxf_sha256'))}\t"
                 f"{_tsv(action.get('source_dxf_size_bytes'))}\t"
+                f"{_tsv(action.get('current_acad_png_sha256'))}\t"
+                f"{_tsv(action.get('current_acad_png_size_bytes'))}\t"
                 f"{_tsv(action.get('candidate_png_sha256'))}\t"
                 f"{_tsv(action.get('candidate_png_size_bytes'))}\t"
                 f"{_tsv(action.get('returned_png_sha256'))}\t"

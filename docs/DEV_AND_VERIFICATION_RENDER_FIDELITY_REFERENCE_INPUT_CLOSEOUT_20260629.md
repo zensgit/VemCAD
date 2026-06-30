@@ -1294,6 +1294,49 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 11 passed
 ```
 
+## Follow-Up Case Action Current AutoCAD Evidence
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Carry the newly validated `current_acad_png` provenance into the final
+  one-command `case_actions[]` / `case_actions.tsv` surface.
+- Make rejected-reference reuse failures self-contained in the top-level
+  operator table: the row now shows both the rejected/current AutoCAD PNG SHA and
+  the returned PNG SHA.
+
+Changes:
+
+- `case_actions[]` evidence now includes optional:
+  - `current_acad_png_sha256`
+  - `current_acad_png_size_bytes`
+- `case_actions.tsv` adds `current_acad_png_sha256` and
+  `current_acad_png_size_bytes` columns.
+- Compact `evidence` strings now include `current_acad=<sha:size>` when
+  available.
+- `run_summary.md` receives the same compact evidence through its Case Actions
+  table.
+- The README documents that case actions carry current/rejected AutoCAD
+  provenance when available.
+
+Boundary:
+
+- Operator evidence/reporting only.
+- No request/intake validation rule change.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 12 passed
+```
+
 ## Follow-Up Current AutoCAD Provenance Validation
 
 Status: implemented in this branch.
