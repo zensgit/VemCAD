@@ -509,10 +509,10 @@ Verification:
 
 ```bash
 python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
-# passed
+# 18 passed
 
 python3 -m pytest tools/render_regression/tests -q
-# passed
+# 174 passed
 ```
 
 ## Follow-Up Route Kind Guards
@@ -548,6 +548,49 @@ Verification:
 ```bash
 python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
 # 62 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 174 passed
+```
+
+## Follow-Up Intake Identity Advisory Markdown
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let operators see the returned-vs-candidate identity advisory directly in
+  `reference_intake.md`.
+- Avoid forcing a JSON lookup when a returned AutoCAD PNG is blank, the
+  candidate render is blank, or the ink bbox aspect strongly diverges.
+
+Changes:
+
+- `acad_reference_batch.py` adds a compact Markdown field for
+  `inspection.identity_advisory`:
+  - advisory status;
+  - returned ink status;
+  - candidate ink status;
+  - optional `aspect_delta`;
+  - explicit `diagnostic-only` marker.
+- The intake Markdown table gets a new `Identity advisory` column.
+- `tools/render_regression/README.md` documents that the Markdown report now
+  surfaces this diagnostic-only identity hint.
+
+Boundary:
+
+- Report visibility only.
+- Diagnostic-only; not a pass/fail gate.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 18 passed
 
 python3 -m pytest tools/render_regression/tests -q
 # 174 passed
