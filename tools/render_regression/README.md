@@ -165,6 +165,10 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> --recursive --t
   `fix-request-package`, `provide-returned-autocad-pngs`,
   `recapture-autocad-or-provide-window`, `inspect-renderer-candidate`, and
   `review-x3-pass`.
+- every recommended action also carries `domain`, such as `input`,
+  `renderer-candidate`, `pass-review`, or `continue`, so unattended jobs can
+  distinguish "get better AutoCAD input" from "inspect renderer output" without
+  parsing action-code strings.
 - `acad_artifact_route.py --require-action <code>` exits `2` if the top-level
   action is not the expected one. Example CI guard:
 
@@ -172,6 +176,16 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> --recursive --t
 python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --recursive \
   --require-action review-x3-pass
+```
+
+When a script only needs to assert the action class, use
+`--require-action-domain <domain>`. For example, this fails closed if a batch
+routes to renderer work instead of an input/recapture gate:
+
+```bash
+python3 tools/render_regression/acad_artifact_route.py <run-dir> \
+  --recursive \
+  --require-action-domain input
 ```
 
 To assert source artifact boundaries as part of the same route step, repeat
