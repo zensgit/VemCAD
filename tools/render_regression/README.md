@@ -211,6 +211,18 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --require-action-domain input
 ```
 
+When a workflow also needs to assert that the chosen action points at the
+expected handoff artifact, use `--require-action-artifact <path-suffix>`.
+Suffix matching keeps the guard stable across absolute CI paths:
+
+```bash
+python3 tools/render_regression/acad_artifact_route.py <run-dir> \
+  --recursive \
+  --require-action provide-returned-autocad-pngs \
+  --require-action-domain input \
+  --require-action-artifact missing_references.md
+```
+
 To assert source artifact boundaries as part of the same route step, repeat
 `--require-source-boundary key=value`. For example, this guarantees every
 routed source artifact explicitly says it is not an AutoCAD-equivalence claim:
