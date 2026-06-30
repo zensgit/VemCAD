@@ -393,6 +393,73 @@ def test_cli_require_action_artifact_exists_resolves_relative_to_artifact_index(
     ]) == 0
 
 
+def test_route_payload_reports_resolved_action_artifact(tmp_path):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    (input_dir / "missing_references.md").write_text("# Missing\n", encoding="utf-8")
+    index = _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "missing_references",
+        "status": "blocked",
+        "case_count": 1,
+        "artifacts": [
+            {"kind": "missing_references_markdown", "path": "missing_references.md"},
+        ],
+    })
+
+    payload = route.route_artifact_index(index)
+    text = route._write_text(payload)
+    markdown = route.route_markdown(payload)
+
+    assert payload["recommended_next_action"]["artifact"] == "missing_references.md"
+    assert payload["action_artifact_resolved"] == str(input_dir / "missing_references.md")
+    assert payload["action_artifact_exists"] is True
+    assert f"action_artifact_resolved: {input_dir / 'missing_references.md'}" in text
+    assert "action_artifact_exists: true" in text
+    assert f"- action_artifact_resolved: `{input_dir / 'missing_references.md'}`" in markdown
+    assert "- action_artifact_exists: `True`" in markdown
+
+
+def test_batch_route_payload_reports_selected_action_artifact_resolution(tmp_path):
+    input_dir = tmp_path / "input"
+    compare_dir = tmp_path / "compare"
+    input_dir.mkdir()
+    compare_dir.mkdir()
+    (input_dir / "missing_references.md").write_text("# Missing\n", encoding="utf-8")
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "missing_references",
+        "status": "blocked",
+        "case_count": 1,
+        "artifacts": [
+            {"kind": "missing_references_markdown", "path": "missing_references.md"},
+        ],
+    })
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"recapture-required": 1},
+        "viewspace_status_counts": {"mismatch": 1},
+        "x3_band_counts": {"fallback": 1},
+        "artifacts": [],
+    })
+
+    payload = route.route_artifact_indexes([input_dir, compare_dir])
+    text = route._write_batch_text(payload)
+    markdown = route.route_markdown(payload)
+
+    assert payload["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
+    assert payload["recommended_next_action"]["source_artifact_index"].endswith("input/artifact_index.json")
+    assert payload["action_artifact_resolved"] == str(input_dir / "missing_references.md")
+    assert payload["action_artifact_exists"] is True
+    assert f"action_artifact_resolved: {input_dir / 'missing_references.md'}" in text
+    assert "action_artifact_exists: true" in text
+    assert f"- action_artifact_resolved: `{input_dir / 'missing_references.md'}`" in markdown
+    assert "- action_artifact_exists: `True`" in markdown
+
+
 def test_cli_require_action_artifact_exists_fails_closed_when_missing(tmp_path, capsys):
     input_dir = tmp_path / "input"
     input_dir.mkdir()

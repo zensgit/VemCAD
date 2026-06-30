@@ -499,6 +499,47 @@ python3 -m pytest tools/render_regression/tests -q
 # 101 passed
 ```
 
+## Follow-Up Action Artifact Resolution Report
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make route reports directly actionable when they select a handoff artifact.
+- Avoid a second "open the artifact index, then manually resolve the relative
+  path" step in CI logs or uploaded Markdown reports.
+
+Changes:
+
+- `acad_artifact_route.py` now annotates single-route and multi-route payloads
+  with:
+  - `action_artifact_resolved`
+  - `action_artifact_exists`
+- Relative action artifacts are resolved with the same source
+  `artifact_index.json` rule already used by `--require-action-artifact-exists`.
+- Text and Markdown route reports print the resolved path and existence state
+  when a selected action names an artifact.
+- Tests cover single-route and batch-route reporting.
+
+Boundary:
+
+- Route-report evidence only.
+- No route priority change.
+- No route gate semantics change.
+- No renderer change.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- No private drawing or AutoCAD PNG committed.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Standalone Compare Route Reports
 
 Status: implemented in this branch.
