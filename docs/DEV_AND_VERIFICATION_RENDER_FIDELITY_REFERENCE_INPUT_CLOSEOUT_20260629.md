@@ -1294,6 +1294,47 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 11 passed
 ```
 
+## Follow-Up Route Case Action Issue-Code Counts
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Surface the new per-case `case_actions[].issue_codes` through
+  `acad_artifact_route.py`, so CI route reports and recursive artifact routing
+  can show the exact defect classes without opening `run_summary.json`.
+- Keep this as a reporting-only route aggregation; it does not change the
+  recommended action or route priority.
+
+Changes:
+
+- Request-run routes now compute `case_action_issue_code_counts` from
+  `case_actions[].issue_codes`.
+- Recursive/multi-artifact route summaries aggregate
+  `case_action_issue_code_counts` across nested request-run routes.
+- Route text and Markdown reports print the new counts.
+- The README documents that route reports surface request/intake/case-action
+  issue-code counts.
+
+Boundary:
+
+- Route evidence/reporting only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# 70 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 192 passed
+```
+
 ## Follow-Up Batch Input-Review Fail Flag
 
 Status: implemented in this branch.

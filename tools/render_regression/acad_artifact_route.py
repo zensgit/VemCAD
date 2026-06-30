@@ -192,11 +192,13 @@ def _route_batch(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _route_run(payload: dict[str, Any]) -> dict[str, Any]:
+    case_actions = payload.get("case_actions") or []
     route = {
         "kind": "request_run",
         "status": str(payload.get("status") or ""),
         "case_action_counts": payload.get("case_action_counts") or {},
         "case_action_domain_counts": payload.get("case_action_domain_counts") or {},
+        "case_action_issue_code_counts": _case_action_issue_code_counts(case_actions),
         "reference_request_validation_status": str(payload.get("reference_request_validation_status") or ""),
         "reference_request_validation_error_count": payload.get("reference_request_validation_error_count"),
         "reference_request_validation_warning_count": payload.get("reference_request_validation_warning_count"),
@@ -208,7 +210,7 @@ def _route_run(payload: dict[str, Any]) -> dict[str, Any]:
         "reference_intake_error_count": payload.get("reference_intake_error_count"),
         "reference_intake_warning_count": payload.get("reference_intake_warning_count"),
         "reference_intake_issue_code_counts": payload.get("reference_intake_issue_code_counts") or {},
-        "case_actions": payload.get("case_actions") or [],
+        "case_actions": case_actions,
         "recommended_next_action": _normalize_recommended_action(
             payload.get("recommended_next_action"),
             _action(
@@ -354,6 +356,19 @@ def _sum_count_maps(routes: list[dict[str, Any]], key: str) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
+def _case_action_issue_code_counts(case_actions: list[Any]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for action in case_actions:
+        if not isinstance(action, dict):
+            continue
+        for raw in str(action.get("issue_codes") or "").split(","):
+            code = raw.strip()
+            if not code:
+                continue
+            counts[code] = counts.get(code, 0) + 1
+    return dict(sorted(counts.items()))
+
+
 def _sum_int_field(routes: list[dict[str, Any]], key: str) -> int | None:
     total = 0
     seen = False
@@ -389,6 +404,10 @@ def _route_batch_summary(routes: list[dict[str, Any]]) -> dict[str, Any]:
         "reference_intake_issue_code_counts": _sum_count_maps(
             routes,
             "reference_intake_issue_code_counts",
+        ),
+        "case_action_issue_code_counts": _sum_count_maps(
+            routes,
+            "case_action_issue_code_counts",
         ),
         "compare_issue_code_counts": _sum_count_maps(
             routes,
@@ -589,6 +608,8 @@ def _write_text(route: dict[str, Any]) -> str:
         lines.append(f"case_action_counts: {_format_counts(route['case_action_counts'])}")
     if route.get("case_action_domain_counts"):
         lines.append(f"case_action_domain_counts: {_format_counts(route['case_action_domain_counts'])}")
+    if route.get("case_action_issue_code_counts"):
+        lines.append(f"case_action_issue_code_counts: {_format_counts(route['case_action_issue_code_counts'])}")
     if route.get("route_count") is not None:
         lines.append(f"route_count: {route.get('route_count')}")
     if route.get("route_kind_counts"):
@@ -704,6 +725,11 @@ def _write_batch_text(payload: dict[str, Any]) -> str:
             "reference_intake_issue_code_counts: "
             + _format_counts(payload["reference_intake_issue_code_counts"])
         )
+    if payload.get("case_action_issue_code_counts"):
+        summary.append(
+            "case_action_issue_code_counts: "
+            + _format_counts(payload["case_action_issue_code_counts"])
+        )
     if payload.get("compare_issue_code_counts"):
         summary.append(
             "compare_issue_code_counts: "
@@ -772,6 +798,11 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         lines.append(f"- case_action_counts: {_md_code_cell(_format_counts(route['case_action_counts']))}")
     if route.get("case_action_domain_counts"):
         lines.append(f"- case_action_domain_counts: {_md_code_cell(_format_counts(route['case_action_domain_counts']))}")
+    if route.get("case_action_issue_code_counts"):
+        lines.append(
+            "- case_action_issue_code_counts: "
+            f"{_md_code_cell(_format_counts(route['case_action_issue_code_counts']))}"
+        )
     if route.get("route_count") is not None:
         lines.append(f"- route_count: {_md_code_cell(route.get('route_count'))}")
     if route.get("route_kind_counts"):
@@ -911,6 +942,11 @@ def _write_markdown(payload: dict[str, Any]) -> str:
                 "- reference_intake_issue_code_counts: "
                 f"{_md_code_cell(_format_counts(payload['reference_intake_issue_code_counts']))}",
             ])
+        if payload.get("case_action_issue_code_counts"):
+            lines.extend([
+                "- case_action_issue_code_counts: "
+                f"{_md_code_cell(_format_counts(payload['case_action_issue_code_counts']))}",
+            ])
         if payload.get("compare_issue_code_counts"):
             lines.extend([
                 "- compare_issue_code_counts: "
@@ -919,6 +955,7 @@ def _write_markdown(payload: dict[str, Any]) -> str:
         if (
             payload.get("reference_request_validation_issue_code_counts")
             or payload.get("reference_intake_issue_code_counts")
+            or payload.get("case_action_issue_code_counts")
             or payload.get("compare_issue_code_counts")
         ):
             lines.append("")
