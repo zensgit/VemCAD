@@ -201,6 +201,11 @@ It returns the comparison exit code, so `viewspace_mismatch` still exits `2`.
 The wrapper is only an orchestration convenience; it does not render DXFs and
 does not replace the X3 gate.
 
+Generated requests may include source-DXF and candidate-PNG provenance
+(`sha256` + byte size). When present, `acad_reference_batch.py --from-request`
+checks those files before building the next manifest. A mismatch means the
+request/candidate inputs drifted and the run blocks before X3.
+
 ```bash
 python3 tools/render_regression/acad_manifest_compare.py \
   --manifest "$NEXT_DIR/input/acad_manifest.json" \

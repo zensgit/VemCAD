@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+import hashlib
 import io
 import json
 import sys
@@ -440,6 +441,22 @@ def _png_size(path: str) -> dict[str, int] | None:
     return {"width": width, "height": height}
 
 
+def _file_provenance(path: str) -> dict[str, Any] | None:
+    if not path:
+        return None
+    file_path = Path(path)
+    if not file_path.is_file():
+        return None
+    digest = hashlib.sha256()
+    with file_path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return {
+        "sha256": digest.hexdigest(),
+        "size_bytes": file_path.stat().st_size,
+    }
+
+
 def _write_reference_request(
     out_dir: Path,
     rows: list[dict[str, Any]],
@@ -475,6 +492,14 @@ def _write_reference_request(
         expected_size = _png_size(_str(row.get("acad_png")))
         if expected_size is not None:
             case["requested_expected_size"] = expected_size
+        source_provenance = _file_provenance(_str(row.get("source_dxf")))
+        if source_provenance is not None:
+            case["source_dxf_sha256"] = source_provenance["sha256"]
+            case["source_dxf_size_bytes"] = source_provenance["size_bytes"]
+        candidate_provenance = _file_provenance(_str(row.get("ours")))
+        if candidate_provenance is not None:
+            case["candidate_png_sha256"] = candidate_provenance["sha256"]
+            case["candidate_png_size_bytes"] = candidate_provenance["size_bytes"]
         cases.append(case)
     payload = {
         "schema": "vemcad.acad_reference_request/v1",

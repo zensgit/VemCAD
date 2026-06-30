@@ -205,3 +205,68 @@ Boundary:
 - No renderer change.
 - No private drawing or AutoCAD PNG committed.
 - Still no AutoCAD-equivalence claim without `viewspace_status=match`.
+
+## Follow-Up Provenance Hardening
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make generated request packages reproducible enough to detect source or
+  candidate drift between request generation and returned-reference fulfilment.
+- Record returned AutoCAD PNG hashes for evidence review without pretending a
+  hash proves the PNG depicts the right drawing.
+
+Changes:
+
+- Generated `reference_request.json` now carries:
+  - `source_dxf_sha256`
+  - `source_dxf_size_bytes`
+  - `candidate_png_sha256`
+  - `candidate_png_size_bytes`
+- `acad_reference_batch.py --from-request` fail-closes when a request declares
+  a source DXF or candidate PNG sha256 and the current file does not match.
+- `reference_intake.json` now records the returned AutoCAD PNG sha256 and file
+  size in `inspection`.
+- Older request files without these provenance fields remain supported.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 10 passed
+
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 6 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 96 passed
+```
+
+Private compatibility smoke:
+
+```bash
+python3 tools/render_regression/acad_reference_request_run.py \
+  --from-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir /private/tmp/vemcad-provenance-compat-smoke-20260629/returned \
+  --case-id G11 \
+  --out-dir /private/tmp/vemcad-provenance-compat-smoke-20260629/run
+# AutoCAD reference request run: viewspace_mismatch
+# exit code: 2
+```
+
+Smoke result:
+
+- old request without provenance fields remains compatible;
+- input-prep passed;
+- compare remained `viewspace_mismatch`;
+- returned PNG sha256 was recorded in `reference_intake.json`.
+
+Boundary:
+
+- Provenance hardening only.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- Does not attempt to infer whether the returned PNG depicts the same drawing;
+  the matched-view X3 gate remains the only fidelity gate.

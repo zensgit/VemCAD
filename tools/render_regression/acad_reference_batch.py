@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -28,6 +29,17 @@ def _str(value: Any) -> str:
 def _image_size(path: Path) -> tuple[int, int]:
     with Image.open(path) as image:
         return image.size
+
+
+def _file_provenance(path: Path) -> dict[str, Any]:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return {
+        "sha256": digest.hexdigest(),
+        "size_bytes": path.stat().st_size,
+    }
 
 
 def _near_white(rgb: tuple[int, int, int]) -> bool:
@@ -80,6 +92,7 @@ def _inspect_reference_png(path: Path) -> tuple[dict[str, Any], list[dict[str, s
             "has_alpha": alpha,
             "corner_white_ratio": round(ratio, 4),
         }
+        inspection.update(_file_provenance(path))
         if long_edge < 1600:
             issues.append({
                 "severity": "warning",
@@ -264,12 +277,30 @@ def _fulfilled_cases(
         if candidate is None:
             raise ValueError(f"request case {case_id}: missing candidate case")
         output_name = _required(request, "recommended_output_name", index)
+        source_dxf = Path(_resolve(request_json.parent, _required(request, "source_dxf", index)))
+        candidate_png = Path(_resolve(candidate_cases.parent, _required(candidate, "ours", index)))
+        expected_source_sha = _str(request.get("source_dxf_sha256"))
+        if expected_source_sha:
+            actual_source = _file_provenance(source_dxf)
+            if actual_source["sha256"] != expected_source_sha:
+                raise ValueError(
+                    f"request case {case_id}: source_dxf sha256 mismatch "
+                    f"({actual_source['sha256']} != {expected_source_sha})"
+                )
+        expected_candidate_sha = _str(request.get("candidate_png_sha256"))
+        if expected_candidate_sha:
+            actual_candidate = _file_provenance(candidate_png)
+            if actual_candidate["sha256"] != expected_candidate_sha:
+                raise ValueError(
+                    f"request case {case_id}: candidate PNG sha256 mismatch "
+                    f"({actual_candidate['sha256']} != {expected_candidate_sha})"
+                )
         item: dict[str, Any] = {
             "id": case_id,
             "drawing_id": _required(request, "drawing_id", index),
-            "source_dxf": _resolve(request_json.parent, _required(request, "source_dxf", index)),
+            "source_dxf": str(source_dxf),
             "acad_png": str((reference_dir / output_name).resolve()),
-            "ours": _resolve(candidate_cases.parent, _required(candidate, "ours", index)),
+            "ours": str(candidate_png),
             "capture_method": _str(request.get("requested_capture_method") or "plot-export"),
             "view_contract": _str(request.get("requested_view_contract") or "model-extents"),
         }
