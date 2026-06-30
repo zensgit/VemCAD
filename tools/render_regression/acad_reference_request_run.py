@@ -134,6 +134,10 @@ def _case_action_counts(case_actions: list[dict[str, Any]]) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
+def _format_case_action_counts(counts: dict[str, int]) -> str:
+    return ", ".join(f"{key}={value}" for key, value in sorted(counts.items())) or "none"
+
+
 def _put_case_action(
     actions: dict[str, dict[str, Any]],
     case_id: str,
@@ -398,6 +402,7 @@ def _write_run_summary(
         "schema": RUN_ARTIFACT_INDEX_SCHEMA,
         "status": payload["status"],
         "recommended_next_action": payload["recommended_next_action"],
+        "case_actions": payload["case_actions"],
         "case_action_counts": payload["case_action_counts"],
         "count": len(artifacts),
         "artifacts": artifacts,
@@ -441,6 +446,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(f"AutoCAD reference request run: {summary['status']}")
         print(f"  recommended next action: {summary['recommended_next_action']['code']}")
+        print(f"  case action counts: {_format_case_action_counts(summary['case_action_counts'])}")
         print(f"  run summary: {args.out_dir / 'run_summary.md'}")
         return batch_rc
 
@@ -458,6 +464,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     print(f"AutoCAD reference request run: {summary['status']}")
     print(f"  recommended next action: {summary['recommended_next_action']['code']}")
+    print(f"  case action counts: {_format_case_action_counts(summary['case_action_counts'])}")
     print(f"  run summary: {args.out_dir / 'run_summary.md'}")
     return compare_rc
 

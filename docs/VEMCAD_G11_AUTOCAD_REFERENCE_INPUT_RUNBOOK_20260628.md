@@ -237,10 +237,11 @@ routed without opening the summary first:
 | `inspect-compare-failure` | Inputs reached compare, but compare failed. Inspect compare artifacts and per-case logs. |
 
 For multi-drawing runs, inspect `case_actions` and `case_action_counts` in
-`run_summary.json`. `run_summary.md` also prints a "Case Actions" table. The
-case-level priority is intentionally fail-closed: request validation issues,
-missing returned PNGs, and intake warnings are listed before compare triage, so
-a suspicious input is not routed as a renderer defect.
+`run_summary.json` or the run-level `artifact_index.json`. `run_summary.md`
+also prints a "Case Actions" table, and the wrapper prints case-action counts
+to stdout. The case-level priority is intentionally fail-closed: request
+validation issues, missing returned PNGs, and intake warnings are listed before
+compare triage, so a suspicious input is not routed as a renderer defect.
 
 Generated requests may include source-DXF and candidate-PNG provenance
 (`sha256` + byte size). When present, `acad_reference_batch.py --from-request`

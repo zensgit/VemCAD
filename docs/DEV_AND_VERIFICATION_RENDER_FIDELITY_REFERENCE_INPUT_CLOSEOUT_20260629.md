@@ -603,6 +603,21 @@ python3 tools/render_regression/acad_reference_request_run.py \
   --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
   --reference-dir /private/tmp/vemcad-provenance-compat-smoke-20260629/returned \
   --case-id G11 \
+  --out-dir /private/tmp/vemcad-run-case-actions-index-smoke-20260629
+# AutoCAD reference request run: viewspace_mismatch
+# case action counts: recapture-autocad-or-provide-window=1
+# artifact_index.case_actions[0].code=recapture-autocad-or-provide-window
+# artifact_index.case_actions[0].triage_bucket=recapture-required
+```
+
+Private compatibility smoke:
+
+```bash
+python3 tools/render_regression/acad_reference_request_run.py \
+  --from-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir /private/tmp/vemcad-provenance-compat-smoke-20260629/returned \
+  --case-id G11 \
   --out-dir /private/tmp/vemcad-run-case-actions-smoke-20260629
 # AutoCAD reference request run: viewspace_mismatch
 # case_action_counts={'recapture-autocad-or-provide-window': 1}
@@ -720,6 +735,40 @@ python3 tools/render_regression/acad_reference_request_run.py \
 # compare/artifact_index.triage_bucket_counts={'recapture-required': 1}
 # compare/artifact_index.viewspace_status_counts={'mismatch': 1}
 # compare/artifact_index.x3_band_counts={'fallback': 1}
+```
+
+## Follow-Up Run Artifact Case Actions
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make the run-level `artifact_index.json` a complete machine-routing entry
+  point for batch request runs.
+- Avoid requiring artifact consumers to open `run_summary.json` just to know
+  which case needs recapture, returned PNG fulfilment, intake review, or X3
+  review.
+
+Changes:
+
+- `<run-dir>/artifact_index.json` now carries the full `case_actions` array,
+  in addition to `case_action_counts`.
+- `acad_reference_request_run.py` prints
+  `case action counts: <code>=<count>, ...` to stdout after the recommended
+  next action.
+
+Boundary:
+
+- Reporting/indexing only.
+- No recommendation-rule change.
+- No renderer change.
+- No AutoCAD PNG equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 6 passed
 ```
 
 Private compatibility smoke:

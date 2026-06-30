@@ -162,7 +162,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     }
 
 
-def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path):
+def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsys):
     _dxf(tmp_path / "dxf" / "B11.dxf")
     _dxf(tmp_path / "dxf" / "B12.dxf")
     _png(tmp_path / "ours" / "G11.png", size=(1600, 1131), box=[40, 30, 1560, 1100])
@@ -179,6 +179,7 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path):
         "--reference-dir", str(tmp_path / "returned"),
         "--out-dir", str(out),
     ]) == 2
+    stdout = capsys.readouterr().out
 
     summary = json.loads((out / "run_summary.json").read_text(encoding="utf-8"))
     artifact_index = _run_artifact_index(out)
@@ -188,6 +189,8 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path):
         "recapture-autocad-or-provide-window": 1,
         "review-x3-pass": 1,
     }
+    assert "case action counts: recapture-autocad-or-provide-window=1, review-x3-pass=1" in stdout
+    assert artifact_index["case_actions"] == summary["case_actions"]
     assert artifact_index["case_action_counts"] == summary["case_action_counts"]
     assert [item["id"] for item in summary["case_actions"]] == ["G12", "G11"]
     assert summary["case_actions"][0]["code"] == "recapture-autocad-or-provide-window"
@@ -296,7 +299,10 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
     assert summary["recommended_next_action"]["artifact"].endswith("missing_references.md")
     assert artifact_index["status"] == "input_blocked"
     assert artifact_index["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
+    assert artifact_index["case_actions"] == summary["case_actions"]
+    assert artifact_index["case_action_counts"] == summary["case_action_counts"]
     assert "recommended next action: provide-returned-autocad-pngs" in stdout
+    assert "case action counts: provide-returned-autocad-pngs=1" in stdout
     assert not (out / "compare" / "summary.json").exists()
     assert _run_artifact_kinds(out) >= {
         "run_summary_json",
