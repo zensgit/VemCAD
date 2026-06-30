@@ -423,9 +423,10 @@ artifact-index lookup.
 Batch artifact indexes and route reports also surface
 `reference_request_validation_issue_code_counts` and
 `reference_intake_issue_code_counts` when those preflight reports exist, plus
-`compare_issue_code_counts` when compare manifests/candidate inputs are blocked.
-This lets CI jobs show the exact request/intake/compare issue codes without
-opening nested JSON artifacts.
+request-run `case_action_issue_code_counts` and `compare_issue_code_counts`
+when those artifacts are present. This lets CI jobs show the exact
+request/intake/case-action/compare issue codes without opening nested JSON
+artifacts.
 When routing multiple artifact indexes at once, the top-level route summary
 aggregates those same issue-code counts across all nested routes.
 

@@ -275,6 +275,7 @@ def test_routes_run_case_actions(tmp_path):
         "case_actions": [{
             "id": "G11",
             "code": "recapture-autocad-or-provide-window",
+            "issue_codes": "warning:corner_background_not_white, warning:long_edge_below_requested",
         }],
         "artifacts": [],
     })
@@ -289,6 +290,10 @@ def test_routes_run_case_actions(tmp_path):
     assert payload["final_exit_code"] == 2
     assert payload["case_action_counts"] == {"recapture-autocad-or-provide-window": 1}
     assert payload["case_action_domain_counts"] == {"input": 1}
+    assert payload["case_action_issue_code_counts"] == {
+        "warning:corner_background_not_white": 1,
+        "warning:long_edge_below_requested": 1,
+    }
     assert payload["route_count"] == 3
     assert payload["route_kind_counts"] == {"batch": 1, "compare": 1, "request_run": 1}
     assert payload["route_status_counts"] == {"pass": 1, "viewspace_mismatch": 2}
@@ -337,6 +342,10 @@ def test_routes_run_case_actions(tmp_path):
     }
     assert "case_action_counts: recapture-autocad-or-provide-window=1" in text
     assert "case_action_domain_counts: input=1" in text
+    assert (
+        "case_action_issue_code_counts: warning:corner_background_not_white=1, "
+        "warning:long_edge_below_requested=1"
+    ) in text
     assert "final_exit_code: 2" in text
     assert "route_count: 3" in text
     assert "route_kind_counts: batch=1, compare=1, request_run=1" in text
@@ -361,6 +370,10 @@ def test_routes_run_case_actions(tmp_path):
     ) in text
     assert "- reference_request_validation_status: `blocked`" in markdown
     assert "- final_exit_code: `2`" in markdown
+    assert (
+        "- case_action_issue_code_counts: `warning:corner_background_not_white=1, "
+        "warning:long_edge_below_requested=1`"
+    ) in markdown
     assert "- route_count: `3`" in markdown
     assert "- route_final_exit_code_counts: `0=2, 2=1`" in markdown
     assert "- route_triage_bucket_counts: `matched-pass=1, recapture-required=1`" in markdown
@@ -385,6 +398,10 @@ def test_routes_run_case_actions(tmp_path):
     batch_payload = route.route_artifact_indexes([index])
     assert batch_payload["compare_issue_code_counts"] == {
         "diagnostic_capture_method": 1,
+    }
+    assert batch_payload["case_action_issue_code_counts"] == {
+        "warning:corner_background_not_white": 1,
+        "warning:long_edge_below_requested": 1,
     }
 
 
