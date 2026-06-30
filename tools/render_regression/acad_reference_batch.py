@@ -1028,13 +1028,14 @@ def _write_missing_references_report(
         f"- missing_count: `{len(missing)}`",
         f"- missing_references_tsv: `{tsv_path}`",
         "",
-        "| Case | Drawing | Source DXF | Expected PNG | Capture | View | Expected size | Expected path |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| Case | Drawing | Source DXF | Source SHA256 | Expected PNG | Capture | View | Expected size | Expected path |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for item in missing:
         lines.append(
             f"| {_md_code_cell(item['id'])} | {_md_table_cell(item.get('drawing_id'))} | "
             f"{_md_code_cell(item.get('source_dxf'))} | "
+            f"{_md_code_cell(item.get('source_dxf_sha256'))} | "
             f"{_md_code_cell(item['recommended_output_name'])} | "
             f"{_md_code_cell(item.get('requested_capture_method'))} | "
             f"{_md_code_cell(item.get('requested_view_contract'))} | "
