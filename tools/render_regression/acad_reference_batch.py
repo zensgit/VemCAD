@@ -203,6 +203,15 @@ def _identity_advisory(returned_png: Path, candidate_png: Path | None) -> tuple[
         "candidate_ink": candidate,
     }
     issues: list[dict[str, str]] = []
+    if returned.get("status") == "blank":
+        issues.append({
+            "severity": "warning",
+            "code": "returned_reference_blank",
+            "message": (
+                "returned AutoCAD reference PNG has no detected ink; check for a blank export, "
+                "wrong file, or unmatched capture window before trusting X3"
+            ),
+        })
     returned_aspect = returned.get("bbox_aspect")
     candidate_aspect = candidate.get("bbox_aspect")
     if isinstance(returned_aspect, (int, float)) and isinstance(candidate_aspect, (int, float)):
