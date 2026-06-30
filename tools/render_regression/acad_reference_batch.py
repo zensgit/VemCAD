@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import acad_reference_manifest as arm  # noqa: E402
 
 INTAKE_SCHEMA = "vemcad.acad_reference_intake/v1"
+BATCH_ARTIFACT_INDEX_SCHEMA = "vemcad.acad_reference_batch_artifact_index/v1"
 
 
 def _str(value: Any) -> str:
@@ -326,6 +327,37 @@ def _write_missing_references_report(
     return len(missing)
 
 
+def _existing_batch_artifacts(out_dir: Path) -> list[dict[str, str]]:
+    known = (
+        ("acad_manifest.json", "acad_manifest"),
+        ("candidate_cases.json", "candidate_cases"),
+        ("reference_intake.json", "reference_intake_json"),
+        ("reference_intake.md", "reference_intake_markdown"),
+        ("missing_references.json", "missing_references_json"),
+        ("missing_references.md", "missing_references_markdown"),
+    )
+    artifacts: list[dict[str, str]] = []
+    for name, kind in known:
+        path = out_dir / name
+        if path.is_file():
+            artifacts.append({"kind": kind, "path": str(path)})
+    return artifacts
+
+
+def _write_batch_artifact_index(out_dir: Path) -> Path | None:
+    artifacts = _existing_batch_artifacts(out_dir)
+    if not artifacts:
+        return None
+    path = out_dir / "artifact_index.json"
+    payload = {
+        "schema": BATCH_ARTIFACT_INDEX_SCHEMA,
+        "count": len(artifacts),
+        "artifacts": artifacts,
+    }
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return path
+
+
 def _write_reference_intake_report(
     out_dir: Path,
     request_json: Path,
@@ -490,12 +522,18 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("--cases is required unless --from-request is set")
             manifest_path, candidates_path, validation = build_files(args.cases, args.out_dir)
     except Exception as exc:
+        index_path = _write_batch_artifact_index(args.out_dir)
         print(f"AutoCAD reference batch: blocked ({exc})", file=sys.stderr)
+        if index_path is not None:
+            print(f"  artifact index : {index_path}", file=sys.stderr)
         return 2
 
+    index_path = _write_batch_artifact_index(args.out_dir)
     print(f"AutoCAD reference batch: {validation['status']} ({validation['case_count']} cases)")
     print(f"  manifest       : {manifest_path}")
     print(f"  candidate cases: {candidates_path}")
+    if index_path is not None:
+        print(f"  artifact index : {index_path}")
     if validation["issues"]:
         for issue in validation["issues"]:
             print(f"  {issue['severity']} {issue['case_id']} {issue['code']}: {issue['message']}")

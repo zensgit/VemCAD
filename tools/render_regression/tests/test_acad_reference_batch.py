@@ -63,6 +63,12 @@ def test_batch_generator_writes_manifest_and_candidates(tmp_path):
     assert manifest["cases"][1]["view_contract"] == "explicit-window"
     assert candidates[0]["diagnostics"] == {"window_source": "extents"}
     assert candidates[1]["render_image"] == "ghcr.io/zensgit/vemcad-render:main"
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert artifact_index["schema"] == "vemcad.acad_reference_batch_artifact_index/v1"
+    assert {item["kind"] for item in artifact_index["artifacts"]} == {
+        "acad_manifest",
+        "candidate_cases",
+    }
 
     dry_run = tmp_path / "dry-run"
     assert harness.main([
@@ -130,6 +136,13 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
     intake_md = (out / "reference_intake.md").read_text(encoding="utf-8")
     assert "AutoCAD Reference Intake Preflight" in intake_md
     assert "G11_autocad_model_extents.png" in intake_md
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert {item["kind"] for item in artifact_index["artifacts"]} == {
+        "acad_manifest",
+        "candidate_cases",
+        "reference_intake_json",
+        "reference_intake_markdown",
+    }
 
     dry_run = tmp_path / "dry-run-request"
     assert harness.main([
@@ -171,6 +184,11 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path):
     missing_md = (out / "missing_references.md").read_text(encoding="utf-8")
     assert "Missing AutoCAD Reference PNGs" in missing_md
     assert "G11_autocad_model_extents.png" in missing_md
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert {item["kind"] for item in artifact_index["artifacts"]} == {
+        "missing_references_json",
+        "missing_references_markdown",
+    }
 
 
 def test_batch_generator_fulfills_subset_of_reference_request(tmp_path):
