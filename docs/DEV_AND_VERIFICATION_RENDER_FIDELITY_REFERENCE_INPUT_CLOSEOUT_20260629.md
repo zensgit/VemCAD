@@ -352,3 +352,74 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 python3 -m pytest tools/render_regression/tests -q
 # 98 passed
 ```
+
+## Follow-Up Request Package Validation
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Validate `reference_request.json` and its matching `candidate_cases.json`
+  before AutoCAD PNG fulfilment.
+- Catch request-package drift and ambiguity before the operator spends time
+  exporting or returning PNGs.
+
+New command:
+
+```bash
+python3 tools/render_regression/acad_reference_batch.py \
+  --validate-request <reference_request.json> \
+  --candidate-cases <candidate_cases.json> \
+  --out-dir <validation-dir>
+```
+
+Outputs:
+
+- `reference_request_validation.json`
+- `reference_request_validation.md`
+- `artifact_index.json`
+
+Checks:
+
+- source DXF exists;
+- declared source DXF sha256 and byte size still match;
+- matching candidate case exists;
+- candidate PNG exists;
+- declared candidate PNG sha256 and byte size still match;
+- requested output PNG names are unique plain filenames;
+- request case ids and candidate ids are not ambiguous;
+- requested expected sizes are positive.
+
+Boundary:
+
+- Input-package validation only.
+- Does not require returned AutoCAD PNGs.
+- Does not compare renders.
+- Does not claim AutoCAD equivalence.
+- Does not change X3 semantics.
+- Does not change renderer code.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 13 passed
+
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py \
+  tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 10 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 100 passed
+```
+
+Private compatibility smoke:
+
+```bash
+python3 tools/render_regression/acad_reference_batch.py \
+  --validate-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --case-id G11 \
+  --out-dir /private/tmp/vemcad-request-validation-smoke-20260629
+# AutoCAD reference request validation: pass (1 cases)
+```

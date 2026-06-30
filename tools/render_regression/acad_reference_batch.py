@@ -18,6 +18,7 @@ import acad_reference_manifest as arm  # noqa: E402
 
 INTAKE_SCHEMA = "vemcad.acad_reference_intake/v1"
 BATCH_ARTIFACT_INDEX_SCHEMA = "vemcad.acad_reference_batch_artifact_index/v1"
+REQUEST_VALIDATION_SCHEMA = "vemcad.acad_reference_request_validation/v1"
 
 
 def _str(value: Any) -> str:
@@ -307,6 +308,47 @@ def _load_candidate_map(path: Path) -> dict[str, dict[str, Any]]:
     return candidates
 
 
+def _load_candidate_map_with_issues(
+    path: Path,
+    case_ids: set[str] | None = None,
+) -> tuple[dict[str, dict[str, Any]], list[dict[str, str]]]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, list):
+        raise ValueError("candidate cases JSON must be a list")
+    candidates: dict[str, dict[str, Any]] = {}
+    issues: list[dict[str, str]] = []
+    for index, item in enumerate(data, start=1):
+        if not isinstance(item, dict):
+            issues.append({
+                "severity": "error",
+                "case_id": f"candidate{index:03d}",
+                "code": "candidate_not_object",
+                "message": "candidate case must be an object",
+            })
+            continue
+        case_id = _str(item.get("id"))
+        if case_ids is not None and case_id not in case_ids:
+            continue
+        if not case_id:
+            issues.append({
+                "severity": "error",
+                "case_id": f"candidate{index:03d}",
+                "code": "candidate_missing_id",
+                "message": "candidate case is missing id",
+            })
+            continue
+        if case_id in candidates:
+            issues.append({
+                "severity": "error",
+                "case_id": case_id,
+                "code": "duplicate_candidate_id",
+                "message": f"candidate id {case_id} appears more than once",
+            })
+            continue
+        candidates[case_id] = item
+    return candidates, issues
+
+
 def _load_request_cases(path: Path) -> list[dict[str, Any]]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
@@ -331,6 +373,291 @@ def _filter_request_cases(cases: list[dict[str, Any]], case_ids: set[str] | None
     if missing:
         raise ValueError(f"requested case id(s) not found in reference request: {', '.join(missing)}")
     return selected
+
+
+def _safe_output_name_issues(case_id: str, output_name: str) -> list[dict[str, str]]:
+    issues: list[dict[str, str]] = []
+    path = Path(output_name)
+    if (
+        "\\" in output_name
+        or path.is_absolute()
+        or path.name != output_name
+        or output_name in (".", "..")
+        or ".." in path.parts
+    ):
+        issues.append({
+            "severity": "error",
+            "case_id": case_id,
+            "code": "unsafe_recommended_output_name",
+            "message": f"recommended_output_name must be a plain filename: {output_name}",
+        })
+    return issues
+
+
+def _expected_size_issues(case_id: str, expected_size: Any) -> list[dict[str, str]]:
+    if expected_size is None:
+        return []
+    width = None
+    height = None
+    if isinstance(expected_size, dict):
+        width = expected_size.get("width")
+        height = expected_size.get("height")
+    elif isinstance(expected_size, (list, tuple)) and len(expected_size) == 2:
+        width, height = expected_size
+    try:
+        width_i = int(width)
+        height_i = int(height)
+    except Exception:
+        width_i = 0
+        height_i = 0
+    if width_i <= 0 or height_i <= 0:
+        return [{
+            "severity": "error",
+            "case_id": case_id,
+            "code": "invalid_requested_expected_size",
+            "message": "requested_expected_size/expected_size must contain positive width and height",
+        }]
+    return []
+
+
+def _size_mismatch_issue(case_id: str, label: str, declared: Any, actual: int) -> list[dict[str, str]]:
+    if declared is None:
+        return []
+    try:
+        declared_int = int(declared)
+    except Exception:
+        return [{
+            "severity": "error",
+            "case_id": case_id,
+            "code": f"{label}_size_invalid",
+            "message": f"{label} size declaration must be an integer",
+        }]
+    if declared_int != actual:
+        return [{
+            "severity": "error",
+            "case_id": case_id,
+            "code": f"{label}_size_mismatch",
+            "message": f"{label} size mismatch ({actual} != {declared_int})",
+        }]
+    return []
+
+
+def _sha_mismatch_issue(case_id: str, label: str, declared: Any, actual: str) -> list[dict[str, str]]:
+    expected = _str(declared)
+    if not expected:
+        return []
+    if expected != actual:
+        return [{
+            "severity": "error",
+            "case_id": case_id,
+            "code": f"{label}_sha256_mismatch",
+            "message": f"{label} sha256 mismatch ({actual} != {expected})",
+        }]
+    return []
+
+
+def _write_reference_request_validation_report(
+    out_dir: Path,
+    request_json: Path,
+    *,
+    candidate_cases: Path,
+    case_ids: set[str] | None = None,
+) -> dict[str, Any]:
+    request_cases = _filter_request_cases(_load_request_cases(request_json), case_ids)
+    selected_case_ids = {_str(item.get("id")) for item in request_cases if _str(item.get("id"))}
+    candidates, global_issues = _load_candidate_map_with_issues(
+        candidate_cases,
+        selected_case_ids if case_ids else None,
+    )
+    rows: list[dict[str, Any]] = []
+    issues: list[dict[str, str]] = [dict(item) for item in global_issues]
+    seen_request_ids: set[str] = set()
+    seen_output_names: dict[str, str] = {}
+
+    for index, request in enumerate(request_cases, start=1):
+        case_id = _str(request.get("id")) or f"case{index:03d}"
+        row_issues: list[dict[str, str]] = []
+        if not _str(request.get("id")):
+            row_issues.append({
+                "severity": "error",
+                "case_id": case_id,
+                "code": "request_missing_id",
+                "message": "request case is missing id",
+            })
+        elif case_id in seen_request_ids:
+            row_issues.append({
+                "severity": "error",
+                "case_id": case_id,
+                "code": "duplicate_request_id",
+                "message": f"request id {case_id} appears more than once",
+            })
+        seen_request_ids.add(case_id)
+
+        output_name = _str(request.get("recommended_output_name"))
+        if not output_name:
+            row_issues.append({
+                "severity": "error",
+                "case_id": case_id,
+                "code": "missing_recommended_output_name",
+                "message": "request case is missing recommended_output_name",
+            })
+        else:
+            row_issues.extend(_safe_output_name_issues(case_id, output_name))
+            previous = seen_output_names.get(output_name)
+            if previous is not None:
+                row_issues.append({
+                    "severity": "error",
+                    "case_id": case_id,
+                    "code": "duplicate_recommended_output_name",
+                    "message": f"recommended output {output_name} is also used by {previous}",
+                })
+            seen_output_names[output_name] = case_id
+
+        source_path = None
+        source_provenance = None
+        source_raw = _str(request.get("source_dxf"))
+        if not source_raw:
+            row_issues.append({
+                "severity": "error",
+                "case_id": case_id,
+                "code": "missing_source_dxf",
+                "message": "request case is missing source_dxf",
+            })
+        else:
+            source_path = Path(_resolve(request_json.parent, source_raw))
+            if not source_path.is_file():
+                row_issues.append({
+                    "severity": "error",
+                    "case_id": case_id,
+                    "code": "source_dxf_missing",
+                    "message": f"source DXF not found: {source_path}",
+                })
+            else:
+                source_provenance = _file_provenance(source_path)
+                row_issues.extend(_sha_mismatch_issue(
+                    case_id,
+                    "source_dxf",
+                    request.get("source_dxf_sha256"),
+                    source_provenance["sha256"],
+                ))
+                row_issues.extend(_size_mismatch_issue(
+                    case_id,
+                    "source_dxf",
+                    request.get("source_dxf_size_bytes"),
+                    source_provenance["size_bytes"],
+                ))
+
+        candidate = candidates.get(case_id)
+        candidate_path = None
+        candidate_provenance = None
+        if candidate is None:
+            row_issues.append({
+                "severity": "error",
+                "case_id": case_id,
+                "code": "candidate_missing",
+                "message": f"candidate case {case_id} is missing",
+            })
+        else:
+            candidate_raw = _str(candidate.get("ours"))
+            if not candidate_raw:
+                row_issues.append({
+                    "severity": "error",
+                    "case_id": case_id,
+                    "code": "candidate_png_missing_field",
+                    "message": "candidate case is missing ours",
+                })
+            else:
+                candidate_path = Path(_resolve(candidate_cases.parent, candidate_raw))
+                if not candidate_path.is_file():
+                    row_issues.append({
+                        "severity": "error",
+                        "case_id": case_id,
+                        "code": "candidate_png_missing",
+                        "message": f"candidate PNG not found: {candidate_path}",
+                    })
+                else:
+                    candidate_provenance = _file_provenance(candidate_path)
+                    row_issues.extend(_sha_mismatch_issue(
+                        case_id,
+                        "candidate_png",
+                        request.get("candidate_png_sha256"),
+                        candidate_provenance["sha256"],
+                    ))
+                    row_issues.extend(_size_mismatch_issue(
+                        case_id,
+                        "candidate_png",
+                        request.get("candidate_png_size_bytes"),
+                        candidate_provenance["size_bytes"],
+                    ))
+
+        row_issues.extend(_expected_size_issues(
+            case_id,
+            request.get("requested_expected_size") or request.get("expected_size"),
+        ))
+        issues.extend(row_issues)
+        rows.append({
+            "id": case_id,
+            "drawing_id": _str(request.get("drawing_id")),
+            "recommended_output_name": output_name,
+            "source_dxf": str(source_path) if source_path else "",
+            "candidate_png": str(candidate_path) if candidate_path else "",
+            "source_dxf_provenance": source_provenance,
+            "candidate_png_provenance": candidate_provenance,
+            "issues": row_issues,
+        })
+
+    error_count = sum(1 for issue in issues if issue.get("severity") == "error")
+    warning_count = sum(1 for issue in issues if issue.get("severity") == "warning")
+    status = "blocked" if error_count else ("review" if warning_count else "pass")
+    payload = {
+        "schema": REQUEST_VALIDATION_SCHEMA,
+        "request": str(request_json.resolve()),
+        "candidate_cases": str(candidate_cases.resolve()),
+        "status": status,
+        "case_count": len(rows),
+        "error_count": error_count,
+        "warning_count": warning_count,
+        "cases": rows,
+        "issues": issues,
+        "boundary": {
+            "autocad_equivalence_claim": False,
+            "requires_returned_autocad_png": False,
+            "purpose": "validate request package provenance before AutoCAD PNG fulfilment",
+        },
+    }
+    out_dir.mkdir(parents=True, exist_ok=True)
+    json_path = out_dir / "reference_request_validation.json"
+    md_path = out_dir / "reference_request_validation.md"
+    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    lines = [
+        "# AutoCAD Reference Request Validation",
+        "",
+        f"- status: `{status}`",
+        f"- request: `{request_json.resolve()}`",
+        f"- candidate_cases: `{candidate_cases.resolve()}`",
+        f"- cases: `{len(rows)}`",
+        f"- errors: `{error_count}`",
+        f"- warnings: `{warning_count}`",
+        "",
+        "This validates request-package identity and provenance before AutoCAD PNG fulfilment. "
+        "It does not compare renders and does not claim AutoCAD equivalence.",
+        "",
+        "| Case | Drawing | Output PNG | Source | Candidate | Issues |",
+        "| --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in rows:
+        issue_text = ", ".join(f"{item['severity']}:{item['code']}" for item in row["issues"]) or "-"
+        lines.append(
+            f"| `{row['id']}` | {_str(row.get('drawing_id'))} | "
+            f"`{row['recommended_output_name']}` | `{row.get('source_dxf') or '-'}` | "
+            f"`{row.get('candidate_png') or '-'}` | {issue_text} |"
+        )
+    if global_issues:
+        lines.extend(["", "## Candidate File Issues", ""])
+        for issue in global_issues:
+            lines.append(f"- `{issue['severity']}:{issue['code']}` {issue['message']}")
+    md_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    return payload
 
 
 def _fulfilled_cases(
@@ -449,6 +776,8 @@ def _existing_batch_artifacts(out_dir: Path) -> list[dict[str, str]]:
         ("reference_intake.md", "reference_intake_markdown"),
         ("missing_references.json", "missing_references_json"),
         ("missing_references.md", "missing_references_markdown"),
+        ("reference_request_validation.json", "reference_request_validation_json"),
+        ("reference_request_validation.md", "reference_request_validation_markdown"),
     )
     artifacts: list[dict[str, str]] = []
     for name, kind in known:
@@ -466,6 +795,8 @@ def _clear_batch_outputs(out_dir: Path) -> None:
         ("reference_intake.md", "reference_intake_markdown"),
         ("missing_references.json", "missing_references_json"),
         ("missing_references.md", "missing_references_markdown"),
+        ("reference_request_validation.json", "reference_request_validation_json"),
+        ("reference_request_validation.md", "reference_request_validation_markdown"),
         ("artifact_index.json", "artifact_index"),
     ):
         path = out_dir / name
@@ -638,18 +969,41 @@ def main(argv: list[str] | None = None) -> int:
                         help="JSON list of AutoCAD reference cases")
     parser.add_argument("--from-request", type=Path, default=None,
                         help="reference_request.json produced by acad_manifest_compare.py")
+    parser.add_argument("--validate-request", type=Path, default=None,
+                        help="validate a reference_request.json before AutoCAD PNG fulfilment")
     parser.add_argument("--candidate-cases", type=Path, default=None,
-                        help="original candidate_cases.json, required with --from-request")
+                        help="original candidate_cases.json, required with --from-request/--validate-request")
     parser.add_argument("--reference-dir", type=Path, default=None,
                         help="directory containing returned AutoCAD PNGs, required with --from-request")
     parser.add_argument("--case-id", action="append", default=None,
-                        help="with --from-request, fulfill only this case id; may repeat")
+                        help="with --from-request/--validate-request, process only this case id; may repeat")
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args(argv)
 
     _clear_batch_outputs(args.out_dir)
 
     try:
+        modes = sum(1 for item in (args.cases, args.from_request, args.validate_request) if item is not None)
+        if modes != 1:
+            raise ValueError("choose exactly one of --cases, --from-request, or --validate-request")
+        if args.validate_request is not None:
+            if args.candidate_cases is None:
+                raise ValueError("--candidate-cases is required with --validate-request")
+            validation = _write_reference_request_validation_report(
+                args.out_dir,
+                args.validate_request,
+                candidate_cases=args.candidate_cases,
+                case_ids=set(args.case_id or []) or None,
+            )
+            index_path = _write_batch_artifact_index(args.out_dir)
+            print(f"AutoCAD reference request validation: {validation['status']} ({validation['case_count']} cases)")
+            print(f"  validation     : {args.out_dir / 'reference_request_validation.json'}")
+            if index_path is not None:
+                print(f"  artifact index : {index_path}")
+            if validation["issues"]:
+                for issue in validation["issues"]:
+                    print(f"  {issue['severity']} {issue.get('case_id', '')} {issue['code']}: {issue['message']}")
+            return 0 if validation["status"] == "pass" else 2
         if args.from_request is not None:
             if args.candidate_cases is None or args.reference_dir is None:
                 raise ValueError("--candidate-cases and --reference-dir are required with --from-request")
@@ -661,8 +1015,6 @@ def main(argv: list[str] | None = None) -> int:
                 case_ids=set(args.case_id or []) or None,
             )
         else:
-            if args.cases is None:
-                raise ValueError("--cases is required unless --from-request is set")
             manifest_path, candidates_path, validation = build_files(args.cases, args.out_dir)
     except Exception as exc:
         index_path = _write_batch_artifact_index(args.out_dir)
