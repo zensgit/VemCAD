@@ -151,6 +151,7 @@ def _run_artifact_index_payload(
             "route_triage_bucket_counts": summary.get("route_triage_bucket_counts") or {},
             "route_viewspace_status_counts": summary.get("route_viewspace_status_counts") or {},
             "route_x3_band_counts": summary.get("route_x3_band_counts") or {},
+            "route_compare_issue_code_counts": summary.get("route_compare_issue_code_counts") or {},
         })
     return payload
 
@@ -587,6 +588,11 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
                 "- route_x3_band_counts: "
                 f"`{_format_case_action_counts(summary.get('route_x3_band_counts') or {})}`"
             )
+        if summary.get("route_compare_issue_code_counts"):
+            lines.append(
+                "- route_compare_issue_code_counts: "
+                f"`{_format_case_action_counts(summary.get('route_compare_issue_code_counts') or {})}`"
+            )
     lines.extend([
         "",
         "## Boundary",
@@ -772,6 +778,7 @@ def _write_run_summary(
         "route_triage_bucket_counts": route_payload.get("triage_bucket_counts") or {},
         "route_viewspace_status_counts": route_payload.get("viewspace_status_counts") or {},
         "route_x3_band_counts": route_payload.get("x3_band_counts") or {},
+        "route_compare_issue_code_counts": route_payload.get("compare_issue_code_counts") or {},
     })
     _write_run_artifact_index(out_dir, payload, artifacts)
     route_payload = artifact_route.route_artifact_indexes(route_inputs)
@@ -837,6 +844,11 @@ def _print_run_summary(summary: dict[str, Any], out_dir: Path) -> None:
         print(
             "  route x3 bands: "
             f"{_format_case_action_counts(summary['route_x3_band_counts'])}"
+        )
+    if summary.get("route_compare_issue_code_counts"):
+        print(
+            "  route compare issue codes: "
+            f"{_format_case_action_counts(summary['route_compare_issue_code_counts'])}"
         )
     if summary.get("route_summary_markdown"):
         print(f"  route summary  : {summary['route_summary_markdown']}")

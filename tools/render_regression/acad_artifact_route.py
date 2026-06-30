@@ -227,6 +227,7 @@ def _route_run(payload: dict[str, Any]) -> dict[str, Any]:
         or payload.get("route_viewspace_status_counts")
         or payload.get("route_x3_band_counts")
         or payload.get("route_final_exit_code_counts")
+        or payload.get("route_compare_issue_code_counts")
     ):
         route.update({
             "route_count": payload.get("route_count"),
@@ -242,6 +243,7 @@ def _route_run(payload: dict[str, Any]) -> dict[str, Any]:
             "route_triage_bucket_counts": payload.get("route_triage_bucket_counts") or {},
             "route_viewspace_status_counts": payload.get("route_viewspace_status_counts") or {},
             "route_x3_band_counts": payload.get("route_x3_band_counts") or {},
+            "route_compare_issue_code_counts": payload.get("route_compare_issue_code_counts") or {},
         })
     return route
 
@@ -408,6 +410,10 @@ def _route_batch_summary(routes: list[dict[str, Any]]) -> dict[str, Any]:
             "triage_bucket_counts": _sum_count_maps(request_run_routes, "route_triage_bucket_counts"),
             "viewspace_status_counts": _sum_count_maps(request_run_routes, "route_viewspace_status_counts"),
             "x3_band_counts": _sum_count_maps(request_run_routes, "route_x3_band_counts"),
+            "compare_issue_code_counts": _sum_count_maps(
+                request_run_routes,
+                "route_compare_issue_code_counts",
+            ),
         })
     return summary
 
@@ -613,6 +619,11 @@ def _write_text(route: dict[str, Any]) -> str:
         lines.append(f"route_viewspace_status_counts: {_format_counts(route['route_viewspace_status_counts'])}")
     if route.get("route_x3_band_counts"):
         lines.append(f"route_x3_band_counts: {_format_counts(route['route_x3_band_counts'])}")
+    if route.get("route_compare_issue_code_counts"):
+        lines.append(
+            "route_compare_issue_code_counts: "
+            + _format_counts(route["route_compare_issue_code_counts"])
+        )
     if route.get("reference_request_validation_status"):
         lines.append(f"reference_request_validation_status: {route['reference_request_validation_status']}")
         lines.append(
@@ -792,6 +803,11 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         lines.append(f"- route_viewspace_status_counts: {_md_code_cell(_format_counts(route['route_viewspace_status_counts']))}")
     if route.get("route_x3_band_counts"):
         lines.append(f"- route_x3_band_counts: {_md_code_cell(_format_counts(route['route_x3_band_counts']))}")
+    if route.get("route_compare_issue_code_counts"):
+        lines.append(
+            "- route_compare_issue_code_counts: "
+            f"{_md_code_cell(_format_counts(route['route_compare_issue_code_counts']))}"
+        )
     if route.get("reference_request_validation_status"):
         lines.extend([
             f"- reference_request_validation_status: {_md_code_cell(route['reference_request_validation_status'])}",
@@ -1057,6 +1073,7 @@ def _issue_code_counts(payload: dict[str, Any]) -> dict[str, int]:
         "reference_request_validation_issue_code_counts",
         "reference_intake_issue_code_counts",
         "compare_issue_code_counts",
+        "route_compare_issue_code_counts",
     ):
         values = payload.get(key)
         if not isinstance(values, dict):

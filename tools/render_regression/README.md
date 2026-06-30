@@ -198,11 +198,12 @@ artifact index also surface route-level `route_count`, `route_kind_counts`,
 artifact topology without opening `route_summary.json`. When compare artifacts
 are present, the same run summary and artifact index also surface
 `route_compare_case_count`, `route_compared_count`, `route_triage_bucket_counts`,
-`route_viewspace_status_counts`, and `route_x3_band_counts`, so operators can
-see whether the compare portion is matched, recapture-required, or an X3
-failure distribution without drilling into the nested route summary. The wrapper
-prints those same route compare distributions to stdout when they are present,
-so CI logs also show the compare portion without opening uploaded artifacts.
+`route_viewspace_status_counts`, `route_x3_band_counts`, and
+`route_compare_issue_code_counts`, so operators can see whether the compare
+portion is matched, recapture-required, X3-failing, or input-blocked without
+drilling into the nested route summary. The wrapper prints those same route
+compare distributions to stdout when they are present, so CI logs also show the
+compare portion without opening uploaded artifacts.
 It also prints the run-level `route_summary.md` path, matching the batch and
 compare CLIs. It also writes
 `case_actions.tsv` for spreadsheet-friendly per-case sorting/filtering by action
