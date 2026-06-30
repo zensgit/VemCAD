@@ -3772,10 +3772,10 @@ Verification:
 python3 -m pytest \
   tools/render_regression/tests/test_acad_reference_request_run.py \
   tools/render_regression/tests/test_acad_artifact_route.py -q
-# passed
+# 69 passed
 
 python3 -m pytest tools/render_regression/tests -q
-# passed
+# 172 passed
 ```
 
 ## Follow-Up Batch Route Error/Warning Count Visibility
@@ -4171,6 +4171,60 @@ Verification:
 
 ```bash
 python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
+## Follow-Up Request-Run Artifact Index Route Compare Evidence
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make the run-level `artifact_index.json` carry the same route compare
+  distribution evidence as `run_summary.json/md` and stdout.
+- Keep machine consumers from having to open `run_summary.json` before they can
+  fail closed on routed compare evidence.
+- Preserve the no-guess discipline: a `viewspace_mismatch` distribution remains
+  input/recapture evidence, not a renderer-tuning signal.
+
+Changes:
+
+- `acad_reference_request_run.py` now rewrites the final run-level
+  `artifact_index.json` after route aggregation so it includes:
+  - `route_count`, `route_kind_counts`, `route_status_counts`;
+  - `route_recommended_action_counts` and
+    `route_recommended_action_domain_counts`;
+  - `route_compare_case_count`, `route_compared_count`,
+    `route_triage_bucket_counts`, `route_viewspace_status_counts`, and
+    `route_x3_band_counts`.
+- The generated `route_summary.json/md` is recomputed after the final artifact
+  index rewrite, so its nested request-run route sees the same evidence.
+- `acad_artifact_route.py` now preserves these request-run `route_*` fields and
+  prints them in text/Markdown route reports.
+- Compare-distribution guards can read the request-run `route_*` fields, so a
+  workflow can run `acad_artifact_route.py <run>/artifact_index.json` directly
+  and still assert triage/viewspace/X3 distributions.
+- `tools/render_regression/README.md` documents that run summaries, run-level
+  artifact indexes, and stdout all carry the route compare distributions.
+
+Boundary:
+
+- Evidence and operator-routing hardening only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_reference_request_run.py \
+  tools/render_regression/tests/test_acad_artifact_route.py -q
 # passed
 
 python3 -m pytest tools/render_regression/tests -q

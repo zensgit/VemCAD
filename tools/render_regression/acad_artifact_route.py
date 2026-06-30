@@ -178,7 +178,7 @@ def _route_batch(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _route_run(payload: dict[str, Any]) -> dict[str, Any]:
-    return {
+    route = {
         "kind": "request_run",
         "status": str(payload.get("status") or ""),
         "case_action_counts": payload.get("case_action_counts") or {},
@@ -203,6 +203,28 @@ def _route_run(payload: dict[str, Any]) -> dict[str, Any]:
             ),
         ),
     }
+    if (
+        payload.get("route_count") is not None
+        or payload.get("route_compare_case_count") is not None
+        or payload.get("route_triage_bucket_counts")
+        or payload.get("route_viewspace_status_counts")
+        or payload.get("route_x3_band_counts")
+    ):
+        route.update({
+            "route_count": payload.get("route_count"),
+            "route_kind_counts": payload.get("route_kind_counts") or {},
+            "route_status_counts": payload.get("route_status_counts") or {},
+            "route_recommended_action_counts": payload.get("route_recommended_action_counts") or {},
+            "route_recommended_action_domain_counts": (
+                payload.get("route_recommended_action_domain_counts") or {}
+            ),
+            "route_compare_case_count": payload.get("route_compare_case_count"),
+            "route_compared_count": payload.get("route_compared_count"),
+            "route_triage_bucket_counts": payload.get("route_triage_bucket_counts") or {},
+            "route_viewspace_status_counts": payload.get("route_viewspace_status_counts") or {},
+            "route_x3_band_counts": payload.get("route_x3_band_counts") or {},
+        })
+    return route
 
 
 def _route_compare(payload: dict[str, Any]) -> dict[str, Any]:
@@ -315,6 +337,7 @@ def _sum_int_field(routes: list[dict[str, Any]], key: str) -> int | None:
 
 def _route_batch_summary(routes: list[dict[str, Any]]) -> dict[str, Any]:
     compare_routes = [route for route in routes if route.get("kind") == "compare"]
+    request_run_routes = [route for route in routes if route.get("kind") == "request_run"]
     summary = {
         "kind_counts": _count_values([str(route.get("kind") or "") for route in routes]),
         "status_counts": _count_values([str(route.get("status") or "") for route in routes]),
@@ -340,6 +363,14 @@ def _route_batch_summary(routes: list[dict[str, Any]]) -> dict[str, Any]:
             "triage_bucket_counts": _sum_count_maps(compare_routes, "triage_bucket_counts"),
             "viewspace_status_counts": _sum_count_maps(compare_routes, "viewspace_status_counts"),
             "x3_band_counts": _sum_count_maps(compare_routes, "x3_band_counts"),
+        })
+    elif request_run_routes:
+        summary.update({
+            "compare_case_count": _sum_int_field(request_run_routes, "route_compare_case_count"),
+            "compared_count": _sum_int_field(request_run_routes, "route_compared_count"),
+            "triage_bucket_counts": _sum_count_maps(request_run_routes, "route_triage_bucket_counts"),
+            "viewspace_status_counts": _sum_count_maps(request_run_routes, "route_viewspace_status_counts"),
+            "x3_band_counts": _sum_count_maps(request_run_routes, "route_x3_band_counts"),
         })
     return summary
 
@@ -486,6 +517,32 @@ def _write_text(route: dict[str, Any]) -> str:
         lines.append(f"case_action_counts: {_format_counts(route['case_action_counts'])}")
     if route.get("case_action_domain_counts"):
         lines.append(f"case_action_domain_counts: {_format_counts(route['case_action_domain_counts'])}")
+    if route.get("route_count") is not None:
+        lines.append(f"route_count: {route.get('route_count')}")
+    if route.get("route_kind_counts"):
+        lines.append(f"route_kind_counts: {_format_counts(route['route_kind_counts'])}")
+    if route.get("route_status_counts"):
+        lines.append(f"route_status_counts: {_format_counts(route['route_status_counts'])}")
+    if route.get("route_recommended_action_counts"):
+        lines.append(
+            "route_recommended_action_counts: "
+            + _format_counts(route["route_recommended_action_counts"])
+        )
+    if route.get("route_recommended_action_domain_counts"):
+        lines.append(
+            "route_recommended_action_domain_counts: "
+            + _format_counts(route["route_recommended_action_domain_counts"])
+        )
+    if route.get("route_compare_case_count") is not None:
+        lines.append(f"route_compare_case_count: {route.get('route_compare_case_count')}")
+    if route.get("route_compared_count") is not None:
+        lines.append(f"route_compared_count: {route.get('route_compared_count')}")
+    if route.get("route_triage_bucket_counts"):
+        lines.append(f"route_triage_bucket_counts: {_format_counts(route['route_triage_bucket_counts'])}")
+    if route.get("route_viewspace_status_counts"):
+        lines.append(f"route_viewspace_status_counts: {_format_counts(route['route_viewspace_status_counts'])}")
+    if route.get("route_x3_band_counts"):
+        lines.append(f"route_x3_band_counts: {_format_counts(route['route_x3_band_counts'])}")
     if route.get("reference_request_validation_status"):
         lines.append(f"reference_request_validation_status: {route['reference_request_validation_status']}")
         lines.append(
@@ -620,6 +677,32 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         lines.append(f"- case_action_counts: `{_format_counts(route['case_action_counts'])}`")
     if route.get("case_action_domain_counts"):
         lines.append(f"- case_action_domain_counts: `{_format_counts(route['case_action_domain_counts'])}`")
+    if route.get("route_count") is not None:
+        lines.append(f"- route_count: `{route.get('route_count')}`")
+    if route.get("route_kind_counts"):
+        lines.append(f"- route_kind_counts: `{_format_counts(route['route_kind_counts'])}`")
+    if route.get("route_status_counts"):
+        lines.append(f"- route_status_counts: `{_format_counts(route['route_status_counts'])}`")
+    if route.get("route_recommended_action_counts"):
+        lines.append(
+            "- route_recommended_action_counts: "
+            f"`{_format_counts(route['route_recommended_action_counts'])}`"
+        )
+    if route.get("route_recommended_action_domain_counts"):
+        lines.append(
+            "- route_recommended_action_domain_counts: "
+            f"`{_format_counts(route['route_recommended_action_domain_counts'])}`"
+        )
+    if route.get("route_compare_case_count") is not None:
+        lines.append(f"- route_compare_case_count: `{route.get('route_compare_case_count')}`")
+    if route.get("route_compared_count") is not None:
+        lines.append(f"- route_compared_count: `{route.get('route_compared_count')}`")
+    if route.get("route_triage_bucket_counts"):
+        lines.append(f"- route_triage_bucket_counts: `{_format_counts(route['route_triage_bucket_counts'])}`")
+    if route.get("route_viewspace_status_counts"):
+        lines.append(f"- route_viewspace_status_counts: `{_format_counts(route['route_viewspace_status_counts'])}`")
+    if route.get("route_x3_band_counts"):
+        lines.append(f"- route_x3_band_counts: `{_format_counts(route['route_x3_band_counts'])}`")
     if route.get("reference_request_validation_status"):
         lines.extend([
             f"- reference_request_validation_status: `{route['reference_request_validation_status']}`",
@@ -843,6 +926,14 @@ def _issue_code_counts(payload: dict[str, Any]) -> dict[str, int]:
 
 def _count_map(payload: dict[str, Any], key: str) -> dict[str, int]:
     values = payload.get(key)
+    if not isinstance(values, dict):
+        fallback_key = {
+            "triage_bucket_counts": "route_triage_bucket_counts",
+            "viewspace_status_counts": "route_viewspace_status_counts",
+            "x3_band_counts": "route_x3_band_counts",
+        }.get(key)
+        if fallback_key:
+            values = payload.get(fallback_key)
     if not isinstance(values, dict):
         return {}
     counts: dict[str, int] = {}
