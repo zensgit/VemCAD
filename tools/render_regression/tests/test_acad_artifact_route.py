@@ -144,6 +144,12 @@ def test_routes_multiple_directories_as_batch(tmp_path):
         "stage": "reference_intake",
         "status": "pass",
         "case_count": 1,
+        "reference_request_validation_issue_code_counts": {
+            "source_dxf_sha256_mismatch": 1,
+        },
+        "reference_intake_issue_code_counts": {
+            "corner_background_not_white": 2,
+        },
         "artifacts": [],
     })
     _write(compare_dir / "artifact_index.json", {
@@ -175,6 +181,12 @@ def test_routes_multiple_directories_as_batch(tmp_path):
         "continue": 1,
         "input": 1,
     }
+    assert payload["reference_request_validation_issue_code_counts"] == {
+        "source_dxf_sha256_mismatch": 1,
+    }
+    assert payload["reference_intake_issue_code_counts"] == {
+        "corner_background_not_white": 2,
+    }
     assert payload["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
     assert payload["recommended_next_action"]["domain"] == "input"
     assert payload["recommended_next_action"]["artifact"].endswith("compare/artifact_index.json")
@@ -198,6 +210,9 @@ def test_cli_multiple_directories_text(tmp_path, capsys):
         "stage": "reference_intake",
         "status": "pass",
         "case_count": 1,
+        "reference_intake_issue_code_counts": {
+            "corner_background_not_white": 2,
+        },
         "artifacts": [],
     })
     _write(compare_dir / "artifact_index.json", {
@@ -223,6 +238,7 @@ def test_cli_multiple_directories_text(tmp_path, capsys):
         "recapture-autocad-or-provide-window=1"
     ) in output
     assert "recommended_action_domain_counts: continue=1, input=1" in output
+    assert "reference_intake_issue_code_counts: corner_background_not_white=2" in output
     assert "recommended_next_action: recapture-autocad-or-provide-window" in output
     assert "recommended_action_domain: input" in output
     assert "autocad_equivalence_claim: false" in output
@@ -244,6 +260,12 @@ def test_cli_recursive_discovers_nested_artifact_indexes(tmp_path, capsys):
         "stage": "reference_intake",
         "status": "pass",
         "case_count": 1,
+        "reference_request_validation_issue_code_counts": {
+            "source_dxf_sha256_mismatch": 1,
+        },
+        "reference_intake_issue_code_counts": {
+            "corner_background_not_white": 2,
+        },
         "artifacts": [],
     })
     _write(compare_dir / "artifact_index.json", {
@@ -281,6 +303,12 @@ def test_cli_writes_json_and_markdown_reports(tmp_path):
         "stage": "reference_intake",
         "status": "pass",
         "case_count": 1,
+        "reference_request_validation_issue_code_counts": {
+            "source_dxf_sha256_mismatch": 1,
+        },
+        "reference_intake_issue_code_counts": {
+            "corner_background_not_white": 2,
+        },
         "artifacts": [],
     })
     _write(compare_dir / "artifact_index.json", {
@@ -314,6 +342,12 @@ def test_cli_writes_json_and_markdown_reports(tmp_path):
         "recapture-autocad-or-provide-window": 1,
     }
     assert payload["recommended_action_domain_counts"] == {"continue": 1, "input": 1}
+    assert payload["reference_request_validation_issue_code_counts"] == {
+        "source_dxf_sha256_mismatch": 1,
+    }
+    assert payload["reference_intake_issue_code_counts"] == {
+        "corner_background_not_white": 2,
+    }
     assert payload["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
     assert payload["recommended_next_action"]["domain"] == "input"
     assert "# AutoCAD Artifact Route Report" in markdown
@@ -321,6 +355,8 @@ def test_cli_writes_json_and_markdown_reports(tmp_path):
     assert "- route_count: `2`" in markdown
     assert "recommended_action_counts" in markdown
     assert "recommended_action_domain_counts" in markdown
+    assert "- reference_request_validation_issue_code_counts: `source_dxf_sha256_mismatch=1`" in markdown
+    assert "- reference_intake_issue_code_counts: `corner_background_not_white=2`" in markdown
     assert "- recommended_next_action: `recapture-autocad-or-provide-window`" in markdown
     assert "- recommended_action_domain: `input`" in markdown
     assert "- read_only_routing: `True`" in markdown

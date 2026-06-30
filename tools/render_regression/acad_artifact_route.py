@@ -263,6 +263,24 @@ def _count_values(values: list[str]) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
+def _sum_count_maps(routes: list[dict[str, Any]], key: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for route in routes:
+        values = route.get(key)
+        if not isinstance(values, dict):
+            continue
+        for code, count in values.items():
+            code_text = str(code)
+            if not code_text:
+                continue
+            try:
+                count_int = int(count)
+            except Exception:
+                continue
+            counts[code_text] = counts.get(code_text, 0) + count_int
+    return dict(sorted(counts.items()))
+
+
 def _route_batch_summary(routes: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "kind_counts": _count_values([str(route.get("kind") or "") for route in routes]),
@@ -273,6 +291,14 @@ def _route_batch_summary(routes: list[dict[str, Any]]) -> dict[str, Any]:
         "recommended_action_domain_counts": _count_values([
             _route_action(route)["domain"] for route in routes
         ]),
+        "reference_request_validation_issue_code_counts": _sum_count_maps(
+            routes,
+            "reference_request_validation_issue_code_counts",
+        ),
+        "reference_intake_issue_code_counts": _sum_count_maps(
+            routes,
+            "reference_intake_issue_code_counts",
+        ),
     }
 
 
@@ -437,6 +463,16 @@ def _write_batch_text(payload: dict[str, Any]) -> str:
         f"message: {action.get('message', '')}",
         f"action_artifact: {action.get('artifact', '')}",
     ]
+    if payload.get("reference_request_validation_issue_code_counts"):
+        summary.append(
+            "reference_request_validation_issue_code_counts: "
+            + _format_counts(payload["reference_request_validation_issue_code_counts"])
+        )
+    if payload.get("reference_intake_issue_code_counts"):
+        summary.append(
+            "reference_intake_issue_code_counts: "
+            + _format_counts(payload["reference_intake_issue_code_counts"])
+        )
     if payload.get("action_artifact_resolved"):
         summary.extend([
             f"action_artifact_resolved: {payload.get('action_artifact_resolved', '')}",
@@ -531,6 +567,21 @@ def _write_markdown(payload: dict[str, Any]) -> str:
             f"- autocad_equivalence_claim: `{bool(boundary.get('autocad_equivalence_claim'))}`",
             "",
         ])
+        if payload.get("reference_request_validation_issue_code_counts"):
+            lines.extend([
+                "- reference_request_validation_issue_code_counts: "
+                f"`{_format_counts(payload['reference_request_validation_issue_code_counts'])}`",
+            ])
+        if payload.get("reference_intake_issue_code_counts"):
+            lines.extend([
+                "- reference_intake_issue_code_counts: "
+                f"`{_format_counts(payload['reference_intake_issue_code_counts'])}`",
+            ])
+        if (
+            payload.get("reference_request_validation_issue_code_counts")
+            or payload.get("reference_intake_issue_code_counts")
+        ):
+            lines.append("")
         if action["artifact"]:
             lines.extend([
                 "## Recommended Action Artifact",

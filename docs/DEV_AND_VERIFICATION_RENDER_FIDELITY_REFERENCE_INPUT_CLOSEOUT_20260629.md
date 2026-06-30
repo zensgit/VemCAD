@@ -621,6 +621,46 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Route Batch Aggregate Issue Code Counts
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make recursive/multi-index route summaries expose aggregate request/intake
+  issue-code counts at the top level.
+- Let CI jobs that upload a single route batch summary see the exact input
+  issue classes without drilling into each nested route.
+
+Changes:
+
+- `acad_artifact_route.py` now sums
+  `reference_request_validation_issue_code_counts` across nested routes.
+- `acad_artifact_route.py` now sums `reference_intake_issue_code_counts`
+  across nested routes.
+- Batch route JSON, text, and Markdown summary output display those aggregate
+  counts when present.
+- `tools/render_regression/README.md` documents the operator-facing behavior.
+
+Boundary:
+
+- Route summary metadata only.
+- No route priority change.
+- No renderer change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Route Issue Code Counts
 
 Status: implemented in this branch.
