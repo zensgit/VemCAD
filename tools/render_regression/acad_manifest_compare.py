@@ -203,7 +203,7 @@ def _write_tsv(path: Path, rows: list[dict[str, Any]]) -> None:
             "id\tdrawing_id\tviewspace_status\tx3_band\tink_iou\tcolor_dist\t"
             "aspect_delta\tcompare_exit_code\ttext_flags\ttext_notes\t"
             "triage_rank\ttriage_bucket\trecommended_action_domain\t"
-            "acad_png\tours\toverlay\tviewspace_report\n"
+            "expected_size\tacad_png\tours\toverlay\tviewspace_report\n"
         )
         for row in rows:
             summary = row.get("x3_summary") or {}
@@ -220,7 +220,8 @@ def _write_tsv(path: Path, rows: list[dict[str, Any]]) -> None:
                 f"{summary.get('color_dist', '')}\t{summary.get('aspect_delta', '')}\t"
                 f"{row.get('compare_exit_code', '')}\t{text_flags}\t{text_notes}\t"
                 f"{row.get('triage_rank', '')}\t{row.get('triage_bucket', '')}\t"
-                f"{row.get('recommended_action_domain', '')}\t{row.get('acad_png', '')}\t"
+                f"{row.get('recommended_action_domain', '')}\t"
+                f"{_expected_size_text(row.get('expected_size'))}\t{row.get('acad_png', '')}\t"
                 f"{row.get('ours', '')}\t{row.get('overlay', '')}\t"
                 f"{row.get('viewspace_report', '')}\n"
             )
@@ -495,10 +496,10 @@ def _write_markdown_summary(path: Path, report: dict[str, Any], *, contact_sheet
             "## Cases",
             "",
             (
-                "| Case | Drawing | View-space | X3 band | Ink IoU | Color dist | "
+                "| Case | Drawing | Expected size | View-space | X3 band | Ink IoU | Color dist | "
                 "Text flags | Text notes | Action domain | Recommended action |"
             ),
-            "| --- | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |",
+            "| --- | --- | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |",
         ])
         for row in rows:
             summary = row.get("x3_summary") or {}
@@ -513,6 +514,7 @@ def _write_markdown_summary(path: Path, report: dict[str, Any], *, contact_sheet
             ) or "-"
             lines.append(
                 f"| {_md_code_cell(row.get('id'))} | {_md_table_cell(row.get('drawing_id'))} | "
+                f"{_md_code_cell(_expected_size_text(row.get('expected_size')))} | "
                 f"{_md_code_cell(row.get('viewspace_status'))} | {_md_code_cell(summary.get('band'))} | "
                 f"{_md_table_cell(summary.get('ink_iou'))} | {_md_table_cell(summary.get('color_dist'))} | "
                 f"{_md_table_cell(text_flags)} | {_md_table_cell(text_notes)} | "

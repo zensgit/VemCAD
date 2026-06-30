@@ -279,12 +279,12 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path, capsys):
     assert (out / "summary.tsv").is_file()
     tsv_lines = (out / "summary.tsv").read_text(encoding="utf-8").splitlines()
     assert "triage_rank\ttriage_bucket\trecommended_action_domain" in tsv_lines[0]
-    assert "\t1\tmatched-pass\tpass-review\t" in tsv_lines[1]
+    assert "\t1\tmatched-pass\tpass-review\t760x570\t" in tsv_lines[1]
     summary_md = (out / "summary.md").read_text(encoding="utf-8")
     assert "AutoCAD Manifest Compare Summary" in summary_md
     assert "status: `pass`" in summary_md
     assert "autocad_equivalence_claim: `False`" in summary_md
-    assert "| `G11` | G11/B11 | `match` | `pass` |" in summary_md
+    assert "| `G11` | G11/B11 | `760x570` | `match` | `pass` |" in summary_md
     assert "`pass-review`" in summary_md
     assert "viewspace_mismatch" in summary_md
     assert "## Triage Priority" in summary_md
@@ -390,7 +390,7 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     summary_md = (out / "summary.md").read_text(encoding="utf-8")
     assert "status: `viewspace_mismatch`" in summary_md
     assert "It is not an AutoCAD-equivalence result" in summary_md
-    assert "| `G11` | G11/B11 | `mismatch` | `fallback` |" in summary_md
+    assert "| `G11` | G11/B11 | `800x600` | `mismatch` | `fallback` |" in summary_md
     assert "| 1 | `G11` | `recapture-required` | `mismatch` | `fallback` |" in summary_md
     assert "`input` | recapture AutoCAD" in summary_md
     assert (out / "contact_sheet.png").stat().st_size > 1000
@@ -533,7 +533,7 @@ def test_manifest_harness_escapes_markdown_table_cells(tmp_path):
     summary_md = (out / "summary.md").read_text(encoding="utf-8")
     case_row = next(line for line in summary_md.splitlines() if "G11\\|bearing cap" in line)
     assert "`G\\|11`" in case_row
-    assert _unescaped_pipe_count(case_row) == 11
+    assert _unescaped_pipe_count(case_row) == 12
     triage_row = next(line for line in summary_md.splitlines() if "`recapture-required`" in line)
     assert "`G\\|11`" in triage_row
     assert _unescaped_pipe_count(triage_row) == 9
