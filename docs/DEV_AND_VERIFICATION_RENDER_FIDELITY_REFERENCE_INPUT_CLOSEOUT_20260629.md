@@ -392,6 +392,45 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Blank Candidate Render Advisory
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Prevent a blank VemCAD candidate PNG from entering X3 as if it were a usable
+  comparison input.
+- Keep the finding as artifact/evidence review, not an automatic renderer
+  defect claim.
+
+Changes:
+
+- `inspection.identity_advisory.candidate_ink.status=blank` now adds a warning:
+  `candidate_render_blank`.
+- The warning moves returned-reference intake to `status=review`, so the
+  operator inspects the candidate render artifact before trusting any X3
+  conclusion.
+- This is symmetric with `returned_reference_blank`, but explicitly describes
+  the candidate render artifact rather than the AutoCAD ground truth.
+
+Boundary:
+
+- Returned-reference intake preflight only.
+- Diagnostic warning, not an AutoCAD-equivalence gate.
+- No renderer change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Request Package Validation
 
 Status: implemented in this branch.

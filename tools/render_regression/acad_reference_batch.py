@@ -212,6 +212,15 @@ def _identity_advisory(returned_png: Path, candidate_png: Path | None) -> tuple[
                 "wrong file, or unmatched capture window before trusting X3"
             ),
         })
+    if candidate.get("status") == "blank":
+        issues.append({
+            "severity": "warning",
+            "code": "candidate_render_blank",
+            "message": (
+                "candidate VemCAD render PNG has no detected ink; check the render artifact "
+                "before trusting X3"
+            ),
+        })
     returned_aspect = returned.get("bbox_aspect")
     candidate_aspect = candidate.get("bbox_aspect")
     if isinstance(returned_aspect, (int, float)) and isinstance(candidate_aspect, (int, float)):
