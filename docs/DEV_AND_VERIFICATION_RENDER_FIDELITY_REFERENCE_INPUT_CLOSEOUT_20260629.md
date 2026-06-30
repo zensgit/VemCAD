@@ -942,6 +942,47 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py too
 # passed
 ```
 
+## Follow-Up Source Request Boundary Route Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let operators fail closed when a routed run no longer carries the source
+  request boundary.
+- Make generated reference-request handoff commands verify both:
+  - source artifact boundary: no AutoCAD-equivalence claim;
+  - source request boundary: returned AutoCAD PNGs and matched-view comparison
+    are still required.
+- Keep compare-only routes from failing the guard: they do not own the source
+  request package, while batch/request-run routes do.
+
+Changes:
+
+- `acad_artifact_route.py` adds `--require-request-boundary key=value`.
+- The guard checks every route that exposes `source_request_boundary` and
+  fails if none expose it.
+- Generated `reference_request.md` route-inspection commands now include:
+  - `--require-request-boundary autocad_equivalence_claim=false`
+  - `--require-request-boundary requires_returned_autocad_png=true`
+  - `--require-request-boundary requires_viewspace_match=true`
+
+Boundary:
+
+- Route/report guard only.
+- No renderer change.
+- No X3 scoring change.
+- No compare behavior change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py tools/render_regression/tests/test_acad_manifest_compare.py -q
+# passed
+```
+
 ## Follow-Up Source Report Issue Code Counts
 
 Status: implemented in this branch.

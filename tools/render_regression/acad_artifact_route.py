@@ -775,6 +775,32 @@ def _check_source_boundary_requirements(
     return failures
 
 
+def _check_request_boundary_requirements(
+    payload: dict[str, Any],
+    expectations: list[tuple[str, Any]],
+) -> list[str]:
+    failures: list[str] = []
+    matched_routes = 0
+    for route in _source_boundary_routes(payload):
+        boundary = route.get("source_request_boundary")
+        artifact = str(route.get("artifact_index") or "<unknown>")
+        if not isinstance(boundary, dict) or not boundary:
+            continue
+        matched_routes += 1
+        for key, expected in expectations:
+            if key not in boundary:
+                failures.append(f"{artifact}: missing source request boundary {key}")
+                continue
+            actual = boundary.get(key)
+            if actual != expected:
+                failures.append(
+                    f"{artifact}: source request boundary {key}={actual!r} != {expected!r}"
+                )
+    if matched_routes == 0:
+        failures.append("no routed artifact exposed source_request_boundary")
+    return failures
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="acad_artifact_route",
@@ -822,6 +848,12 @@ def main(argv: list[str] | None = None) -> int:
                         ))
     parser.add_argument("--require-source-boundary", action="append", default=[],
                         help="exit 2 unless every routed source artifact boundary has key=value; may repeat")
+    parser.add_argument("--require-request-boundary", action="append", default=[],
+                        help=(
+                            "exit 2 unless every routed source request boundary has key=value; "
+                            "routes without source_request_boundary are ignored, but at least one "
+                            "route must expose it; may repeat"
+                        ))
     parser.add_argument("--require-issue-code", action="append", default=[],
                         help=(
                             "exit 2 unless the routed request/intake issue-code counts "
@@ -846,6 +878,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         source_boundary_expectations = [
             _parse_boundary_expectation(item) for item in args.require_source_boundary
+        ]
+        request_boundary_expectations = [
+            _parse_boundary_expectation(item) for item in args.require_request_boundary
         ]
         action_count_expectations = [
             _parse_count_expectation(item) for item in args.require_action_count
@@ -1051,6 +1086,13 @@ def main(argv: list[str] | None = None) -> int:
         failures = _check_source_boundary_requirements(payload, source_boundary_expectations)
         if failures:
             print("acad_artifact_route: source boundary requirement failed", file=sys.stderr)
+            for failure in failures:
+                print(f"acad_artifact_route: {failure}", file=sys.stderr)
+            return 2
+    if request_boundary_expectations:
+        failures = _check_request_boundary_requirements(payload, request_boundary_expectations)
+        if failures:
+            print("acad_artifact_route: source request boundary requirement failed", file=sys.stderr)
             for failure in failures:
                 print(f"acad_artifact_route: {failure}", file=sys.stderr)
             return 2
