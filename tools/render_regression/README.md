@@ -222,6 +222,9 @@ requested output names.
 Generated recapture request Markdown also surfaces the source DXF and candidate
 PNG SHA256 values already stored in `reference_request.json`, so handoffs can
 verify identity without opening the JSON first.
+It also shows the current view-space status, current X3 band, and requested
+expected size for each recapture case, so the handoff explains why a fresh
+AutoCAD export is needed and what size contract it should satisfy.
 Route Markdown reports also use safe code spans for action artifacts and count
 summaries, so unusual artifact paths remain readable in the top-level route
 handoff.

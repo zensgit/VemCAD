@@ -549,6 +549,19 @@ def _png_size(path: str) -> dict[str, int] | None:
     return {"width": width, "height": height}
 
 
+def _expected_size_text(expected_size: Any) -> str:
+    if isinstance(expected_size, dict):
+        width = expected_size.get("width")
+        height = expected_size.get("height")
+    elif isinstance(expected_size, (list, tuple)) and len(expected_size) == 2:
+        width, height = expected_size
+    else:
+        return ""
+    width_text = _str(width)
+    height_text = _str(height)
+    return f"{width_text}x{height_text}" if width_text and height_text else ""
+
+
 def _file_provenance(path: str) -> dict[str, Any] | None:
     if not path:
         return None
@@ -622,13 +635,19 @@ def _write_reference_request(
         "",
         "These cases failed the view-space contract. They need fresh AutoCAD model-extents exports before X3 can be interpreted as render fidelity.",
         "",
-        "| Rank | Case | Drawing | Requested PNG | Source DXF | Source SHA256 | Candidate SHA256 |",
-        "| ---: | --- | --- | --- | --- | --- | --- |",
+        (
+            "| Rank | Case | Drawing | Current view | Current X3 | Expected size | "
+            "Requested PNG | Source DXF | Source SHA256 | Candidate SHA256 |"
+        ),
+        "| ---: | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for case in cases:
         lines.append(
             f"| {_md_table_cell(case['triage_rank'])} | {_md_code_cell(case['id'])} | "
             f"{_md_table_cell(case['drawing_id'])} | "
+            f"{_md_code_cell(case.get('current_viewspace_status'))} | "
+            f"{_md_code_cell(case.get('current_x3_band'))} | "
+            f"{_md_code_cell(_expected_size_text(case.get('requested_expected_size')))} | "
             f"{_md_code_cell(case['recommended_output_name'])} | {_md_code_cell(case['source_dxf'])} | "
             f"{_md_code_cell(case.get('source_dxf_sha256'))} | {_md_code_cell(case.get('candidate_png_sha256'))} |"
         )
