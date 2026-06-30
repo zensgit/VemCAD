@@ -23,10 +23,14 @@ def test_routes_batch_missing_references(tmp_path):
         "status": "blocked",
         "case_count": 2,
         "missing_count": 2,
-        "artifacts": [],
+        "artifacts": [
+            {"kind": "missing_references_markdown", "path": "input/missing_references.md"},
+            {"kind": "missing_references_tsv", "path": "input/missing_references.tsv"},
+        ],
     })
 
     payload = route.route_artifact_index(index)
+    text = route._write_text(payload)
 
     assert payload["schema"] == "vemcad.acad_artifact_route/v1"
     assert payload["boundary"]["read_only_routing"] is True
@@ -37,6 +41,8 @@ def test_routes_batch_missing_references(tmp_path):
     assert payload["status"] == "blocked"
     assert payload["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
     assert payload["recommended_next_action"]["domain"] == "input"
+    assert payload["recommended_next_action"]["artifact"] == "input/missing_references.md"
+    assert "action_artifact: input/missing_references.md" in text
 
 
 def test_routes_directory_containing_artifact_index(tmp_path):
