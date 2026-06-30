@@ -554,6 +554,8 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         ("missing references", "missing_references_markdown"),
         ("missing references tsv", "missing_references_tsv"),
         ("compare summary", "compare_summary_markdown"),
+        ("compare reference request", "compare_reference_request_markdown"),
+        ("compare reference request json", "compare_reference_request_json"),
         ("compare artifact index", "compare_artifact_index"),
         ("case actions tsv", "case_actions_tsv"),
         ("route summary json", "route_summary_json"),
@@ -628,6 +630,8 @@ def _write_run_summary(
         "missing_references_tsv": _existing(input_dir / "missing_references.tsv"),
         "compare_summary_json": _existing(compare_summary_json),
         "compare_summary_markdown": _existing(compare_dir / "summary.md"),
+        "compare_reference_request_json": _existing(compare_dir / "reference_request.json"),
+        "compare_reference_request_markdown": _existing(compare_dir / "reference_request.md"),
         "compare_artifact_index": _existing(compare_dir / "artifact_index.json"),
         "route_summary_json": str(out_dir / "route_summary.json"),
         "route_summary_markdown": str(out_dir / "route_summary.md"),
@@ -663,6 +667,8 @@ def _write_run_summary(
         ("missing_references_tsv", "missing_references_tsv"),
         ("compare_summary_json", "compare_summary_json"),
         ("compare_summary_markdown", "compare_summary_markdown"),
+        ("compare_reference_request_json", "compare_reference_request_json"),
+        ("compare_reference_request_markdown", "compare_reference_request_markdown"),
         ("compare_artifact_index", "compare_artifact_index"),
     ):
         item = _maybe_artifact(kind, str(payload.get(key) or ""))

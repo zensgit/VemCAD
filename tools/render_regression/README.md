@@ -241,6 +241,10 @@ For one-command request runs, per-case `case_actions` rows use the same
 recapture handoff: a `recapture-autocad-or-provide-window` case points at
 `compare/reference_request.md` when generated, while matched/pass review cases
 still point at the compare summary.
+The run-level artifact index and run summary also list
+`compare_reference_request_json` and `compare_reference_request_markdown` when
+the compare phase generated a recapture request, so automation can discover the
+handoff without opening the nested compare artifact index first.
 `acad_manifest_compare.py` also writes per-case `recommended_action_domain`
 values into `summary.json`, `summary.tsv`, `summary.md`, and the compare
 artifact index counts. A `viewspace_mismatch` case therefore remains an
