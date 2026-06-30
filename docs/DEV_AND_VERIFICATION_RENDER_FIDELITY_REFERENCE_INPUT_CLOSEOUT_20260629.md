@@ -1379,6 +1379,44 @@ python3 -m pytest tools/render_regression/tests -q
 # 114 passed
 ```
 
+## Follow-Up Standalone Compare Route Stdout
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make standalone `acad_manifest_compare.py` logs self-directing, matching the
+  request-run and batch/input-prep CLIs.
+- Let CI logs show the next safe action without requiring the reviewer to open
+  `route_summary.json`.
+
+Changes:
+
+- After writing `route_summary.json/md`, `acad_manifest_compare.py` now prints:
+  - `route summary  : <compare-dir>/route_summary.md`;
+  - `recommended next action: <code>`.
+- Covered routes:
+  - matched-view pass -> `review-x3-pass`;
+  - `viewspace_mismatch` -> `recapture-autocad-or-provide-window`;
+  - blocked manifest/dry-run -> `inspect-compare-input-block`.
+
+Boundary:
+
+- CLI/log surfacing only.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 6 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 114 passed
+```
+
 Private compatibility smoke:
 
 ```bash
