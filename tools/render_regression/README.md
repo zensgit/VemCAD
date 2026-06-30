@@ -146,6 +146,14 @@ python3 tools/render_regression/acad_manifest_compare.py \
   --candidate-cases <candidate_cases.json> \
   --out-dir <compare-dir>
 
+python3 tools/render_regression/acad_reference_batch.py \
+  --validate-request <compare-dir>/reference_request.json \
+  --candidate-cases <candidate_cases.json> \
+  --require-request-boundary autocad_equivalence_claim=false \
+  --require-request-boundary requires_returned_autocad_png=true \
+  --require-request-boundary requires_viewspace_match=true \
+  --out-dir <request-validation-dir>
+
 python3 tools/render_regression/acad_reference_request_run.py \
   --from-request <compare-dir>/reference_request.json \
   --candidate-cases <candidate_cases.json> \

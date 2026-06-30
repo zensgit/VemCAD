@@ -104,6 +104,22 @@ def _format_boundary(boundary: dict[str, Any]) -> str:
     return ", ".join(f"{key}={value}" for key, value in sorted(boundary.items())) or "none"
 
 
+def _parse_boundary_expectation(raw: str) -> tuple[str, Any]:
+    if "=" not in raw:
+        raise ValueError(f"boundary expectation must be key=value: {raw}")
+    key, value = raw.split("=", 1)
+    key = key.strip()
+    value = value.strip()
+    if not key:
+        raise ValueError(f"boundary expectation key is empty: {raw}")
+    lowered = value.lower()
+    if lowered == "true":
+        return key, True
+    if lowered == "false":
+        return key, False
+    return key, value
+
+
 def _near_white(rgb: tuple[int, int, int]) -> bool:
     return min(rgb) >= 245 and (max(rgb) - min(rgb)) <= 10
 
@@ -456,6 +472,31 @@ def _request_boundary(data: dict[str, Any]) -> dict[str, Any]:
     return dict(boundary) if isinstance(boundary, dict) else {}
 
 
+def _request_boundary_requirement_issues(
+    boundary: dict[str, Any],
+    expectations: list[tuple[str, Any]],
+) -> list[dict[str, str]]:
+    issues: list[dict[str, str]] = []
+    for key, expected in expectations:
+        if key not in boundary:
+            issues.append({
+                "severity": "error",
+                "case_id": "<request>",
+                "code": "missing_request_boundary",
+                "message": f"source request boundary is missing {key}",
+            })
+            continue
+        actual = boundary.get(key)
+        if actual != expected:
+            issues.append({
+                "severity": "error",
+                "case_id": "<request>",
+                "code": "request_boundary_mismatch",
+                "message": f"source request boundary {key}={actual!r} != {expected!r}",
+            })
+    return issues
+
+
 def _filter_request_cases(cases: list[dict[str, Any]], case_ids: set[str] | None) -> list[dict[str, Any]]:
     if not case_ids:
         return cases
@@ -582,6 +623,7 @@ def _write_reference_request_validation_report(
     *,
     candidate_cases: Path,
     case_ids: set[str] | None = None,
+    request_boundary_expectations: list[tuple[str, Any]] | None = None,
 ) -> dict[str, Any]:
     request_payload = _load_request_payload(request_json)
     request_boundary = _request_boundary(request_payload)
@@ -593,6 +635,10 @@ def _write_reference_request_validation_report(
     )
     rows: list[dict[str, Any]] = []
     issues: list[dict[str, str]] = [dict(item) for item in global_issues]
+    issues.extend(_request_boundary_requirement_issues(
+        request_boundary,
+        request_boundary_expectations or [],
+    ))
     seen_request_ids: set[str] = set()
     seen_output_names: dict[str, str] = {}
 
@@ -1204,12 +1250,14 @@ def build_files_from_request(
     reference_dir: Path,
     out_dir: Path,
     case_ids: set[str] | None = None,
+    request_boundary_expectations: list[tuple[str, Any]] | None = None,
 ) -> tuple[Path, Path, dict[str, Any]]:
     request_validation = _write_reference_request_validation_report(
         out_dir,
         request_json,
         candidate_cases=candidate_cases,
         case_ids=case_ids,
+        request_boundary_expectations=request_boundary_expectations,
     )
     if request_validation["status"] == "blocked":
         raise ValueError(
@@ -1260,6 +1308,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="directory containing returned AutoCAD PNGs, required with --from-request")
     parser.add_argument("--case-id", action="append", default=None,
                         help="with --from-request/--validate-request, process only this case id; may repeat")
+    parser.add_argument("--require-request-boundary", action="append", default=[],
+                        help="with --from-request/--validate-request, require request boundary key=value; may repeat")
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args(argv)
 
@@ -1269,6 +1319,9 @@ def main(argv: list[str] | None = None) -> int:
         modes = sum(1 for item in (args.cases, args.from_request, args.validate_request) if item is not None)
         if modes != 1:
             raise ValueError("choose exactly one of --cases, --from-request, or --validate-request")
+        request_boundary_expectations = [
+            _parse_boundary_expectation(item) for item in args.require_request_boundary
+        ]
         if args.validate_request is not None:
             if args.candidate_cases is None:
                 raise ValueError("--candidate-cases is required with --validate-request")
@@ -1277,6 +1330,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.validate_request,
                 candidate_cases=args.candidate_cases,
                 case_ids=set(args.case_id or []) or None,
+                request_boundary_expectations=request_boundary_expectations,
             )
             index_path = _write_batch_artifact_index(args.out_dir, validation=validation)
             route_payload = _write_batch_route_report(index_path)
@@ -1298,6 +1352,7 @@ def main(argv: list[str] | None = None) -> int:
                 reference_dir=args.reference_dir,
                 out_dir=args.out_dir,
                 case_ids=set(args.case_id or []) or None,
+                request_boundary_expectations=request_boundary_expectations,
             )
         else:
             manifest_path, candidates_path, validation = build_files(args.cases, args.out_dir)
