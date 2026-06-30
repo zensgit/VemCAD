@@ -1289,6 +1289,11 @@ def main(argv: list[str] | None = None) -> int:
                             "exit 2 if the routed request/intake/compare issue-code counts "
                             "include this code; may repeat"
                         ))
+    parser.add_argument("--require-issue-code-count", action="append", default=[],
+                        help=(
+                            "exit 2 unless routed request/intake/compare issue-code counts "
+                            "contain code=count; may repeat"
+                        ))
     parser.add_argument("--require-triage-bucket", action="append", default=[],
                         help=(
                             "exit 2 unless routed compare triage_bucket_counts "
@@ -1345,6 +1350,9 @@ def main(argv: list[str] | None = None) -> int:
         ]
         final_exit_code_count_expectations = [
             _parse_count_expectation(item) for item in args.require_final_exit_code_count
+        ]
+        issue_code_count_expectations = [
+            _parse_count_expectation(item) for item in args.require_issue_code_count
         ]
         triage_bucket_expectations = [
             _parse_count_expectation(item) for item in args.require_triage_bucket
@@ -1583,8 +1591,22 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
-    if args.require_issue_code or args.forbid_issue_code:
+    if args.require_issue_code or args.forbid_issue_code or issue_code_count_expectations:
         counts = _issue_code_counts(payload)
+        count_failures = _check_count_guards(
+            label="issue code",
+            counts=counts,
+            required=issue_code_count_expectations,
+            forbidden=[],
+        )
+        if count_failures:
+            print("acad_artifact_route: " + "; ".join(count_failures), file=sys.stderr)
+            print(
+                "acad_artifact_route: issue code counts: "
+                + _format_counts(counts),
+                file=sys.stderr,
+            )
+            return 2
         missing = [code for code in args.require_issue_code if not counts.get(code, 0)]
         if missing:
             print(
