@@ -577,6 +577,50 @@ python3 -m pytest tools/render_regression/tests -q
 # 101 passed
 ```
 
+## Follow-Up Batch Route Issue Code Counts
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make batch/input-stage route reports carry the same concrete issue-code
+  evidence as run-level route reports.
+- Let CI jobs that stop at request validation, missing references, or returned
+  PNG intake expose the exact request/intake issue classes without opening
+  nested JSON artifacts.
+
+Changes:
+
+- `acad_reference_batch.py` now aggregates
+  `reference_request_validation_issue_code_counts` from
+  `reference_request_validation.json`.
+- `acad_reference_batch.py` now aggregates
+  `reference_intake_issue_code_counts` from `reference_intake.json`.
+- `acad_artifact_route.py` now passes those counts through batch routes, so
+  route JSON, text, and Markdown display them.
+- `tools/render_regression/README.md` documents the operator-facing behavior.
+
+Boundary:
+
+- Batch artifact metadata and route-report evidence only.
+- No route priority change.
+- No renderer change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_reference_batch.py \
+  tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Route Issue Code Counts
 
 Status: implemented in this branch.

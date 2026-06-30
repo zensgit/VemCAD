@@ -23,6 +23,12 @@ def test_routes_batch_missing_references(tmp_path):
         "status": "blocked",
         "case_count": 2,
         "missing_count": 2,
+        "reference_request_validation_issue_code_counts": {
+            "source_dxf_sha256_mismatch": 1,
+        },
+        "reference_intake_issue_code_counts": {
+            "returned_reference_blank": 2,
+        },
         "artifacts": [
             {"kind": "missing_references_markdown", "path": "input/missing_references.md"},
             {"kind": "missing_references_tsv", "path": "input/missing_references.tsv"},
@@ -31,6 +37,7 @@ def test_routes_batch_missing_references(tmp_path):
 
     payload = route.route_artifact_index(index)
     text = route._write_text(payload)
+    markdown = route.route_markdown(payload)
 
     assert payload["schema"] == "vemcad.acad_artifact_route/v1"
     assert payload["boundary"]["read_only_routing"] is True
@@ -42,7 +49,17 @@ def test_routes_batch_missing_references(tmp_path):
     assert payload["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
     assert payload["recommended_next_action"]["domain"] == "input"
     assert payload["recommended_next_action"]["artifact"] == "input/missing_references.md"
+    assert payload["reference_request_validation_issue_code_counts"] == {
+        "source_dxf_sha256_mismatch": 1,
+    }
+    assert payload["reference_intake_issue_code_counts"] == {
+        "returned_reference_blank": 2,
+    }
     assert "action_artifact: input/missing_references.md" in text
+    assert "reference_request_validation_issue_code_counts: source_dxf_sha256_mismatch=1" in text
+    assert "reference_intake_issue_code_counts: returned_reference_blank=2" in text
+    assert "- reference_request_validation_issue_code_counts: `source_dxf_sha256_mismatch=1`" in markdown
+    assert "- reference_intake_issue_code_counts: `returned_reference_blank=2`" in markdown
 
 
 def test_routes_directory_containing_artifact_index(tmp_path):

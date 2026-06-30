@@ -79,6 +79,23 @@ def _read_json(path: Path) -> dict[str, Any]:
     return payload if isinstance(payload, dict) else {}
 
 
+def _issue_code_counts(payload: dict[str, Any]) -> dict[str, int]:
+    issues = payload.get("issues")
+    if not isinstance(issues, list):
+        issues = []
+        for row in payload.get("cases") or []:
+            if isinstance(row, dict):
+                issues.extend(row.get("issues") or [])
+    counts: dict[str, int] = {}
+    for issue in issues:
+        if not isinstance(issue, dict):
+            continue
+        code = _str(issue.get("code"))
+        if code:
+            counts[code] = counts.get(code, 0) + 1
+    return dict(sorted(counts.items()))
+
+
 def _near_white(rgb: tuple[int, int, int]) -> bool:
     return min(rgb) >= 245 and (max(rgb) - min(rgb)) <= 10
 
@@ -998,6 +1015,7 @@ def _batch_index_metadata(out_dir: Path, batch_validation: dict[str, Any] | None
             "error_count": request_validation.get("error_count"),
             "warning_count": request_validation.get("warning_count"),
             "reference_request_validation_status": str(request_validation.get("status") or ""),
+            "reference_request_validation_issue_code_counts": _issue_code_counts(request_validation),
         })
     if missing:
         metadata.update({
@@ -1016,6 +1034,7 @@ def _batch_index_metadata(out_dir: Path, batch_validation: dict[str, Any] | None
             "error_count": intake.get("error_count"),
             "warning_count": intake.get("warning_count"),
             "reference_intake_status": str(intake.get("status") or ""),
+            "reference_intake_issue_code_counts": _issue_code_counts(intake),
         })
     if not request_validation and not missing and not intake and manifest:
         metadata.update({

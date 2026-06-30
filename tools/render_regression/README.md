@@ -242,6 +242,11 @@ Route JSON, text, and Markdown also surface that same resolution as
 `action_artifact_resolved` plus `action_artifact_exists`, so CI logs and
 uploaded route reports can point directly at the handoff file without a second
 artifact-index lookup.
+Batch artifact indexes and route reports also surface
+`reference_request_validation_issue_code_counts` and
+`reference_intake_issue_code_counts` when those preflight reports exist. This
+lets CI jobs that stop at the input stage show the exact request/intake issue
+codes without opening nested JSON artifacts.
 
 To assert source artifact boundaries as part of the same route step, repeat
 `--require-source-boundary key=value`. For example, this guarantees every
