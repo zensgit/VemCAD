@@ -882,13 +882,49 @@ def _write_reference_request_validation_report(
     out_dir.mkdir(parents=True, exist_ok=True)
     json_path = out_dir / "reference_request_validation.json"
     md_path = out_dir / "reference_request_validation.md"
+    tsv_path = out_dir / "reference_request_validation.tsv"
     json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    with tsv_path.open("w", encoding="utf-8") as handle:
+        handle.write(
+            "id\tdrawing_id\trecommended_output_name\trequested_capture_method\t"
+            "requested_view_contract\trequested_expected_size\tsource_dxf\tsource_dxf_sha256\t"
+            "source_dxf_size_bytes\tcandidate_png\tcandidate_png_sha256\tcandidate_png_size_bytes\t"
+            "issue_codes\n"
+        )
+        for row in rows:
+            source_prov = row.get("source_dxf_provenance")
+            if not isinstance(source_prov, dict):
+                source_prov = {}
+            candidate_prov = row.get("candidate_png_provenance")
+            if not isinstance(candidate_prov, dict):
+                candidate_prov = {}
+            issue_codes = ",".join(
+                f"{_str(item.get('severity'))}:{_str(item.get('code'))}"
+                for item in row.get("issues") or []
+                if _str(item.get("code"))
+            )
+            handle.write(
+                f"{_tsv(row.get('id'))}\t"
+                f"{_tsv(row.get('drawing_id'))}\t"
+                f"{_tsv(row.get('recommended_output_name'))}\t"
+                f"{_tsv(row.get('requested_capture_method'))}\t"
+                f"{_tsv(row.get('requested_view_contract'))}\t"
+                f"{_tsv(row.get('requested_expected_size'))}\t"
+                f"{_tsv(row.get('source_dxf'))}\t"
+                f"{_tsv(source_prov.get('sha256'))}\t"
+                f"{_tsv(source_prov.get('size_bytes'))}\t"
+                f"{_tsv(row.get('candidate_png'))}\t"
+                f"{_tsv(candidate_prov.get('sha256'))}\t"
+                f"{_tsv(candidate_prov.get('size_bytes'))}\t"
+                f"{_tsv(issue_codes)}\n"
+            )
     lines = [
         "# AutoCAD Reference Request Validation",
         "",
         f"- status: `{status}`",
         f"- request: `{request_json.resolve()}`",
         f"- candidate_cases: `{candidate_cases.resolve()}`",
+        f"- reference_request_validation_tsv: `{tsv_path}`",
         f"- cases: `{len(rows)}`",
         f"- errors: `{error_count}`",
         f"- warnings: `{warning_count}`",
@@ -1076,6 +1112,7 @@ def _existing_batch_artifacts(out_dir: Path) -> list[dict[str, str]]:
         ("missing_references.tsv", "missing_references_tsv"),
         ("reference_request_validation.json", "reference_request_validation_json"),
         ("reference_request_validation.md", "reference_request_validation_markdown"),
+        ("reference_request_validation.tsv", "reference_request_validation_tsv"),
         ("route_summary.json", "route_summary_json"),
         ("route_summary.md", "route_summary_markdown"),
     )
@@ -1098,6 +1135,7 @@ def _clear_batch_outputs(out_dir: Path) -> None:
         ("missing_references.tsv", "missing_references_tsv"),
         ("reference_request_validation.json", "reference_request_validation_json"),
         ("reference_request_validation.md", "reference_request_validation_markdown"),
+        ("reference_request_validation.tsv", "reference_request_validation_tsv"),
         ("route_summary.json", "route_summary_json"),
         ("route_summary.md", "route_summary_markdown"),
         ("artifact_index.json", "artifact_index"),
