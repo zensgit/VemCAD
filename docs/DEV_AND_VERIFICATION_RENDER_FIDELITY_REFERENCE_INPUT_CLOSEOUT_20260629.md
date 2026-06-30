@@ -206,6 +206,46 @@ Boundary:
 - No private drawing or AutoCAD PNG committed.
 - Still no AutoCAD-equivalence claim without `viewspace_status=match`.
 
+## Follow-Up Returned PNG Expected Size Intake Gate
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make returned-reference intake itself fail closed when a returned AutoCAD PNG
+  does not match the request-declared expected size.
+- Put actual returned PNG size and requested expected size in the same intake
+  row, so operators do not need to infer the mismatch from manifest validation
+  artifacts.
+
+Changes:
+
+- `acad_reference_batch.py` now carries `requested_expected_size` into
+  `reference_intake.json` inspection rows.
+- `reference_intake.md` now prints both actual `Size` and `Expected size`.
+- A returned PNG whose actual size differs from the request-declared size now
+  adds `error:returned_png_size_mismatch` and sets returned-reference intake to
+  `status=blocked`.
+- The `--from-request` run stops at returned-reference intake in that case,
+  before writing `acad_manifest.json` / `candidate_cases.json`.
+
+Boundary:
+
+- Returned-reference input-chain preflight only.
+- No renderer change.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- No private drawing or AutoCAD PNG committed.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Provenance Hardening
 
 Status: implemented in this branch.

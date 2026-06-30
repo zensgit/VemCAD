@@ -400,12 +400,14 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
     assert intake["warning_count"] == 0
     assert intake["issue_code_counts"] == {}
     assert intake["boundary"]["autocad_equivalence_claim"] is False
+    assert intake["cases"][0]["inspection"]["requested_expected_size"] == "1600x1131"
     assert intake["cases"][0]["inspection"]["sha256"] == _sha256(
         tmp_path / "returned" / "G11_autocad_model_extents.png"
     )
     intake_md = (out / "reference_intake.md").read_text(encoding="utf-8")
     assert "AutoCAD Reference Intake Preflight" in intake_md
     assert "G11_autocad_model_extents.png" in intake_md
+    assert "1600x1131" in intake_md
     assert "issue_code_counts: `none`" in intake_md
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["boundary"]["compares_renders"] is False
@@ -627,16 +629,25 @@ def test_batch_generator_blocks_returned_png_size_mismatch_when_request_declares
         "--out-dir", str(out),
     ]) == 2
 
-    manifest = json.loads((out / "acad_manifest.json").read_text(encoding="utf-8"))
-    assert manifest["cases"][0]["expected_size"] == {"width": 1600, "height": 1131}
+    assert not (out / "acad_manifest.json").exists()
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["stage"] == "reference_intake"
     assert artifact_index["status"] == "blocked"
-    assert artifact_index["batch_validation_status"] == "blocked"
-    assert artifact_index["reference_intake_status"] == "review"
-    assert {item["kind"] for item in artifact_index["artifacts"]} >= {
-        "acad_manifest",
-        "candidate_cases",
+    assert "batch_validation_status" not in artifact_index
+    assert artifact_index["reference_intake_status"] == "blocked"
+    assert artifact_index["reference_intake_issue_code_counts"]["returned_png_size_mismatch"] == 1
+    intake = json.loads((out / "reference_intake.json").read_text(encoding="utf-8"))
+    assert intake["status"] == "blocked"
+    assert intake["cases"][0]["inspection"]["requested_expected_size"] == "1600x1131"
+    assert intake["issue_code_counts"]["returned_png_size_mismatch"] == 1
+    intake_md = (out / "reference_intake.md").read_text(encoding="utf-8")
+    assert "returned_png_size_mismatch" in intake_md
+    assert "1200x900" in intake_md
+    assert "1600x1131" in intake_md
+    artifact_kinds = {item["kind"] for item in artifact_index["artifacts"]}
+    assert "acad_manifest" not in artifact_kinds
+    assert "candidate_cases" not in artifact_kinds
+    assert artifact_kinds >= {
         "reference_intake_json",
         "reference_intake_markdown",
         "reference_request_validation_json",
