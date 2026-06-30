@@ -983,6 +983,43 @@ python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py tool
 # passed
 ```
 
+## Follow-Up Route Request Boundary README
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make the operator-facing render-regression README match the route guard added
+  in the previous slice.
+- Document that `--require-request-boundary` checks only routes that expose
+  `source_request_boundary`, ignores compare-only routes, and fails if no
+  routed artifact exposes the request boundary.
+- Provide the full fail-closed route assertion used by generated
+  `reference_request.md` handoff commands.
+
+Changes:
+
+- `tools/render_regression/README.md` now documents:
+  - `--require-request-boundary autocad_equivalence_claim=false`
+  - `--require-request-boundary requires_returned_autocad_png=true`
+  - `--require-request-boundary requires_viewspace_match=true`
+
+Boundary:
+
+- Documentation only.
+- No renderer change.
+- No X3 scoring change.
+- No compare behavior change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+```
+
 ## Follow-Up Source Report Issue Code Counts
 
 Status: implemented in this branch.
