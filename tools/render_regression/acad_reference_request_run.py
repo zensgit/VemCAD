@@ -74,6 +74,58 @@ def _maybe_artifact(kind: str, path: str) -> dict[str, str] | None:
     return {"kind": kind, "path": path}
 
 
+def _run_artifact_index_payload(
+    summary: dict[str, Any],
+    artifacts: list[dict[str, str]],
+) -> dict[str, Any]:
+    payload = {
+        "schema": RUN_ARTIFACT_INDEX_SCHEMA,
+        "boundary": _artifact_index_boundary(summary),
+        "status": summary["status"],
+        "recommended_next_action": summary["recommended_next_action"],
+        "case_actions": summary["case_actions"],
+        "case_action_counts": summary["case_action_counts"],
+        "case_action_domain_counts": summary["case_action_domain_counts"],
+        "reference_request_validation_status": summary["reference_request_validation_status"],
+        "reference_request_validation_error_count": summary["reference_request_validation_error_count"],
+        "reference_request_validation_warning_count": summary["reference_request_validation_warning_count"],
+        "reference_request_validation_issue_code_counts": (
+            summary["reference_request_validation_issue_code_counts"]
+        ),
+        "source_request_boundary": summary.get("source_request_boundary") or {},
+        "reference_intake_status": summary["reference_intake_status"],
+        "reference_intake_error_count": summary["reference_intake_error_count"],
+        "reference_intake_warning_count": summary["reference_intake_warning_count"],
+        "reference_intake_issue_code_counts": summary["reference_intake_issue_code_counts"],
+        "count": len(artifacts),
+        "artifacts": artifacts,
+    }
+    if summary.get("route_count") is not None:
+        payload.update({
+            "route_count": summary.get("route_count"),
+            "route_kind_counts": summary.get("route_kind_counts") or {},
+            "route_status_counts": summary.get("route_status_counts") or {},
+            "route_recommended_action_counts": summary.get("route_recommended_action_counts") or {},
+            "route_recommended_action_domain_counts": (
+                summary.get("route_recommended_action_domain_counts") or {}
+            ),
+            "route_compare_case_count": summary.get("route_compare_case_count"),
+            "route_compared_count": summary.get("route_compared_count"),
+            "route_triage_bucket_counts": summary.get("route_triage_bucket_counts") or {},
+            "route_viewspace_status_counts": summary.get("route_viewspace_status_counts") or {},
+            "route_x3_band_counts": summary.get("route_x3_band_counts") or {},
+        })
+    return payload
+
+
+def _write_run_artifact_index(
+    out_dir: Path,
+    summary: dict[str, Any],
+    artifacts: list[dict[str, str]],
+) -> None:
+    _write_json(out_dir / "artifact_index.json", _run_artifact_index_payload(summary, artifacts))
+
+
 def _compare_status(compare_summary: Path) -> str:
     if not compare_summary.is_file():
         return ""
@@ -575,26 +627,7 @@ def _write_run_summary(
         item = _maybe_artifact(kind, str(payload.get(key) or ""))
         if item is not None:
             artifacts.append(item)
-    _write_json(out_dir / "artifact_index.json", {
-        "schema": RUN_ARTIFACT_INDEX_SCHEMA,
-        "boundary": _artifact_index_boundary(payload),
-        "status": payload["status"],
-        "recommended_next_action": payload["recommended_next_action"],
-        "case_actions": payload["case_actions"],
-        "case_action_counts": payload["case_action_counts"],
-        "case_action_domain_counts": payload["case_action_domain_counts"],
-        "reference_request_validation_status": payload["reference_request_validation_status"],
-        "reference_request_validation_error_count": payload["reference_request_validation_error_count"],
-        "reference_request_validation_warning_count": payload["reference_request_validation_warning_count"],
-        "reference_request_validation_issue_code_counts": payload["reference_request_validation_issue_code_counts"],
-        "source_request_boundary": payload.get("source_request_boundary") or {},
-        "reference_intake_status": payload["reference_intake_status"],
-        "reference_intake_error_count": payload["reference_intake_error_count"],
-        "reference_intake_warning_count": payload["reference_intake_warning_count"],
-        "reference_intake_issue_code_counts": payload["reference_intake_issue_code_counts"],
-        "count": len(artifacts),
-        "artifacts": artifacts,
-    })
+    _write_run_artifact_index(out_dir, payload, artifacts)
     route_inputs = [Path(path) for path in (
         payload.get("input_artifact_index"),
         str(out_dir / "artifact_index.json"),
@@ -620,6 +653,13 @@ def _write_run_summary(
         "route_viewspace_status_counts": route_payload.get("viewspace_status_counts") or {},
         "route_x3_band_counts": route_payload.get("x3_band_counts") or {},
     })
+    _write_run_artifact_index(out_dir, payload, artifacts)
+    route_payload = artifact_route.route_artifact_indexes(route_inputs)
+    artifact_route.write_route_report_files(
+        route_payload,
+        out_json=Path(payload["route_summary_json"]),
+        out_md=Path(payload["route_summary_markdown"]),
+    )
     _write_json(out_dir / "run_summary.json", payload)
     _write_markdown(out_dir / "run_summary.md", payload)
     return payload

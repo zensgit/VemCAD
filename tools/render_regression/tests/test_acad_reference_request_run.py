@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import acad_reference_request_run as runner  # noqa: E402
+import acad_artifact_route as route  # noqa: E402
 
 
 REQUEST_BOUNDARY = {
@@ -207,6 +208,32 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert artifact_index["reference_intake_status"] == "pass"
     assert artifact_index["reference_intake_error_count"] == 0
     assert artifact_index["reference_intake_warning_count"] == 0
+    assert artifact_index["route_count"] == 3
+    assert artifact_index["route_kind_counts"] == {
+        "batch": 1,
+        "compare": 1,
+        "request_run": 1,
+    }
+    assert artifact_index["route_status_counts"] == {"pass": 3}
+    assert artifact_index["route_recommended_action_counts"] == {
+        "continue-to-request-run": 1,
+        "review-x3-pass": 2,
+    }
+    assert artifact_index["route_recommended_action_domain_counts"] == {
+        "continue": 1,
+        "pass-review": 2,
+    }
+    assert artifact_index["route_compare_case_count"] == 1
+    assert artifact_index["route_compared_count"] == 1
+    assert artifact_index["route_triage_bucket_counts"] == {"matched-pass": 1}
+    assert artifact_index["route_viewspace_status_counts"] == {"match": 1}
+    assert artifact_index["route_x3_band_counts"] == {"pass": 1}
+    routed_run = route.route_artifact_index(out / "artifact_index.json")
+    assert routed_run["route_compare_case_count"] == 1
+    assert routed_run["route_compared_count"] == 1
+    assert routed_run["route_triage_bucket_counts"] == {"matched-pass": 1}
+    assert routed_run["route_viewspace_status_counts"] == {"match": 1}
+    assert routed_run["route_x3_band_counts"] == {"pass": 1}
     assert "recommended next action: review-x3-pass" in stdout
     assert "recommended next action domain: pass-review" in stdout
     assert "reference request validation issue codes: none" in stdout
@@ -264,6 +291,11 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     }
     route_summary = json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
     route_summary_md = (out / "route_summary.md").read_text(encoding="utf-8")
+    request_run_route = next(item for item in route_summary["routes"] if item["kind"] == "request_run")
+    assert request_run_route["route_compare_case_count"] == 1
+    assert request_run_route["route_triage_bucket_counts"] == {"matched-pass": 1}
+    assert "- route_compare_case_count: `1`" in route_summary_md
+    assert "- route_triage_bucket_counts: `matched-pass=1`" in route_summary_md
     assert route_summary["recommended_action_counts"] == {
         "continue-to-request-run": 1,
         "review-x3-pass": 2,
@@ -337,6 +369,17 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
         "mismatch": 1,
     }
     assert summary["route_x3_band_counts"] == {"pass": 2}
+    assert artifact_index["route_compare_case_count"] == 2
+    assert artifact_index["route_compared_count"] == 2
+    assert artifact_index["route_triage_bucket_counts"] == {
+        "matched-pass": 1,
+        "recapture-required": 1,
+    }
+    assert artifact_index["route_viewspace_status_counts"] == {
+        "match": 1,
+        "mismatch": 1,
+    }
+    assert artifact_index["route_x3_band_counts"] == {"pass": 2}
     assert "case action counts: recapture-autocad-or-provide-window=1, review-x3-pass=1" in stdout
     assert "case action domain counts: input=1, pass-review=1" in stdout
     assert "route compare cases: 2" in stdout

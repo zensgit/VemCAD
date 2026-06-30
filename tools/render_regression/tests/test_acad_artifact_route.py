@@ -208,6 +208,31 @@ def test_routes_run_case_actions(tmp_path):
         },
         "case_action_counts": {"recapture-autocad-or-provide-window": 1},
         "case_action_domain_counts": {"input": 1},
+        "route_count": 3,
+        "route_kind_counts": {"batch": 1, "compare": 1, "request_run": 1},
+        "route_status_counts": {"pass": 1, "viewspace_mismatch": 2},
+        "route_recommended_action_counts": {
+            "continue-to-request-run": 1,
+            "recapture-autocad-or-provide-window": 2,
+        },
+        "route_recommended_action_domain_counts": {
+            "continue": 1,
+            "input": 2,
+        },
+        "route_compare_case_count": 2,
+        "route_compared_count": 2,
+        "route_triage_bucket_counts": {
+            "matched-pass": 1,
+            "recapture-required": 1,
+        },
+        "route_viewspace_status_counts": {
+            "match": 1,
+            "mismatch": 1,
+        },
+        "route_x3_band_counts": {
+            "fallback": 1,
+            "pass": 1,
+        },
         "reference_request_validation_status": "blocked",
         "reference_request_validation_error_count": 1,
         "reference_request_validation_warning_count": 0,
@@ -241,6 +266,31 @@ def test_routes_run_case_actions(tmp_path):
     assert payload["recommended_next_action"]["domain"] == "input"
     assert payload["case_action_counts"] == {"recapture-autocad-or-provide-window": 1}
     assert payload["case_action_domain_counts"] == {"input": 1}
+    assert payload["route_count"] == 3
+    assert payload["route_kind_counts"] == {"batch": 1, "compare": 1, "request_run": 1}
+    assert payload["route_status_counts"] == {"pass": 1, "viewspace_mismatch": 2}
+    assert payload["route_recommended_action_counts"] == {
+        "continue-to-request-run": 1,
+        "recapture-autocad-or-provide-window": 2,
+    }
+    assert payload["route_recommended_action_domain_counts"] == {
+        "continue": 1,
+        "input": 2,
+    }
+    assert payload["route_compare_case_count"] == 2
+    assert payload["route_compared_count"] == 2
+    assert payload["route_triage_bucket_counts"] == {
+        "matched-pass": 1,
+        "recapture-required": 1,
+    }
+    assert payload["route_viewspace_status_counts"] == {
+        "match": 1,
+        "mismatch": 1,
+    }
+    assert payload["route_x3_band_counts"] == {
+        "fallback": 1,
+        "pass": 1,
+    }
     assert payload["reference_request_validation_status"] == "blocked"
     assert payload["reference_request_validation_error_count"] == 1
     assert payload["reference_request_validation_warning_count"] == 0
@@ -260,6 +310,12 @@ def test_routes_run_case_actions(tmp_path):
     }
     assert "case_action_counts: recapture-autocad-or-provide-window=1" in text
     assert "case_action_domain_counts: input=1" in text
+    assert "route_count: 3" in text
+    assert "route_kind_counts: batch=1, compare=1, request_run=1" in text
+    assert "route_compare_case_count: 2" in text
+    assert "route_triage_bucket_counts: matched-pass=1, recapture-required=1" in text
+    assert "route_viewspace_status_counts: match=1, mismatch=1" in text
+    assert "route_x3_band_counts: fallback=1, pass=1" in text
     assert "reference_request_validation_status: blocked" in text
     assert "reference_request_validation_errors: 1" in text
     assert "reference_request_validation_warnings: 0" in text
@@ -274,6 +330,8 @@ def test_routes_run_case_actions(tmp_path):
         "returned_reference_blank=1"
     ) in text
     assert "- reference_request_validation_status: `blocked`" in markdown
+    assert "- route_count: `3`" in markdown
+    assert "- route_triage_bucket_counts: `matched-pass=1, recapture-required=1`" in markdown
     assert "- reference_request_validation_errors: `1`" in markdown
     assert "- reference_request_validation_warnings: `0`" in markdown
     assert "- reference_request_validation_issue_code_counts: `source_dxf_sha256_mismatch=1`" in markdown
@@ -1176,6 +1234,39 @@ def test_cli_require_compare_counts_passes_for_batch(tmp_path):
         "mismatch=1",
         "--require-x3-band",
         "fail=1",
+        "--require-x3-band",
+        "fallback=1",
+    ]) == 0
+
+
+def test_cli_require_compare_counts_passes_for_request_run_route_fields(tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    _write(run_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_request_run_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "recommended_next_action": {
+            "code": "recapture-autocad-or-provide-window",
+            "message": "recapture",
+            "domain": "input",
+        },
+        "case_action_counts": {"recapture-autocad-or-provide-window": 1},
+        "case_action_domain_counts": {"input": 1},
+        "route_compare_case_count": 2,
+        "route_compared_count": 2,
+        "route_triage_bucket_counts": {"matched-pass": 1, "recapture-required": 1},
+        "route_viewspace_status_counts": {"match": 1, "mismatch": 1},
+        "route_x3_band_counts": {"fallback": 1, "pass": 1},
+        "case_actions": [],
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(run_dir),
+        "--require-triage-bucket",
+        "recapture-required=1",
+        "--require-viewspace-status",
+        "mismatch=1",
         "--require-x3-band",
         "fallback=1",
     ]) == 0

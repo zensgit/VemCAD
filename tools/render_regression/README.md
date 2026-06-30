@@ -176,13 +176,14 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
 `artifact_index.json`. These carry both `case_action_counts` and
 `case_action_domain_counts`, plus `recommended_next_action.domain`, so the run
 summary itself distinguishes input/recapture gates from renderer-candidate
-work before a separate route report is generated. The run summary also surfaces
-route-level `route_count`, `route_kind_counts`, `route_status_counts`,
+work before a separate route report is generated. The run summary and run-level
+artifact index also surface route-level `route_count`, `route_kind_counts`,
+`route_status_counts`,
 `route_recommended_action_counts`, and
 `route_recommended_action_domain_counts`, so operators can inspect the routed
 artifact topology without opening `route_summary.json`. When compare artifacts
-are present, the same run summary also surfaces `route_compare_case_count`,
-`route_compared_count`, `route_triage_bucket_counts`,
+are present, the same run summary and artifact index also surface
+`route_compare_case_count`, `route_compared_count`, `route_triage_bucket_counts`,
 `route_viewspace_status_counts`, and `route_x3_band_counts`, so operators can
 see whether the compare portion is matched, recapture-required, or an X3
 failure distribution without drilling into the nested route summary. The wrapper
