@@ -166,6 +166,8 @@ def _route_batch(payload: dict[str, Any]) -> dict[str, Any]:
         "status": status,
         "stage": stage,
         "case_count": payload.get("case_count"),
+        "error_count": payload.get("error_count"),
+        "warning_count": payload.get("warning_count"),
         "reference_request_validation_issue_code_counts": (
             payload.get("reference_request_validation_issue_code_counts") or {}
         ),
@@ -432,6 +434,10 @@ def _write_text(route: dict[str, Any]) -> str:
         f"recommended_action_domain: {action.get('domain', '')}",
         f"message: {action.get('message', '')}",
     ]
+    if route.get("error_count") is not None:
+        lines.append(f"errors: {route.get('error_count')}")
+    if route.get("warning_count") is not None:
+        lines.append(f"warnings: {route.get('warning_count')}")
     if action.get("artifact"):
         lines.append(f"action_artifact: {action.get('artifact', '')}")
     if route.get("action_artifact_resolved"):
@@ -540,6 +546,10 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         f"- recommended_action_domain: `{action['domain']}`",
         f"- message: {action['message']}",
     ]
+    if route.get("error_count") is not None:
+        lines.append(f"- errors: `{route.get('error_count')}`")
+    if route.get("warning_count") is not None:
+        lines.append(f"- warnings: `{route.get('warning_count')}`")
     if boundary:
         lines.extend([
             f"- read_only_routing: `{bool(boundary.get('read_only_routing'))}`",

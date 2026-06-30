@@ -98,6 +98,8 @@ def test_routes_batch_reference_intake_blocked(tmp_path):
         "stage": "reference_intake",
         "status": "blocked",
         "case_count": 1,
+        "error_count": 1,
+        "warning_count": 0,
         "reference_intake_issue_code_counts": {
             "returned_png_size_mismatch": 1,
         },
@@ -107,6 +109,8 @@ def test_routes_batch_reference_intake_blocked(tmp_path):
     })
 
     payload = route.route_artifact_index(index)
+    text = route._write_text(payload)
+    markdown = route.route_markdown(payload)
 
     assert payload["kind"] == "batch"
     assert payload["status"] == "blocked"
@@ -116,6 +120,12 @@ def test_routes_batch_reference_intake_blocked(tmp_path):
     assert payload["reference_intake_issue_code_counts"] == {
         "returned_png_size_mismatch": 1,
     }
+    assert payload["error_count"] == 1
+    assert payload["warning_count"] == 0
+    assert "errors: 1" in text
+    assert "warnings: 0" in text
+    assert "- errors: `1`" in markdown
+    assert "- warnings: `0`" in markdown
 
 
 def test_routes_prioritize_blocked_returned_reference_input_over_renderer_candidate(tmp_path):
@@ -140,6 +150,8 @@ def test_routes_prioritize_blocked_returned_reference_input_over_renderer_candid
         "stage": "reference_intake",
         "status": "blocked",
         "case_count": 1,
+        "error_count": 1,
+        "warning_count": 0,
         "reference_intake_issue_code_counts": {
             "returned_png_size_mismatch": 1,
         },
@@ -152,6 +164,8 @@ def test_routes_prioritize_blocked_returned_reference_input_over_renderer_candid
         compare_dir / "artifact_index.json",
         input_dir / "artifact_index.json",
     ])
+    input_route_text = route._write_text(payload["routes"][1])
+    markdown = route.route_markdown(payload)
 
     assert payload["recommended_next_action"]["code"] == "fix-returned-reference-input"
     assert payload["recommended_next_action"]["domain"] == "input"
@@ -165,6 +179,12 @@ def test_routes_prioritize_blocked_returned_reference_input_over_renderer_candid
         "input": 1,
         "renderer-candidate": 1,
     }
+    assert payload["routes"][1]["error_count"] == 1
+    assert payload["routes"][1]["warning_count"] == 0
+    assert "errors: 1" in input_route_text
+    assert "warnings: 0" in input_route_text
+    assert "- errors: `1`" in markdown
+    assert "- warnings: `0`" in markdown
 
 
 def test_routes_run_case_actions(tmp_path):
