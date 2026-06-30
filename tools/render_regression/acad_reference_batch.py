@@ -891,12 +891,12 @@ def _write_reference_request_validation_report(
     for row in rows:
         issue_text = ", ".join(f"{item['severity']}:{item['code']}" for item in row["issues"]) or "-"
         lines.append(
-            f"| `{row['id']}` | {_str(row.get('drawing_id'))} | "
-            f"`{row['recommended_output_name']}` | `{row.get('requested_capture_method') or '-'}` | "
-            f"`{row.get('requested_view_contract') or '-'}` | "
-            f"`{row.get('requested_expected_size') or '-'}` | "
-            f"`{row.get('source_dxf') or '-'}` | "
-            f"`{row.get('candidate_png') or '-'}` | {issue_text} |"
+            f"| {_md_code_cell(row['id'])} | {_md_table_cell(row.get('drawing_id'))} | "
+            f"{_md_code_cell(row['recommended_output_name'])} | {_md_code_cell(row.get('requested_capture_method'))} | "
+            f"{_md_code_cell(row.get('requested_view_contract'))} | "
+            f"{_md_code_cell(row.get('requested_expected_size'))} | "
+            f"{_md_code_cell(row.get('source_dxf'))} | "
+            f"{_md_code_cell(row.get('candidate_png'))} | {_md_table_cell(issue_text)} |"
         )
     if global_issues:
         lines.extend(["", "## Candidate File Issues", ""])

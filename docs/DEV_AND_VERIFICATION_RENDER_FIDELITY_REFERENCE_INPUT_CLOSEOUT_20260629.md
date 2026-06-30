@@ -4365,3 +4365,45 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
 python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
+
+## Follow-Up Request Validation Markdown Table Cell Escaping
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Extend the Markdown table escaping hardening to the earliest request-package
+  validation report.
+- Keep `reference_request_validation.md` reliable when request package fields
+  contain Markdown table metacharacters before any returned AutoCAD PNG is
+  available.
+
+Changes:
+
+- The `reference_request_validation.md` table now formats case IDs, drawing
+  IDs, recommended output names, capture/view/size cells, source DXF paths,
+  candidate PNG paths, and issue summaries through the same Markdown-safe
+  helpers used by the missing-reference and intake reports.
+- Regression coverage runs `acad_reference_batch.py --validate-request` with a
+  drawing ID containing `|` plus a newline and PNG names containing `|`, then
+  asserts the rendered table row keeps the expected number of unescaped
+  Markdown delimiters.
+- `tools/render_regression/README.md` now names all three escaped operator
+  Markdown tables: request-validation, missing-reference, and intake.
+
+Boundary:
+
+- Operator report formatting only.
+- JSON and TSV payloads remain unchanged structured sources of truth.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# passed
+```
