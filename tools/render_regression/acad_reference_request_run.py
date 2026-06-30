@@ -66,6 +66,8 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- status: `{summary['status']}`",
         f"- batch_exit_code: `{summary['batch_exit_code']}`",
         f"- compare_exit_code: `{summary['compare_exit_code']}`",
+        f"- reference_request_validation_status: `{summary['reference_request_validation_status']}`",
+        f"- reference_request_validation_errors: `{summary['reference_request_validation_error_count']}`",
         f"- reference_intake_status: `{summary['reference_intake_status']}`",
         f"- reference_intake_warnings: `{summary['reference_intake_warning_count']}`",
         "",
@@ -83,6 +85,7 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
     ]
     for label, key in (
         ("input artifact index", "input_artifact_index"),
+        ("request validation", "reference_request_validation_markdown"),
         ("reference intake", "reference_intake_markdown"),
         ("missing references", "missing_references_markdown"),
         ("compare summary", "compare_summary_markdown"),
@@ -104,6 +107,7 @@ def _write_run_summary(
 ) -> dict[str, Any]:
     compare_summary_json = compare_dir / "summary.json"
     compare_status = _compare_status(compare_summary_json)
+    request_validation = _intake_status(input_dir / "reference_request_validation.json")
     intake = _intake_status(input_dir / "reference_intake.json")
     if batch_rc != 0:
         status = "input_blocked"
@@ -117,6 +121,11 @@ def _write_run_summary(
         "input_dir": str(input_dir),
         "compare_dir": str(compare_dir),
         "input_artifact_index": _existing(input_dir / "artifact_index.json"),
+        "reference_request_validation_json": _existing(input_dir / "reference_request_validation.json"),
+        "reference_request_validation_markdown": _existing(input_dir / "reference_request_validation.md"),
+        "reference_request_validation_status": request_validation["status"],
+        "reference_request_validation_error_count": request_validation["error_count"],
+        "reference_request_validation_warning_count": request_validation["warning_count"],
         "reference_intake_json": _existing(input_dir / "reference_intake.json"),
         "reference_intake_markdown": _existing(input_dir / "reference_intake.md"),
         "reference_intake_status": intake["status"],

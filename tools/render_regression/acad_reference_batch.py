@@ -932,6 +932,16 @@ def build_files_from_request(
     out_dir: Path,
     case_ids: set[str] | None = None,
 ) -> tuple[Path, Path, dict[str, Any]]:
+    request_validation = _write_reference_request_validation_report(
+        out_dir,
+        request_json,
+        candidate_cases=candidate_cases,
+        case_ids=case_ids,
+    )
+    if request_validation["status"] == "blocked":
+        raise ValueError(
+            f"reference request package validation blocked; see {out_dir / 'reference_request_validation.md'}"
+        )
     missing_count = _write_missing_references_report(
         out_dir,
         request_json,

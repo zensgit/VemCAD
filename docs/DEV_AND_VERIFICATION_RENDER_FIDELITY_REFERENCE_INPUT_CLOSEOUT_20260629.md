@@ -458,3 +458,56 @@ python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
 python3 -m pytest tools/render_regression/tests -q
 # 100 passed
 ```
+
+## Follow-Up Enforced Fulfilment Validation
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make request-package validation part of the normal `--from-request` fulfilment
+  path, not merely an optional preflight command.
+- Surface validation blocks in the one-command runner summary.
+
+Changes:
+
+- `acad_reference_batch.py --from-request` now writes
+  `reference_request_validation.json/md` before checking returned PNGs.
+- If request validation is `blocked`, fulfilment stops before
+  `missing_references`, `reference_intake`, manifest generation, or X3.
+- `acad_reference_request_run.py` now copies
+  `reference_request_validation_status/error_count/warning_count` into
+  `run_summary.json/md`.
+
+Boundary:
+
+- Input-package gate only.
+- No renderer change.
+- No AutoCAD PNG equivalence claim.
+- No X3 semantics change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 13 passed
+
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 5 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 101 passed
+```
+
+Private compatibility smoke:
+
+```bash
+python3 tools/render_regression/acad_reference_request_run.py \
+  --from-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir /private/tmp/vemcad-provenance-compat-smoke-20260629/returned \
+  --case-id G11 \
+  --out-dir /private/tmp/vemcad-validate-on-fulfill-smoke-20260629
+# AutoCAD reference request run: viewspace_mismatch
+# run_summary: reference_request_validation_status=pass, reference_intake_status=pass
+```

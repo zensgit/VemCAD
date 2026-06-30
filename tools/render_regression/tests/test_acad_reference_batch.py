@@ -260,6 +260,8 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
         "candidate_cases",
         "reference_intake_json",
         "reference_intake_markdown",
+        "reference_request_validation_json",
+        "reference_request_validation_markdown",
     }
 
     dry_run = tmp_path / "dry-run-request"
@@ -297,8 +299,10 @@ def test_batch_generator_blocks_request_when_source_dxf_provenance_drifts(tmp_pa
     ]) == 2
 
     assert not (out / "acad_manifest.json").exists()
+    validation = json.loads((out / "reference_request_validation.json").read_text(encoding="utf-8"))
+    assert validation["status"] == "blocked"
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
-    assert "reference_intake_json" in {item["kind"] for item in artifact_index["artifacts"]}
+    assert "reference_request_validation_json" in {item["kind"] for item in artifact_index["artifacts"]}
 
 
 def test_batch_generator_blocks_request_when_candidate_png_provenance_drifts(tmp_path):
@@ -361,6 +365,8 @@ def test_batch_generator_blocks_returned_png_size_mismatch_when_request_declares
         "candidate_cases",
         "reference_intake_json",
         "reference_intake_markdown",
+        "reference_request_validation_json",
+        "reference_request_validation_markdown",
     }
 
 
@@ -400,6 +406,8 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path):
     assert {item["kind"] for item in artifact_index["artifacts"]} == {
         "missing_references_json",
         "missing_references_markdown",
+        "reference_request_validation_json",
+        "reference_request_validation_markdown",
     }
 
 
