@@ -551,6 +551,47 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Reference Request Route Check
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make generated `reference_request.md` handoffs include the next machine-route
+  inspection command after returned AutoCAD PNGs are processed.
+- Keep the handoff explicit that route inspection is still a boundary/evidence
+  check, not an AutoCAD-equivalence claim.
+
+Changes:
+
+- `acad_manifest_compare.py` now appends an `acad_artifact_route.py` command to
+  generated `reference_request.md` files.
+- The command uses:
+  - `<next-run-dir>` as the wrapper output directory;
+  - `--recursive` to discover nested route artifacts;
+  - `--text` for operator-readable logs;
+  - `--require-source-boundary autocad_equivalence_claim=false` so stale or
+    overclaiming artifacts fail closed.
+
+Boundary:
+
+- Generated handoff Markdown only.
+- No route priority change.
+- No renderer change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Route Status Guards
 
 Status: implemented in this branch.

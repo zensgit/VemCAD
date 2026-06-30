@@ -292,6 +292,10 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert "acad_reference_batch.py" in request_md
     assert "--validate-request" in request_md
     assert "acad_reference_request_run.py" in request_md
+    assert "acad_artifact_route.py <next-run-dir>" in request_md
+    assert "--recursive" in request_md
+    assert "--text" in request_md
+    assert "--require-source-boundary autocad_equivalence_claim=false" in request_md
     assert f"--candidate-cases {candidates}" in request_md
     assert "viewspace_mismatch` still exits `2`" in request_md
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
