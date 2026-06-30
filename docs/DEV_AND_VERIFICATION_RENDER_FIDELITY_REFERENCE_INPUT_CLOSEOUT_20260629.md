@@ -430,6 +430,45 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Route Count Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let unattended route steps assert how many artifact indexes were actually
+  routed.
+- Catch incomplete or polluted recursive route inputs where the expected kinds
+  may be present, but a shard is missing or an old artifact index was included.
+
+Changes:
+
+- `acad_artifact_route.py` adds `--require-route-count <n>`.
+- Single-route payloads count as `1`.
+- Batch-route payloads use their top-level `count`.
+- Failure messages print the actual count plus current kind counts for
+  operator diagnosis.
+- `tools/render_regression/README.md` documents the operator-facing behavior.
+
+Boundary:
+
+- Route topology assertion only.
+- No route priority change.
+- No renderer change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Route Status Guards
 
 Status: implemented in this branch.

@@ -239,6 +239,11 @@ assert the routed artifact topology itself. This catches incomplete recursive
 inputs, such as a run that accidentally uploads only the input batch artifacts
 and never includes the compare artifact index.
 
+Use `--require-route-count <n>` when a workflow also needs to prove the
+recursive route discovered the expected number of artifact indexes. This catches
+missing or extra extracted artifacts that still happen to include the expected
+topology kinds.
+
 When a workflow also needs to assert that the chosen action points at the
 expected handoff artifact, use `--require-action-artifact <path-suffix>`.
 Suffix matching keeps the guard stable across absolute CI paths:
