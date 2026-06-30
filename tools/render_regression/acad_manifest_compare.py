@@ -147,7 +147,8 @@ def _write_tsv(path: Path, rows: list[dict[str, Any]]) -> None:
         handle.write(
             "id\tdrawing_id\tviewspace_status\tx3_band\tink_iou\tcolor_dist\t"
             "aspect_delta\tcompare_exit_code\ttext_flags\ttext_notes\t"
-            "triage_rank\ttriage_bucket\tacad_png\tours\toverlay\tviewspace_report\n"
+            "triage_rank\ttriage_bucket\trecommended_action_domain\t"
+            "acad_png\tours\toverlay\tviewspace_report\n"
         )
         for row in rows:
             summary = row.get("x3_summary") or {}
@@ -163,7 +164,8 @@ def _write_tsv(path: Path, rows: list[dict[str, Any]]) -> None:
                 f"{summary.get('band', '')}\t{summary.get('ink_iou', '')}\t"
                 f"{summary.get('color_dist', '')}\t{summary.get('aspect_delta', '')}\t"
                 f"{row.get('compare_exit_code', '')}\t{text_flags}\t{text_notes}\t"
-                f"{row.get('triage_rank', '')}\t{row.get('triage_bucket', '')}\t{row.get('acad_png', '')}\t"
+                f"{row.get('triage_rank', '')}\t{row.get('triage_bucket', '')}\t"
+                f"{row.get('recommended_action_domain', '')}\t{row.get('acad_png', '')}\t"
                 f"{row.get('ours', '')}\t{row.get('overlay', '')}\t"
                 f"{row.get('viewspace_report', '')}\n"
             )
@@ -324,6 +326,7 @@ def _artifact_index(
             "compared_count": report.get("compared_count"),
             "issue_count": len(report.get("issues") or []),
             "triage_bucket_counts": _count_values(rows, "triage_bucket"),
+            "recommended_action_domain_counts": _count_values(rows, "recommended_action_domain"),
             "viewspace_status_counts": _count_values(rows, "viewspace_status"),
             "x3_band_counts": _count_x3_bands(rows),
         })
@@ -415,9 +418,9 @@ def _write_markdown_summary(path: Path, report: dict[str, Any], *, contact_sheet
             "",
             (
                 "| Case | Drawing | View-space | X3 band | Ink IoU | Color dist | "
-                "Text flags | Text notes | Recommended action |"
+                "Text flags | Text notes | Action domain | Recommended action |"
             ),
-            "| --- | --- | --- | --- | ---: | ---: | --- | --- | --- |",
+            "| --- | --- | --- | --- | ---: | ---: | --- | --- | --- | --- |",
         ])
         for row in rows:
             summary = row.get("x3_summary") or {}
@@ -434,7 +437,8 @@ def _write_markdown_summary(path: Path, report: dict[str, Any], *, contact_sheet
                 f"| `{_md(row.get('id'))}` | {_md(row.get('drawing_id'))} | "
                 f"`{_md(row.get('viewspace_status'))}` | `{_md(summary.get('band'))}` | "
                 f"{_md(summary.get('ink_iou'))} | {_md(summary.get('color_dist'))} | "
-                f"{_md(text_flags)} | {_md(text_notes)} | {_md(row.get('recommended_action'))} |"
+                f"{_md(text_flags)} | {_md(text_notes)} | "
+                f"`{_md(row.get('recommended_action_domain'))}` | {_md(row.get('recommended_action'))} |"
             )
         lines.extend([
             "",
@@ -442,9 +446,9 @@ def _write_markdown_summary(path: Path, report: dict[str, Any], *, contact_sheet
             "",
             (
                 "| Rank | Case | Bucket | View-space | X3 band | Ink IoU | "
-                "Recommended next action |"
+                "Action domain | Recommended next action |"
             ),
-            "| ---: | --- | --- | --- | --- | ---: | --- |",
+            "| ---: | --- | --- | --- | --- | ---: | --- | --- |",
         ])
         for rank, row in enumerate(_triage_rows(rows), start=1):
             summary = row.get("x3_summary") or {}
@@ -453,7 +457,8 @@ def _write_markdown_summary(path: Path, report: dict[str, Any], *, contact_sheet
             lines.append(
                 f"| {display_rank} | `{_md(row.get('id'))}` | `{bucket}` | "
                 f"`{_md(row.get('viewspace_status'))}` | `{_md(summary.get('band'))}` | "
-                f"{_md(summary.get('ink_iou'))} | {_md(row.get('recommended_action'))} |"
+                f"{_md(summary.get('ink_iou'))} | "
+                f"`{_md(row.get('recommended_action_domain'))}` | {_md(row.get('recommended_action'))} |"
             )
         lines.extend(["", "## Artifact Paths", ""])
         for row in rows:
@@ -631,6 +636,17 @@ def _triage_bucket(row: dict[str, Any]) -> str:
     return "input-review"
 
 
+def _recommended_action_domain(row: dict[str, Any]) -> str:
+    bucket = _triage_bucket(row)
+    if bucket == "renderer-candidate":
+        return artifact_route.ACTION_DOMAINS["inspect-renderer-candidate"]
+    if bucket == "recapture-required":
+        return artifact_route.ACTION_DOMAINS["recapture-autocad-or-provide-window"]
+    if bucket == "matched-pass":
+        return artifact_route.ACTION_DOMAINS["review-x3-pass"]
+    return artifact_route.ACTION_DOMAINS["inspect-returned-reference-warnings"]
+
+
 def _triage_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     bucket_order = {
         "renderer-candidate": 0,
@@ -654,6 +670,7 @@ def _annotate_triage(rows: list[dict[str, Any]]) -> None:
     for rank, row in enumerate(_triage_rows(rows), start=1):
         row["triage_rank"] = rank
         row["triage_bucket"] = _triage_bucket(row)
+        row["recommended_action_domain"] = _recommended_action_domain(row)
 
 
 def _compare_case(case: dict[str, Any], candidate: dict[str, Any], out_dir: Path) -> dict[str, Any]:
@@ -775,6 +792,7 @@ def build_report(
         "issues": issues,
         "validation": validation,
         "rows": rows,
+        "recommended_action_domain_counts": _count_values(rows, "recommended_action_domain"),
         "boundary": {
             "renders_dxf": False,
             "requires_viewspace_match": True,

@@ -1860,6 +1860,48 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Manifest Compare Row Domains
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Carry action-domain routing at the per-case compare row level.
+- Make `summary.json`, `summary.tsv`, `summary.md`, and the compare
+  `artifact_index.json` classify each case as `input`, `renderer-candidate`,
+  `pass-review`, or `input-review`.
+- Keep `viewspace_mismatch` rows explicitly in the `input` domain so low pixel
+  scores cannot be mistaken for renderer work.
+
+Changes:
+
+- `acad_manifest_compare.py` now annotates each compared row with
+  `recommended_action_domain`.
+- `summary.json` and the compare artifact index include
+  `recommended_action_domain_counts`.
+- `summary.tsv` adds a `recommended_action_domain` column.
+- `summary.md` prints the domain in both the case table and triage-priority
+  table.
+
+Boundary:
+
+- Compare-report metadata only.
+- No X3 scoring change.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Recommended Next Action
 
 Status: implemented in this branch.

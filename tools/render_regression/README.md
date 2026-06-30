@@ -163,6 +163,10 @@ work before a separate route report is generated.
 The batch, compare, and request-run CLIs also print the recommended action
 domain next to the action code, so CI logs can show the route class without
 opening JSON artifacts.
+`acad_manifest_compare.py` also writes per-case `recommended_action_domain`
+values into `summary.json`, `summary.tsv`, `summary.md`, and the compare
+artifact index counts. A `viewspace_mismatch` case therefore remains an
+`input` domain case even when its raw X3 pixels look bad.
 
 `artifact_index.json` 与 `route_summary.json/md` 都是机器可读的操作入口：
 
