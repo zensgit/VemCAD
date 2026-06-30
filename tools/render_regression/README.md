@@ -194,7 +194,11 @@ per row, so operators can verify the capture-size contract before any returned
 AutoCAD PNG exists.
 Both request validation and returned-reference intake reports print
 `issue_code_counts` at the top, so operators can see the issue classes without
-scanning per-case tables.
+scanning per-case tables. Returned-reference intake also prints the requested
+expected size next to the actual returned PNG size and blocks with
+`returned_png_size_mismatch` when a returned AutoCAD PNG does not match the
+request-declared size; in that case the run stops before writing a compare
+manifest.
 The batch, compare, and request-run CLIs also print the recommended action
 domain next to the action code, so CI logs can show the route class without
 opening JSON artifacts.

@@ -53,6 +53,24 @@ def _expected_size_text(expected_size: Any) -> str:
     return f"{width_text}x{height_text}" if width_text and height_text else ""
 
 
+def _expected_size_dimensions(expected_size: Any) -> tuple[int, int] | None:
+    if isinstance(expected_size, dict):
+        width = expected_size.get("width")
+        height = expected_size.get("height")
+    elif isinstance(expected_size, (list, tuple)) and len(expected_size) == 2:
+        width, height = expected_size
+    else:
+        return None
+    try:
+        width_int = int(width)
+        height_int = int(height)
+    except Exception:
+        return None
+    if width_int <= 0 or height_int <= 0:
+        return None
+    return width_int, height_int
+
+
 def _image_size(path: Path) -> tuple[int, int]:
     with Image.open(path) as image:
         return image.size
@@ -1152,6 +1170,9 @@ def _write_reference_intake_report(
         case_id = _required(request, "id", index)
         output_name = _required(request, "recommended_output_name", index)
         expected_path = (reference_dir / output_name).resolve()
+        expected_size = request.get("requested_expected_size") or request.get("expected_size")
+        expected_size_text = _expected_size_text(expected_size)
+        expected_size_dims = _expected_size_dimensions(expected_size)
         row_issues: list[dict[str, str]] = []
         inspection: dict[str, Any] = {"path": str(expected_path)}
         try:
@@ -1162,6 +1183,24 @@ def _write_reference_intake_report(
                 "code": "reference_png_unreadable",
                 "message": str(exc),
             }]
+        if expected_size_text:
+            inspection["requested_expected_size"] = expected_size_text
+        width = inspection.get("width")
+        height = inspection.get("height")
+        if (
+            expected_size_dims is not None
+            and isinstance(width, int)
+            and isinstance(height, int)
+            and (width, height) != expected_size_dims
+        ):
+            row_issues.append({
+                "severity": "error",
+                "code": "returned_png_size_mismatch",
+                "message": (
+                    f"returned PNG size {width}x{height} != requested "
+                    f"{expected_size_dims[0]}x{expected_size_dims[1]}"
+                ),
+            })
         candidate = candidates.get(case_id)
         candidate_png = None
         if candidate is not None:
@@ -1222,8 +1261,8 @@ def _write_reference_intake_report(
         "",
         "This is a capture-quality preflight only. It does not compare against VemCAD and does not claim AutoCAD equivalence.",
         "",
-        "| Case | Drawing | PNG | Size | Long edge | Corner white | Issues |",
-        "| --- | --- | --- | ---: | ---: | ---: | --- |",
+        "| Case | Drawing | PNG | Size | Expected size | Long edge | Corner white | Issues |",
+        "| --- | --- | --- | ---: | ---: | ---: | ---: | --- |",
     ]
     for row in rows:
         inspection = row["inspection"]
@@ -1236,6 +1275,7 @@ def _write_reference_intake_report(
         lines.append(
             f"| `{row['id']}` | {_str(row.get('drawing_id'))} | "
             f"`{row['recommended_output_name']}` | {size} | "
+            f"{inspection.get('requested_expected_size', '-')} | "
             f"{inspection.get('long_edge', '-')} | {inspection.get('corner_white_ratio', '-')} | "
             f"{issue_text} |"
         )
