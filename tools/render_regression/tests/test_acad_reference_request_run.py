@@ -91,8 +91,11 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path):
     assert summary["reference_intake_warning_count"] == 0
     assert summary["reference_intake_markdown"].endswith("reference_intake.md")
     assert summary["compare_summary_markdown"].endswith("summary.md")
+    assert summary["recommended_next_action"]["code"] == "review-x3-pass"
+    assert summary["recommended_next_action"]["artifact"].endswith("summary.md")
     assert compare_summary["status"] == "pass"
-    assert (out / "run_summary.md").is_file()
+    summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
+    assert "recommended_next_action: `review-x3-pass`" in summary_md
     assert _run_artifact_kinds(out) >= {
         "run_summary_json",
         "run_summary_markdown",
@@ -110,7 +113,11 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path):
 def test_reference_request_run_preserves_viewspace_mismatch_exit(tmp_path):
     _dxf(tmp_path / "dxf" / "B11.dxf")
     _png(tmp_path / "ours" / "G11.png", size=(760, 570), box=[20, 15, 740, 555])
-    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", size=(800, 600), box=[220, 165, 580, 435])
+    _png(
+        tmp_path / "returned" / "G11_autocad_model_extents.png",
+        size=(1600, 1200),
+        box=[400, 300, 1200, 900],
+    )
     request = _request(tmp_path / "reference_request.json")
     candidates = _candidates(tmp_path / "candidate_cases.json")
     out = tmp_path / "run"
@@ -129,6 +136,8 @@ def test_reference_request_run_preserves_viewspace_mismatch_exit(tmp_path):
     assert summary["reference_request_validation_status"] == "pass"
     assert summary["batch_exit_code"] == 0
     assert summary["compare_exit_code"] == 2
+    assert summary["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
+    assert "do not tune the renderer" in summary["recommended_next_action"]["message"]
     assert compare_summary["status"] == "viewspace_mismatch"
 
 
@@ -158,9 +167,12 @@ def test_reference_request_run_surfaces_intake_review_warnings(tmp_path):
     assert summary["reference_request_validation_status"] == "pass"
     assert summary["reference_intake_status"] == "review"
     assert summary["reference_intake_warning_count"] == 2
+    assert summary["recommended_next_action"]["code"] == "inspect-returned-reference-warnings"
+    assert summary["recommended_next_action"]["artifact"].endswith("reference_intake.md")
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
     assert "reference_intake_status: `review`" in summary_md
     assert "reference_intake_warnings: `2`" in summary_md
+    assert "recommended_next_action: `inspect-returned-reference-warnings`" in summary_md
 
 
 def test_reference_request_run_stops_on_missing_reference(tmp_path):
@@ -187,6 +199,8 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path):
     assert summary["reference_intake_status"] == ""
     assert summary["reference_intake_warning_count"] is None
     assert summary["compare_summary_markdown"] == ""
+    assert summary["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
+    assert summary["recommended_next_action"]["artifact"].endswith("missing_references.md")
     assert not (out / "compare" / "summary.json").exists()
     assert _run_artifact_kinds(out) >= {
         "run_summary_json",
@@ -230,6 +244,8 @@ def test_reference_request_run_surfaces_request_validation_block(tmp_path):
     assert summary["reference_request_validation_status"] == "blocked"
     assert summary["reference_request_validation_error_count"] == 1
     assert summary["reference_request_validation_markdown"].endswith("reference_request_validation.md")
+    assert summary["recommended_next_action"]["code"] == "fix-request-package"
+    assert summary["recommended_next_action"]["artifact"].endswith("reference_request_validation.md")
     assert summary["reference_intake_status"] == ""
     assert not (out / "compare" / "summary.json").exists()
     assert _run_artifact_kinds(out) >= {

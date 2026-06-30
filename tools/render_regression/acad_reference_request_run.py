@@ -66,7 +66,57 @@ def _intake_status(intake_json: Path) -> dict[str, Any]:
     }
 
 
+def _recommended_next_action(summary: dict[str, Any]) -> dict[str, str]:
+    validation_status = str(summary.get("reference_request_validation_status") or "")
+    validation_errors = summary.get("reference_request_validation_error_count")
+    intake_status = str(summary.get("reference_intake_status") or "")
+    status = str(summary.get("status") or "")
+
+    if validation_status in {"blocked", "unreadable"} or validation_errors:
+        return {
+            "code": "fix-request-package",
+            "message": "Fix the request package before exporting or returning AutoCAD PNGs.",
+            "artifact": str(summary.get("reference_request_validation_markdown") or ""),
+        }
+    if status == "input_blocked" and summary.get("missing_references_markdown"):
+        return {
+            "code": "provide-returned-autocad-pngs",
+            "message": "Place the returned AutoCAD PNGs using the requested filenames, then rerun the wrapper.",
+            "artifact": str(summary.get("missing_references_markdown") or ""),
+        }
+    if intake_status == "review":
+        return {
+            "code": "inspect-returned-reference-warnings",
+            "message": "Inspect returned-reference intake warnings before trusting visual conclusions.",
+            "artifact": str(summary.get("reference_intake_markdown") or ""),
+        }
+    if status == "viewspace_mismatch":
+        return {
+            "code": "recapture-autocad-or-provide-window",
+            "message": "Recapture AutoCAD at matched model extents or provide the real world window; do not tune the renderer.",
+            "artifact": str(summary.get("compare_summary_markdown") or ""),
+        }
+    if status == "pass":
+        return {
+            "code": "review-x3-pass",
+            "message": "Review X3 and artifacts; open renderer work only for a concrete matched-view defect.",
+            "artifact": str(summary.get("compare_summary_markdown") or ""),
+        }
+    if status == "compare_failed":
+        return {
+            "code": "inspect-compare-failure",
+            "message": "Inspect compare outputs and per-case logs before changing renderer code.",
+            "artifact": str(summary.get("compare_summary_markdown") or ""),
+        }
+    return {
+        "code": "inspect-run-summary",
+        "message": "Inspect the run summary and artifact index before choosing the next action.",
+        "artifact": str(summary.get("run_artifact_index") or ""),
+    }
+
+
 def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
+    next_action = summary["recommended_next_action"]
     lines = [
         "# AutoCAD Reference Request Run",
         "",
@@ -77,6 +127,8 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- reference_request_validation_errors: `{summary['reference_request_validation_error_count']}`",
         f"- reference_intake_status: `{summary['reference_intake_status']}`",
         f"- reference_intake_warnings: `{summary['reference_intake_warning_count']}`",
+        f"- recommended_next_action: `{next_action['code']}`",
+        f"- recommended_next_action_message: {next_action['message']}",
         "",
         "## Boundary",
         "",
@@ -102,6 +154,8 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         value = summary.get(key) or ""
         if value:
             lines.append(f"- {label}: `{value}`")
+    if next_action.get("artifact"):
+        lines.append(f"- recommended next action artifact: `{next_action['artifact']}`")
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
 
@@ -151,6 +205,7 @@ def _write_run_summary(
             "autocad_equivalence_claim": False,
         },
     }
+    payload["recommended_next_action"] = _recommended_next_action(payload)
     _write_json(out_dir / "run_summary.json", payload)
     _write_markdown(out_dir / "run_summary.md", payload)
     artifacts = [
