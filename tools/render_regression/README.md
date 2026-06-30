@@ -254,7 +254,9 @@ capture-window issues without opening `reference_intake.json`. The same intake
 pass writes `reference_intake.tsv`, with one row per returned PNG and columns
 for actual/requested size, returned PNG SHA256+size, corner/alpha diagnostics,
 identity advisory, and per-case issue codes, so review/fail-closed jobs can
-upload the intake evidence without parsing Markdown.
+upload the intake evidence without parsing Markdown. The Markdown intake table
+also shows the returned PNG provenance (`sha256` and size), so human review can
+confirm which AutoCAD export was checked without opening JSON or TSV.
 The request-validation, missing-reference, and intake Markdown tables escape
 operator-supplied cells (`|`, newlines, and code-span edge cases), so drawing
 IDs and output filenames cannot silently corrupt the table shape.

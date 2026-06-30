@@ -1433,8 +1433,11 @@ def _write_reference_intake_report(
         "",
         "This is a capture-quality preflight only. It does not compare against VemCAD and does not claim AutoCAD equivalence.",
         "",
-        "| Case | Drawing | PNG | Size | Expected size | Long edge | Corner white | Identity advisory | Issues |",
-        "| --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |",
+        (
+            "| Case | Drawing | PNG | Returned provenance | Size | Expected size | "
+            "Long edge | Corner white | Identity advisory | Issues |"
+        ),
+        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |",
     ]
     for row in rows:
         inspection = row["inspection"]
@@ -1446,7 +1449,8 @@ def _write_reference_intake_report(
         )
         lines.append(
             f"| {_md_code_cell(row['id'])} | {_md_table_cell(row.get('drawing_id'))} | "
-            f"{_md_code_cell(row['recommended_output_name'])} | {_md_table_cell(size)} | "
+            f"{_md_code_cell(row['recommended_output_name'])} | "
+            f"{_md_code_cell(_provenance_text(inspection))} | {_md_table_cell(size)} | "
             f"{_md_table_cell(inspection.get('requested_expected_size', '-'))} | "
             f"{_md_table_cell(inspection.get('long_edge', '-'))} | {_md_table_cell(inspection.get('corner_white_ratio', '-'))} | "
             f"{_md_table_cell(_identity_advisory_text(inspection.get('identity_advisory') or {}))} | "
