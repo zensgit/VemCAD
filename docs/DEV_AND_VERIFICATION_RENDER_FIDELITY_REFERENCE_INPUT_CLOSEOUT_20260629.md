@@ -1441,6 +1441,50 @@ python3 -m pytest tools/render_regression/tests -q
 # 195 passed
 ```
 
+## Follow-Up Generated Route Command Final-Exit Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep the generated post-return route command from passing solely because the
+  route topology and uploaded artifacts exist.
+- Require the routed final-exit distribution to be success-shaped before an
+  unattended workflow interprets pixels or X3 output.
+- Fail closed for `viewspace_mismatch`, input-review hard failures, compare
+  failures, or any other request-run result where the one-command wrapper exits
+  non-zero.
+
+Changes:
+
+- `acad_manifest_compare.py` now writes
+  `--require-final-exit-code-count 0=2` into the generated post-return
+  `acad_artifact_route.py <next-run-dir> --recursive` command.
+- `tools/render_regression/README.md` mirrors the same guard in the quick-start
+  route command.
+- Regression coverage asserts the guard appears exactly once in generated
+  `reference_request.md` and in the README command block.
+
+Boundary:
+
+- Operator command hardening only.
+- No route priority change.
+- No request-run action change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 11 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 195 passed
+```
+
 ## Follow-Up Request-Run Input TSV Artifacts
 
 Status: implemented in this branch.

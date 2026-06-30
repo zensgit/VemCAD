@@ -742,6 +742,7 @@ def _write_reference_request(
         "  --require-artifact-kind case_actions_tsv \\",
         "  --require-artifact-kind summary_tsv \\",
         "  --require-route-count 3 \\",
+        "  --require-final-exit-code-count 0=2 \\",
         "  --require-action-artifact-exists",
         "```",
         "",

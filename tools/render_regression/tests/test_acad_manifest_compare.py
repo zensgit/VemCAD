@@ -104,6 +104,7 @@ def test_readme_recapture_route_example_documents_handoff_guards():
         "--require-artifact-kind case_actions_tsv",
         "--require-artifact-kind summary_tsv",
         "--require-route-count 3",
+        "--require-final-exit-code-count 0=2",
         "--require-action-artifact-exists",
     ]:
         assert expected in block
@@ -474,6 +475,7 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert request_md.count("--require-artifact-kind case_actions_tsv") == 1
     assert request_md.count("--require-artifact-kind summary_tsv") == 1
     assert request_md.count("--require-route-count 3") == 1
+    assert request_md.count("--require-final-exit-code-count 0=2") == 1
     assert request_md.count("--require-action-artifact-exists") == 1
     for expected in [
         "--require-request-boundary autocad_equivalence_claim=false",
@@ -496,6 +498,7 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
         "--require-artifact-kind case_actions_tsv",
         "--require-artifact-kind summary_tsv",
         "--require-route-count 3",
+        "--require-final-exit-code-count 0=2",
         "--require-action-artifact-exists",
     ]:
         assert expected in route_block
