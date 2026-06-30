@@ -703,3 +703,71 @@ Boundary:
 - No private drawing or AutoCAD PNG committed.
 - `reference_intake` is explicitly `autocad_equivalence_claim=False` and
   `replaces_x3_compare=False`.
+
+### Slice 14 — Reference Batch Artifact Index
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Give every `acad_reference_batch.py` run one stable review entry point.
+- Make unattended input-prep runs easier to inspect whether they pass, warn, or
+  block before X3.
+
+Deliverables:
+
+- `tools/render_regression/acad_reference_batch.py`
+- `tools/render_regression/tests/test_acad_reference_batch.py`
+- `docs/VEMCAD_G11_AUTOCAD_REFERENCE_INPUT_RUNBOOK_20260628.md`
+
+Behavior:
+
+- Successful `--cases` runs write `artifact_index.json` pointing at:
+  - `acad_manifest.json`
+  - `candidate_cases.json`
+- Successful `--from-request` runs also index:
+  - `reference_intake.json`
+  - `reference_intake.md`
+- Missing-reference blocked runs now still leave `artifact_index.json` pointing
+  at:
+  - `missing_references.json`
+  - `missing_references.md`
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 6 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 89 passed
+```
+
+Private blocked-path smoke:
+
+```bash
+python3 tools/render_regression/acad_reference_batch.py \
+  --from-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir /private/tmp/vemcad-reference-index-smoke-20260629/returned \
+  --case-id G11 \
+  --out-dir /private/tmp/vemcad-reference-index-smoke-20260629/input
+# AutoCAD reference batch: blocked (...)
+# artifact index : /private/tmp/vemcad-reference-index-smoke-20260629/input/artifact_index.json
+# exit code: 2
+```
+
+Smoke result:
+
+- `artifact_index.schema=vemcad.acad_reference_batch_artifact_index/v1`
+- `artifact_index.count=2`
+- kinds:
+  - `missing_references_json`
+  - `missing_references_markdown`
+
+Boundary:
+
+- Evidence discoverability only.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- Does not change X3 semantics or AutoCAD-equivalence wording.

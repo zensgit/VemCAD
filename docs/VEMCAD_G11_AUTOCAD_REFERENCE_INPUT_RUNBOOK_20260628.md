@@ -114,6 +114,7 @@ The batch helper writes the same two harness inputs:
 
 - `$BATCH_DIR/acad_manifest.json`
 - `$BATCH_DIR/candidate_cases.json`
+- `$BATCH_DIR/artifact_index.json`
 
 Relative paths inside `cases.json` resolve relative to the JSON file. Each
 AutoCAD PNG is opened to record `expected_size`; unreadable images or missing
@@ -144,6 +145,11 @@ inputs:
 
 - `$NEXT_DIR/input/reference_intake.json`
 - `$NEXT_DIR/input/reference_intake.md`
+- `$NEXT_DIR/input/artifact_index.json`
+
+All generated helper artifacts, including missing-reference reports on blocked
+runs, are listed in `artifact_index.json` so unattended runs have one stable
+entry point for review.
 
 The intake preflight checks obvious capture-quality signals before X3:
 
