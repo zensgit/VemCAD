@@ -4102,3 +4102,42 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
+
+## Follow-Up Request-Run Compare Distribution CLI Logs
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make CI logs show the request-run compare distribution directly, not only
+  `run_summary.json/md`.
+- Keep unattended jobs useful even when an operator only sees stdout from
+  `acad_reference_request_run.py`.
+
+Changes:
+
+- `acad_reference_request_run.py` now prints route compare case count, compared
+  count, triage bucket counts, viewspace status counts, and X3 band counts when
+  those fields are present in the run summary.
+- The duplicate success/input-blocked print blocks were consolidated through a
+  shared `_print_run_summary()` helper.
+- Regression coverage proves both pass and mixed `viewspace_mismatch` runs emit
+  the new stdout lines.
+
+Boundary:
+
+- CLI log visibility only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
