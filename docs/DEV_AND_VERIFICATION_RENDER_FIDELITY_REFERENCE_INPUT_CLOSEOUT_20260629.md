@@ -1096,6 +1096,45 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # passed
 ```
 
+## Follow-Up Boundary Guard Handoff Coverage
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep the operator README's unattended-flow example aligned with generated
+  `reference_request.md`.
+- Prevent generated handoff tests from passing when only one of the three
+  commands carries the request-boundary guard.
+
+Changes:
+
+- `tools/render_regression/README.md` now shows the guarded
+  `acad_artifact_route.py <run-dir> --recursive --text` command with:
+  - `--require-source-boundary autocad_equivalence_claim=false`
+  - `--require-request-boundary autocad_equivalence_claim=false`
+  - `--require-request-boundary requires_returned_autocad_png=true`
+  - `--require-request-boundary requires_viewspace_match=true`
+- `test_acad_manifest_compare.py` now asserts each
+  `--require-request-boundary` line appears three times: validate, run, and
+  route.
+
+Boundary:
+
+- Documentation/test hardening only.
+- No renderer change.
+- No X3 scoring change.
+- No compare behavior change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# passed
+```
+
 ## Follow-Up Source Report Issue Code Counts
 
 Status: implemented in this branch.

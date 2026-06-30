@@ -163,7 +163,13 @@ python3 tools/render_regression/acad_reference_request_run.py \
   --require-request-boundary requires_viewspace_match=true \
   --out-dir <run-dir>
 
-python3 tools/render_regression/acad_artifact_route.py <run-dir> --recursive --text
+python3 tools/render_regression/acad_artifact_route.py <run-dir> \
+  --recursive \
+  --text \
+  --require-source-boundary autocad_equivalence_claim=false \
+  --require-request-boundary autocad_equivalence_claim=false \
+  --require-request-boundary requires_returned_autocad_png=true \
+  --require-request-boundary requires_viewspace_match=true
 ```
 
 `acad_reference_request_run.py` writes `run_summary.json/md` and a run-level
