@@ -1821,6 +1821,45 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up CLI Action Domain Logs
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Surface the route action domain in CLI logs, not only JSON/Markdown artifacts.
+- Let CI logs and operator transcripts show whether the next action is an
+  `input`, `renderer-candidate`, `pass-review`, or `continue` domain without
+  opening artifact files.
+
+Changes:
+
+- `acad_reference_batch.py` prints `recommended next action domain` beside the
+  route action code.
+- `acad_manifest_compare.py` prints the same field beside the route action code.
+- Existing stdout/stderr tests now assert the expected domains:
+  `continue`, `input`, and `pass-review`.
+
+Boundary:
+
+- CLI log visibility only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_reference_batch.py \
+  tools/render_regression/tests/test_acad_manifest_compare.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Recommended Next Action
 
 Status: implemented in this branch.

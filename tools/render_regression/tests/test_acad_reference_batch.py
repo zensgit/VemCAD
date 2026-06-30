@@ -104,6 +104,7 @@ def test_batch_generator_writes_manifest_and_candidates(tmp_path, capsys):
     assert route["recommended_next_action"]["code"] == "continue-to-request-run"
     assert "route summary" in stdout
     assert "recommended next action: continue-to-request-run" in stdout
+    assert "recommended next action domain: continue" in stdout
 
     dry_run = tmp_path / "dry-run"
     assert harness.main([
@@ -179,6 +180,7 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
     assert route["recommended_next_action"]["code"] == "continue-to-request-run"
     assert "route summary" in stdout
     assert "recommended next action: continue-to-request-run" in stdout
+    assert "recommended next action domain: continue" in stdout
 
 
 def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(tmp_path):
@@ -536,6 +538,7 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path, capsys):
     assert route["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
     assert "route summary" in stderr
     assert "recommended next action: provide-returned-autocad-pngs" in stderr
+    assert "recommended next action domain: input" in stderr
 
 
 def test_batch_generator_clears_stale_missing_reports_on_successful_rerun(tmp_path):
