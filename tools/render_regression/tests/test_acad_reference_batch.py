@@ -439,6 +439,61 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
     ]) == 0
 
 
+def test_batch_generator_from_request_honors_boundary_guard_before_fulfilment(tmp_path):
+    source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
+    _png(tmp_path / "ours" / "G11.png", (760, 570), box=[20, 15, 740, 555])
+    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1600, 1131), box=[40, 30, 1560, 1100])
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "reason": "recapture-required",
+        "case_count": 1,
+        "boundary": {
+            "autocad_equivalence_claim": True,
+            "requires_returned_autocad_png": True,
+        },
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "source_dxf_sha256": _sha256(source),
+            "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_capture_method": "plot-export",
+            "requested_view_contract": "model-extents",
+            "requested_expected_size": {"width": 1600, "height": 1131},
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{
+        "id": "G11",
+        "ours": "ours/G11.png",
+        "diagnostics": {"window_source": "content_bbox"},
+    }]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--require-request-boundary", "autocad_equivalence_claim=false",
+        "--out-dir", str(out),
+    ]) == 2
+
+    validation = json.loads((out / "reference_request_validation.json").read_text(encoding="utf-8"))
+    assert validation["status"] == "blocked"
+    assert validation["issue_code_counts"] == {"request_boundary_mismatch": 1}
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert artifact_index["stage"] == "request_validation"
+    assert artifact_index["status"] == "blocked"
+    assert artifact_index["reference_request_validation_issue_code_counts"] == {
+        "request_boundary_mismatch": 1,
+    }
+    route = _route_summary(out)
+    assert route["recommended_next_action"]["code"] == "fix-request-package"
+    assert not (out / "acad_manifest.json").exists()
+    assert not (out / "reference_intake.json").exists()
+
+
 def test_batch_generator_validation_blocks_unmatched_capture_contract_before_capture(tmp_path):
     source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
     ours = Path(_png(tmp_path / "ours" / "G11.png", (760, 570)))

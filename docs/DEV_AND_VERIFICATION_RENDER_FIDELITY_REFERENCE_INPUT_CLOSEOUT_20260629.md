@@ -1135,6 +1135,43 @@ python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
 # passed
 ```
 
+## Follow-Up From-Request Boundary Guard Regression
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Pin the direct `acad_reference_batch.py --from-request` failure path when a
+  request-boundary guard rejects the package.
+- Prove fulfilment stops before manifest/intake generation, while still leaving
+  request-validation artifacts and a route action for operators.
+
+Changes:
+
+- `test_acad_reference_batch.py` now covers:
+  - `--from-request ... --require-request-boundary autocad_equivalence_claim=false`
+    with a mismatched request boundary;
+  - `reference_request_validation.json` status `blocked`;
+  - batch `artifact_index.json` stage `request_validation`;
+  - route action `fix-request-package`;
+  - no `acad_manifest.json` or `reference_intake.json` generated.
+
+Boundary:
+
+- Test hardening only.
+- No renderer change.
+- No X3 scoring change.
+- No compare behavior change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# passed
+```
+
 ## Follow-Up Source Report Issue Code Counts
 
 Status: implemented in this branch.
