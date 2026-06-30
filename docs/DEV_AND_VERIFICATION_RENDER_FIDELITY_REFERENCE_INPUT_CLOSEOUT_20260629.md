@@ -469,6 +469,46 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Route Action Count Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let unattended route steps assert the exact routed action distribution.
+- Catch mixed batches where the top-level recommendation is correct, but a
+  nested route or request-run case still contains an unexpected operator action.
+
+Changes:
+
+- `acad_artifact_route.py` adds repeatable
+  `--require-action-count <code=count>`.
+- Multi-route payloads use top-level `recommended_action_counts`.
+- Request-run payloads use `case_action_counts`.
+- Single-route payloads derive a count of `1` from the top-level action.
+- Invalid count expectations fail closed with an actionable parse error.
+- Failure messages print current action counts for operator diagnosis.
+- `tools/render_regression/README.md` documents the operator-facing behavior.
+
+Boundary:
+
+- Route action-distribution assertion only.
+- No route priority change.
+- No renderer change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Route Status Guards
 
 Status: implemented in this branch.

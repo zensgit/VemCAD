@@ -727,6 +727,144 @@ def test_cli_forbid_action_domain_fails_on_request_run_case_domain_counts(tmp_pa
     assert "action domain counts: input=1, renderer-candidate=1" in stderr
 
 
+def test_cli_require_action_count_passes_for_batch(tmp_path):
+    input_dir = tmp_path / "input"
+    compare_dir = tmp_path / "compare"
+    input_dir.mkdir()
+    compare_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "pass",
+        "case_count": 1,
+        "artifacts": [],
+    })
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"recapture-required": 1},
+        "viewspace_status_counts": {"mismatch": 1},
+        "x3_band_counts": {"fallback": 1},
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        str(compare_dir),
+        "--require-action-count",
+        "continue-to-request-run=1",
+        "--require-action-count",
+        "recapture-autocad-or-provide-window=1",
+    ]) == 0
+
+
+def test_cli_require_action_count_fails_closed_for_batch_mismatch(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    compare_dir = tmp_path / "compare"
+    input_dir.mkdir()
+    compare_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "pass",
+        "case_count": 1,
+        "artifacts": [],
+    })
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"recapture-required": 1},
+        "viewspace_status_counts": {"mismatch": 1},
+        "x3_band_counts": {"fallback": 1},
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        str(compare_dir),
+        "--require-action-count",
+        "recapture-autocad-or-provide-window=2",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "required action count mismatch: recapture-autocad-or-provide-window=2 (got 1)" in stderr
+    assert (
+        "action counts: continue-to-request-run=1, "
+        "recapture-autocad-or-provide-window=1"
+    ) in stderr
+
+
+def test_cli_require_action_count_passes_for_request_run_cases(tmp_path):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    _write(run_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_request_run_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "recommended_next_action": {
+            "code": "recapture-autocad-or-provide-window",
+            "message": "recapture",
+            "domain": "input",
+        },
+        "case_action_counts": {
+            "recapture-autocad-or-provide-window": 2,
+        },
+        "case_action_domain_counts": {
+            "input": 2,
+        },
+        "case_actions": [],
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(run_dir),
+        "--require-action-count",
+        "recapture-autocad-or-provide-window=2",
+    ]) == 0
+
+
+def test_cli_require_action_count_passes_for_single_route(tmp_path):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "missing_references",
+        "status": "blocked",
+        "case_count": 1,
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--require-action-count",
+        "provide-returned-autocad-pngs=1",
+    ]) == 0
+
+
+def test_cli_require_action_count_rejects_bad_expectation(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "missing_references",
+        "status": "blocked",
+        "case_count": 1,
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--require-action-count",
+        "provide-returned-autocad-pngs=soon",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "count expectation value must be an integer" in stderr
+
+
 def test_cli_require_status_passes_when_present(tmp_path):
     input_dir = tmp_path / "input"
     compare_dir = tmp_path / "compare"

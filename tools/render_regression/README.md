@@ -229,6 +229,12 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --forbid-action-domain renderer-candidate
 ```
 
+Use `--require-action-count <code=count>` when a workflow needs to assert the
+exact routed action distribution. For multi-route payloads this checks
+`recommended_action_counts`; for request-run payloads it checks
+`case_action_counts`; for a single route it checks the top-level action as
+count `1`.
+
 Use `--require-status <status>` / `--forbid-status <status>` when a workflow
 needs to assert the routed status distribution itself, such as requiring
 `viewspace_mismatch` in a recapture test or forbidding any nested `blocked`
