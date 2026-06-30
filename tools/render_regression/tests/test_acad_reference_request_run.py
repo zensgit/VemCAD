@@ -333,13 +333,20 @@ def test_reference_request_run_surfaces_intake_review_warnings(tmp_path):
     assert summary["reference_request_validation_status"] == "pass"
     assert summary["reference_intake_status"] == "review"
     assert summary["reference_intake_warning_count"] == 2
+    assert summary["reference_intake_issue_code_counts"] == {
+        "corner_background_not_white": 1,
+        "long_edge_below_requested": 1,
+    }
     assert summary["recommended_next_action"]["code"] == "inspect-returned-reference-warnings"
     assert summary["recommended_next_action"]["domain"] == "input-review"
     assert summary["recommended_next_action"]["artifact"].endswith("reference_intake.md")
     assert summary["case_action_domain_counts"] == {"input-review": 1}
+    artifact_index = _run_artifact_index(out)
+    assert artifact_index["reference_intake_issue_code_counts"] == summary["reference_intake_issue_code_counts"]
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
     assert "reference_intake_status: `review`" in summary_md
     assert "reference_intake_warnings: `2`" in summary_md
+    assert "reference_intake_issue_codes: `corner_background_not_white=1, long_edge_below_requested=1`" in summary_md
     assert "recommended_next_action: `inspect-returned-reference-warnings`" in summary_md
 
 
@@ -442,12 +449,17 @@ def test_reference_request_run_surfaces_request_validation_block(tmp_path):
     assert summary["compare_exit_code"] is None
     assert summary["reference_request_validation_status"] == "blocked"
     assert summary["reference_request_validation_error_count"] == 1
+    assert summary["reference_request_validation_issue_code_counts"] == {"source_dxf_sha256_mismatch": 1}
     assert summary["reference_request_validation_markdown"].endswith("reference_request_validation.md")
     assert summary["recommended_next_action"]["code"] == "fix-request-package"
     assert summary["recommended_next_action"]["domain"] == "input"
     assert summary["recommended_next_action"]["artifact"].endswith("reference_request_validation.md")
     assert summary["case_action_domain_counts"] == {"input": 1}
     assert summary["reference_intake_status"] == ""
+    artifact_index = _run_artifact_index(out)
+    assert artifact_index["reference_request_validation_issue_code_counts"] == {
+        "source_dxf_sha256_mismatch": 1,
+    }
     assert not (out / "compare" / "summary.json").exists()
     assert _run_artifact_kinds(out) >= {
         "run_summary_json",

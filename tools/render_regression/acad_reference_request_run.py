@@ -66,12 +66,30 @@ def _compare_status(compare_summary: Path) -> str:
     return str(payload.get("status") or "")
 
 
+def _issue_code_counts(payload: dict[str, Any]) -> dict[str, int]:
+    issues = payload.get("issues")
+    if not isinstance(issues, list):
+        issues = []
+        for row in payload.get("cases") or []:
+            if isinstance(row, dict):
+                issues.extend(row.get("issues") or [])
+    counts: dict[str, int] = {}
+    for issue in issues:
+        if not isinstance(issue, dict):
+            continue
+        code = str(issue.get("code") or "")
+        if code:
+            counts[code] = counts.get(code, 0) + 1
+    return dict(sorted(counts.items()))
+
+
 def _intake_status(intake_json: Path) -> dict[str, Any]:
     if not intake_json.is_file():
         return {
             "status": "",
             "error_count": None,
             "warning_count": None,
+            "issue_code_counts": {},
         }
     try:
         payload = json.loads(intake_json.read_text(encoding="utf-8"))
@@ -80,11 +98,13 @@ def _intake_status(intake_json: Path) -> dict[str, Any]:
             "status": "unreadable",
             "error_count": None,
             "warning_count": None,
+            "issue_code_counts": {},
         }
     return {
         "status": str(payload.get("status") or ""),
         "error_count": payload.get("error_count"),
         "warning_count": payload.get("warning_count"),
+        "issue_code_counts": _issue_code_counts(payload),
     }
 
 
@@ -339,8 +359,11 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- compare_exit_code: `{summary['compare_exit_code']}`",
         f"- reference_request_validation_status: `{summary['reference_request_validation_status']}`",
         f"- reference_request_validation_errors: `{summary['reference_request_validation_error_count']}`",
+        "- reference_request_validation_issue_codes: "
+        f"`{_format_case_action_counts(summary['reference_request_validation_issue_code_counts'])}`",
         f"- reference_intake_status: `{summary['reference_intake_status']}`",
         f"- reference_intake_warnings: `{summary['reference_intake_warning_count']}`",
+        f"- reference_intake_issue_codes: `{_format_case_action_counts(summary['reference_intake_issue_code_counts'])}`",
         f"- recommended_next_action: `{next_action['code']}`",
         f"- recommended_next_action_domain: `{next_action['domain']}`",
         f"- recommended_next_action_message: {next_action['message']}",
@@ -427,11 +450,13 @@ def _write_run_summary(
         "reference_request_validation_status": request_validation["status"],
         "reference_request_validation_error_count": request_validation["error_count"],
         "reference_request_validation_warning_count": request_validation["warning_count"],
+        "reference_request_validation_issue_code_counts": request_validation["issue_code_counts"],
         "reference_intake_json": _existing(input_dir / "reference_intake.json"),
         "reference_intake_markdown": _existing(input_dir / "reference_intake.md"),
         "reference_intake_status": intake["status"],
         "reference_intake_error_count": intake["error_count"],
         "reference_intake_warning_count": intake["warning_count"],
+        "reference_intake_issue_code_counts": intake["issue_code_counts"],
         "missing_references_json": _existing(input_dir / "missing_references.json"),
         "missing_references_markdown": _existing(input_dir / "missing_references.md"),
         "missing_references_tsv": _existing(input_dir / "missing_references.tsv"),
@@ -485,6 +510,8 @@ def _write_run_summary(
         "case_actions": payload["case_actions"],
         "case_action_counts": payload["case_action_counts"],
         "case_action_domain_counts": payload["case_action_domain_counts"],
+        "reference_request_validation_issue_code_counts": payload["reference_request_validation_issue_code_counts"],
+        "reference_intake_issue_code_counts": payload["reference_intake_issue_code_counts"],
         "count": len(artifacts),
         "artifacts": artifacts,
     })
@@ -541,6 +568,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  recommended next action domain: {summary['recommended_next_action']['domain']}")
         print(f"  case action counts: {_format_case_action_counts(summary['case_action_counts'])}")
         print(f"  case action domain counts: {_format_case_action_counts(summary['case_action_domain_counts'])}")
+        print(f"  reference intake issue codes: {_format_case_action_counts(summary['reference_intake_issue_code_counts'])}")
         print(f"  run summary: {args.out_dir / 'run_summary.md'}")
         return batch_rc
 
@@ -561,6 +589,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"  recommended next action domain: {summary['recommended_next_action']['domain']}")
     print(f"  case action counts: {_format_case_action_counts(summary['case_action_counts'])}")
     print(f"  case action domain counts: {_format_case_action_counts(summary['case_action_domain_counts'])}")
+    print(f"  reference intake issue codes: {_format_case_action_counts(summary['reference_intake_issue_code_counts'])}")
     print(f"  run summary: {args.out_dir / 'run_summary.md'}")
     return compare_rc
 
