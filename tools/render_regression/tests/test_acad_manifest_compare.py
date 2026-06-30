@@ -50,6 +50,14 @@ def _readme_route_example_block() -> str:
     return readme[start:end]
 
 
+def _readme_request_run_example_block() -> str:
+    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
+    marker = "python3 tools/render_regression/acad_reference_request_run.py \\"
+    start = readme.index(marker)
+    end = readme.index("```", start)
+    return readme[start:end]
+
+
 def _manifest(
     path: Path,
     *,
@@ -87,6 +95,17 @@ def test_readme_recapture_route_example_documents_handoff_guards():
         "--require-kind request_run",
         "--require-route-count 3",
         "--require-action-artifact-exists",
+    ]:
+        assert expected in block
+
+
+def test_readme_recapture_request_run_example_documents_input_review_guard():
+    block = _readme_request_run_example_block()
+    for expected in [
+        "--require-request-boundary autocad_equivalence_claim=false",
+        "--require-request-boundary requires_returned_autocad_png=true",
+        "--require-request-boundary requires_viewspace_match=true",
+        "--fail-on-input-review",
     ]:
         assert expected in block
 
