@@ -36,7 +36,7 @@ def _route_summary(out: Path) -> dict:
     return json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
 
 
-def test_batch_generator_writes_manifest_and_candidates(tmp_path):
+def test_batch_generator_writes_manifest_and_candidates(tmp_path, capsys):
     _png(tmp_path / "acad" / "G01.png", (320, 240))
     _png(tmp_path / "ours" / "G01.png", (320, 240))
     _png(tmp_path / "acad" / "G02.png", (640, 480))
@@ -67,6 +67,7 @@ def test_batch_generator_writes_manifest_and_candidates(tmp_path):
     out = tmp_path / "out"
 
     assert batch.main(["--cases", str(cases), "--out-dir", str(out)]) == 0
+    stdout = capsys.readouterr().out
 
     manifest = json.loads((out / "acad_manifest.json").read_text(encoding="utf-8"))
     candidates = json.loads((out / "candidate_cases.json").read_text(encoding="utf-8"))
@@ -93,6 +94,8 @@ def test_batch_generator_writes_manifest_and_candidates(tmp_path):
     route = _route_summary(out)
     assert route["kind"] == "batch"
     assert route["recommended_next_action"]["code"] == "continue-to-request-run"
+    assert "route summary" in stdout
+    assert "recommended next action: continue-to-request-run" in stdout
 
     dry_run = tmp_path / "dry-run"
     assert harness.main([
@@ -109,7 +112,7 @@ def test_batch_generator_blocks_bad_cases_json(tmp_path):
     assert batch.main(["--cases", str(cases), "--out-dir", str(tmp_path / "out")]) == 2
 
 
-def test_batch_generator_validates_reference_request_package_before_fulfilment(tmp_path):
+def test_batch_generator_validates_reference_request_package_before_fulfilment(tmp_path, capsys):
     source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
     ours = Path(_png(tmp_path / "ours" / "G11.png", (760, 570)))
     request = tmp_path / "reference_request.json"
@@ -136,6 +139,7 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
         "--candidate-cases", str(candidates),
         "--out-dir", str(out),
     ]) == 0
+    stdout = capsys.readouterr().out
 
     validation = json.loads((out / "reference_request_validation.json").read_text(encoding="utf-8"))
     assert validation["schema"] == "vemcad.acad_reference_request_validation/v1"
@@ -165,6 +169,8 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
     route = _route_summary(out)
     assert route["kind"] == "batch"
     assert route["recommended_next_action"]["code"] == "continue-to-request-run"
+    assert "route summary" in stdout
+    assert "recommended next action: continue-to-request-run" in stdout
 
 
 def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(tmp_path):
@@ -468,7 +474,7 @@ def test_batch_generator_blocks_returned_png_size_mismatch_when_request_declares
     }
 
 
-def test_batch_generator_blocks_request_without_returned_png(tmp_path):
+def test_batch_generator_blocks_request_without_returned_png(tmp_path, capsys):
     _dxf(tmp_path / "dxf" / "G11.dxf")
     _png(tmp_path / "ours" / "G11.png", (760, 570))
     request = tmp_path / "reference_request.json"
@@ -492,6 +498,7 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path):
         "--reference-dir", str(tmp_path / "returned"),
         "--out-dir", str(out),
     ]) == 2
+    stderr = capsys.readouterr().err
     missing = json.loads((out / "missing_references.json").read_text(encoding="utf-8"))
     assert missing["schema"] == "vemcad.acad_reference_missing/v1"
     assert missing["missing_count"] == 1
@@ -517,6 +524,8 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path):
     route = _route_summary(out)
     assert route["kind"] == "batch"
     assert route["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
+    assert "route summary" in stderr
+    assert "recommended next action: provide-returned-autocad-pngs" in stderr
 
 
 def test_batch_generator_clears_stale_missing_reports_on_successful_rerun(tmp_path):
