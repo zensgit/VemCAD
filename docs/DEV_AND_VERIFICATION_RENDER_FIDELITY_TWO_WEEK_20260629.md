@@ -630,3 +630,76 @@ Boundary:
 - Local/private workflow smoke only.
 - No private drawing, AutoCAD PNG, overlay, or contact sheet committed.
 - No renderer change.
+
+### Slice 13 — Returned Reference Intake Preflight
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Reduce the chance that a returned AutoCAD PNG makes it all the way to X3
+  before we notice basic capture-quality problems.
+- Keep the hard boundary intact: intake preflight does not compare against
+  VemCAD and does not claim AutoCAD equivalence.
+
+Deliverables:
+
+- `tools/render_regression/acad_reference_batch.py`
+- `tools/render_regression/tests/test_acad_reference_batch.py`
+- `docs/VEMCAD_G11_AUTOCAD_REFERENCE_INPUT_RUNBOOK_20260628.md`
+
+Behavior:
+
+- `acad_reference_batch.py --from-request` now writes:
+  - `reference_intake.json`
+  - `reference_intake.md`
+- Missing returned PNGs still fail closed through `missing_references.*`.
+- Unreadable returned PNGs fail closed through `reference_intake.*`.
+- Present-but-suspicious PNGs produce `status=review` warnings without
+  replacing the X3 gate:
+  - long edge below `1600px`;
+  - alpha/transparency channel present;
+  - sampled corners not near white, often indicating dark background,
+    toolbar/chrome, or a bad crop.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 6 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 89 passed
+```
+
+Private workflow smoke:
+
+```bash
+python3 tools/render_regression/acad_reference_batch.py \
+  --from-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir /private/tmp/vemcad-reference-intake-smoke-20260629/returned \
+  --case-id G11 \
+  --out-dir /private/tmp/vemcad-reference-intake-smoke-20260629/input
+# AutoCAD reference batch: pass (1 cases)
+```
+
+Smoke result:
+
+- `reference_intake.status=pass`
+- size: `2339x1653`
+- long_edge: `2339`
+- alpha: `False`
+- corner_white_ratio: `1.0`
+
+The smoke reuses the old G11 PNG only to prove the intake mechanism. It does
+not change the earlier `viewspace_mismatch` conclusion and does not create an
+AutoCAD-equivalence claim.
+
+Boundary:
+
+- Input-prep diagnostics only.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- `reference_intake` is explicitly `autocad_equivalence_claim=False` and
+  `replaces_x3_compare=False`.
