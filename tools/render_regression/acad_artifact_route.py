@@ -243,6 +243,70 @@ def _write_batch_text(payload: dict[str, Any]) -> str:
     return "\n\n".join(chunks)
 
 
+def _route_action(route: dict[str, Any]) -> dict[str, str]:
+    action = route.get("recommended_next_action") or {}
+    if isinstance(action, dict):
+        return {
+            "code": str(action.get("code") or ""),
+            "message": str(action.get("message") or ""),
+            "artifact": str(action.get("artifact") or ""),
+        }
+    return {"code": "", "message": "", "artifact": ""}
+
+
+def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
+    action = _route_action(route)
+    lines = [
+        f"## {heading}",
+        "",
+        f"- artifact_index: `{route.get('artifact_index', '')}`",
+        f"- kind: `{route.get('kind', '')}`",
+        f"- status: `{route.get('status', '')}`",
+        f"- recommended_next_action: `{action['code']}`",
+        f"- message: {action['message']}",
+    ]
+    if action["artifact"]:
+        lines.append(f"- action_artifact: `{action['artifact']}`")
+    if route.get("case_action_counts"):
+        lines.append(f"- case_action_counts: `{_format_counts(route['case_action_counts'])}`")
+    if route.get("triage_bucket_counts"):
+        lines.append(f"- triage_bucket_counts: `{_format_counts(route['triage_bucket_counts'])}`")
+    return "\n".join(lines)
+
+
+def _write_markdown(payload: dict[str, Any]) -> str:
+    lines = [
+        "# AutoCAD Artifact Route Report",
+        "",
+        "This report is read-only routing guidance. It does not compare renders,",
+        "change X3 scoring, tune the renderer, or claim AutoCAD equivalence.",
+        "",
+    ]
+    if payload.get("schema") == BATCH_SCHEMA:
+        lines.extend([
+            "## Summary",
+            "",
+            f"- route_count: `{payload.get('count', 0)}`",
+            f"- kind_counts: `{_format_counts(payload.get('kind_counts') or {})}`",
+            f"- status_counts: `{_format_counts(payload.get('status_counts') or {})}`",
+            "- recommended_action_counts: "
+            f"`{_format_counts(payload.get('recommended_action_counts') or {})}`",
+            "",
+        ])
+        for index, route in enumerate(payload.get("routes") or [], start=1):
+            lines.append(_write_markdown_route(route, heading=f"Route {index}"))
+            lines.append("")
+    else:
+        lines.append(_write_markdown_route(payload, heading="Route"))
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def _write_output_file(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="acad_artifact_route",
@@ -252,6 +316,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--recursive", action="store_true",
                         help="discover artifact_index.json files recursively under directory inputs")
     parser.add_argument("--text", action="store_true", help="print a human-readable summary instead of JSON")
+    parser.add_argument("--out-json", type=Path, help="also write the route payload JSON to this file")
+    parser.add_argument("--out-md", type=Path, help="also write a Markdown route report to this file")
     args = parser.parse_args(argv)
 
     try:
@@ -270,6 +336,10 @@ def main(argv: list[str] | None = None) -> int:
             print(_write_text(payload))
     else:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
+    if args.out_json:
+        _write_output_file(args.out_json, json.dumps(payload, ensure_ascii=False, indent=2) + "\n")
+    if args.out_md:
+        _write_output_file(args.out_md, _write_markdown(payload))
     return 0
 
 

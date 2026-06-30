@@ -184,6 +184,54 @@ def test_cli_recursive_discovers_nested_artifact_indexes(tmp_path, capsys):
     assert "recommended_next_action: recapture-autocad-or-provide-window" in output
 
 
+def test_cli_writes_json_and_markdown_reports(tmp_path):
+    input_dir = tmp_path / "input"
+    compare_dir = tmp_path / "compare"
+    out_json = tmp_path / "reports" / "route_summary.json"
+    out_md = tmp_path / "reports" / "route_summary.md"
+    input_dir.mkdir()
+    compare_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "pass",
+        "case_count": 1,
+        "artifacts": [],
+    })
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"recapture-required": 1},
+        "viewspace_status_counts": {"mismatch": 1},
+        "x3_band_counts": {"fallback": 1},
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        str(compare_dir),
+        "--out-json",
+        str(out_json),
+        "--out-md",
+        str(out_md),
+    ]) == 0
+    payload = json.loads(out_json.read_text(encoding="utf-8"))
+    markdown = out_md.read_text(encoding="utf-8")
+
+    assert payload["schema"] == "vemcad.acad_artifact_route_batch/v1"
+    assert payload["recommended_action_counts"] == {
+        "continue-to-request-run": 1,
+        "recapture-autocad-or-provide-window": 1,
+    }
+    assert "# AutoCAD Artifact Route Report" in markdown
+    assert "does not compare renders" in markdown
+    assert "- route_count: `2`" in markdown
+    assert "recommended_action_counts" in markdown
+    assert "recapture-autocad-or-provide-window=1" in markdown
+
+
 def test_recursive_rejects_directory_without_artifact_indexes(tmp_path):
     assert route.main([str(tmp_path), "--recursive"]) == 2
 

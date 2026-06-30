@@ -893,6 +893,52 @@ python3 tools/render_regression/acad_artifact_route.py \
 # recommended_action_counts: continue-to-request-run=1, recapture-autocad-or-provide-window=2
 ```
 
+## Follow-Up Artifact Route Report Files
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let CI upload stable route artifacts instead of relying only on stdout.
+- Give reviewers both a machine-readable route payload and a compact Markdown
+  route report.
+
+Changes:
+
+- `acad_artifact_route.py` now supports:
+  - `--out-json <path>` to write the route payload JSON;
+  - `--out-md <path>` to write a Markdown route report.
+- Stdout behavior remains unchanged.
+- Parent output directories are created automatically.
+- The Markdown report includes an explicit boundary statement that it is
+  read-only routing guidance and does not claim AutoCAD equivalence.
+
+Boundary:
+
+- Read-only route reporting only.
+- No routing-rule change.
+- No renderer change.
+- No X3 scoring change.
+- No AutoCAD PNG equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# 11 passed
+```
+
+Private compatibility smoke:
+
+```bash
+python3 tools/render_regression/acad_artifact_route.py \
+  /private/tmp/vemcad-artifact-route-recursive-smoke-20260629 --recursive \
+  --out-json /private/tmp/vemcad-artifact-route-report-smoke-20260629/route_summary.json \
+  --out-md /private/tmp/vemcad-artifact-route-report-smoke-20260629/route_summary.md
+# route_summary.json.recommended_action_counts={'continue-to-request-run': 1, 'recapture-autocad-or-provide-window': 2}
+# route_summary.md includes the read-only/no-equivalence boundary statement
+```
+
 Private compatibility smoke:
 
 ```bash
