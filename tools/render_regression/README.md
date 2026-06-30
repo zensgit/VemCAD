@@ -197,19 +197,21 @@ The lower-level `acad_reference_batch.py --from-request` path accepts the same
 one-command wrapper can use the same opt-in hard gate.
 The run summary and run-level
 artifact index also surface route-level `route_count`, `route_kind_counts`,
-`route_status_counts`,
+`route_artifact_kind_counts`, `route_status_counts`,
 `route_final_exit_code_counts`,
 `route_recommended_action_counts`, and
 `route_recommended_action_domain_counts`, so operators can inspect the routed
-artifact topology without opening `route_summary.json`. When compare artifacts
-are present, the same run summary and artifact index also surface
+artifact topology and uploaded handoff artifact types without opening
+`route_summary.json`. When compare artifacts are present, the same run summary
+and artifact index also surface
 `route_compare_case_count`, `route_compared_count`, `route_triage_bucket_counts`,
 `route_viewspace_status_counts`, `route_x3_band_counts`, and
 `route_compare_issue_code_counts`, so operators can see whether the compare
 portion is matched, recapture-required, X3-failing, or input-blocked without
 drilling into the nested route summary. The wrapper prints those same route
-compare distributions to stdout when they are present, so CI logs also show the
-compare portion without opening uploaded artifacts.
+artifact-kind and compare distributions to stdout when they are present, so CI
+logs also show the handoff files and compare portion without opening uploaded
+artifacts.
 It also prints the run-level `route_summary.md` path, matching the batch and
 compare CLIs. It also writes
 `case_actions.tsv` for spreadsheet-friendly per-case sorting/filtering by action

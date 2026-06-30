@@ -1339,6 +1339,61 @@ python3 -m pytest tools/render_regression/tests -q
 # 195 passed
 ```
 
+## Follow-Up Request-Run Route Artifact-Kind Summary
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Carry the new route-level artifact-kind evidence through the one-command
+  request runner, not only the standalone route tool.
+- Let `run_summary.json`, `run_summary.md`, the run-level
+  `artifact_index.json`, routed request-run reports, and CI stdout show whether
+  the expected operator artifacts actually travelled through the run.
+- Avoid requiring an operator to open nested `route_summary.json` merely to see
+  that `reference_request_validation_tsv`, `reference_intake_tsv`,
+  `missing_references_tsv`, or compare-side artifacts were present.
+
+Changes:
+
+- `acad_reference_request_run.py` now copies
+  `route_payload.artifact_kind_counts` into `route_artifact_kind_counts`.
+- The run-level `artifact_index.json` stores that same distribution.
+- `run_summary.md` and stdout print the route artifact-kind distribution.
+- `acad_artifact_route.py` now preserves `route_artifact_kind_counts` when a
+  request-run artifact index is routed again, and its text/Markdown reports
+  display the nested distribution.
+- Regression coverage proves a successful matched-view request run surfaces
+  key artifact kinds across JSON, Markdown, stdout, and routed reports.
+
+Boundary:
+
+- Operator evidence/reporting only.
+- No route priority change.
+- No request-run action change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_reference_request_run.py::test_reference_request_run_fulfills_and_compares_match \
+  -q
+# 1 passed
+
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 11 passed
+
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# 73 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 195 passed
+```
+
 ## Follow-Up Request-Run Input TSV Artifacts
 
 Status: implemented in this branch.
