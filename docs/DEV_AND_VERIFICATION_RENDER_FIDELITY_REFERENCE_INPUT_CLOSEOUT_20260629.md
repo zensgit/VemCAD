@@ -939,6 +939,62 @@ python3 tools/render_regression/acad_artifact_route.py \
 # route_summary.md includes the read-only/no-equivalence boundary statement
 ```
 
+## Follow-Up Request-Run Route Reports
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make `acad_reference_request_run.py` produce the route reports directly, so
+  CI artifact consumers do not need a second post-processing command.
+- Keep the run root as the single review entry point: run summary, artifact
+  index, and route reports live together.
+
+Changes:
+
+- Each request run now writes:
+  - `<run-dir>/route_summary.json`
+  - `<run-dir>/route_summary.md`
+- The run-level `artifact_index.json` includes both route report files.
+- The route reports are generated from the same `acad_artifact_route.py` logic
+  used by the standalone CLI.
+- The route report covers whatever indexes exist for the run:
+  input + run root + compare when compare ran, or input + run root when the
+  run stops before compare.
+
+Boundary:
+
+- Reporting/indexing only.
+- No routing-rule change.
+- No renderer change.
+- No X3 scoring change.
+- No AutoCAD PNG equivalence claim.
+- `viewspace_mismatch` remains recapture/window input work.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 6 passed
+
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# 11 passed
+```
+
+Private compatibility smoke:
+
+```bash
+python3 tools/render_regression/acad_reference_request_run.py \
+  --from-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir /private/tmp/vemcad-provenance-compat-smoke-20260629/returned \
+  --case-id G11 \
+  --out-dir /private/tmp/vemcad-request-run-route-report-smoke-20260629
+# AutoCAD reference request run: viewspace_mismatch
+# route_summary.json.recommended_action_counts={'continue-to-request-run': 1, 'recapture-autocad-or-provide-window': 2}
+# route_summary.md includes the read-only/no-equivalence boundary statement
+```
+
 Private compatibility smoke:
 
 ```bash

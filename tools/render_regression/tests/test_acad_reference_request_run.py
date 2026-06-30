@@ -140,6 +140,8 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert summary["reference_intake_warning_count"] == 0
     assert summary["reference_intake_markdown"].endswith("reference_intake.md")
     assert summary["compare_summary_markdown"].endswith("summary.md")
+    assert summary["route_summary_json"].endswith("route_summary.json")
+    assert summary["route_summary_markdown"].endswith("route_summary.md")
     assert summary["recommended_next_action"]["code"] == "review-x3-pass"
     assert summary["recommended_next_action"]["artifact"].endswith("summary.md")
     assert artifact_index["status"] == "pass"
@@ -148,9 +150,12 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert compare_summary["status"] == "pass"
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
     assert "recommended_next_action: `review-x3-pass`" in summary_md
+    assert "route summary markdown" in summary_md
     assert _run_artifact_kinds(out) >= {
         "run_summary_json",
         "run_summary_markdown",
+        "route_summary_json",
+        "route_summary_markdown",
         "input_artifact_index",
         "reference_request_validation_json",
         "reference_request_validation_markdown",
@@ -160,6 +165,14 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
         "compare_summary_markdown",
         "compare_artifact_index",
     }
+    route_summary = json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
+    route_summary_md = (out / "route_summary.md").read_text(encoding="utf-8")
+    assert route_summary["recommended_action_counts"] == {
+        "continue-to-request-run": 1,
+        "review-x3-pass": 2,
+    }
+    assert "AutoCAD Artifact Route Report" in route_summary_md
+    assert "claim AutoCAD equivalence" in route_summary_md
 
 
 def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsys):
@@ -202,6 +215,11 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert "## Case Actions" in summary_md
     assert "| `G12` | G12/B12 | `recapture-autocad-or-provide-window`" in summary_md
     assert "| `G11` | G11/B11 | `review-x3-pass`" in summary_md
+    route_summary = json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
+    assert route_summary["recommended_action_counts"] == {
+        "continue-to-request-run": 1,
+        "recapture-autocad-or-provide-window": 2,
+    }
 
 
 def test_reference_request_run_preserves_viewspace_mismatch_exit(tmp_path):
@@ -233,6 +251,8 @@ def test_reference_request_run_preserves_viewspace_mismatch_exit(tmp_path):
     assert summary["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
     assert "do not tune the renderer" in summary["recommended_next_action"]["message"]
     assert compare_summary["status"] == "viewspace_mismatch"
+    route_summary_md = (out / "route_summary.md").read_text(encoding="utf-8")
+    assert "recapture-autocad-or-provide-window=2" in route_summary_md
 
 
 def test_reference_request_run_surfaces_intake_review_warnings(tmp_path):
@@ -307,6 +327,8 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
     assert _run_artifact_kinds(out) >= {
         "run_summary_json",
         "run_summary_markdown",
+        "route_summary_json",
+        "route_summary_markdown",
         "input_artifact_index",
         "reference_request_validation_json",
         "reference_request_validation_markdown",
@@ -314,6 +336,10 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
         "missing_references_markdown",
     }
     assert "compare_summary_json" not in _run_artifact_kinds(out)
+    route_summary = json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
+    assert route_summary["recommended_action_counts"] == {
+        "provide-returned-autocad-pngs": 2,
+    }
 
 
 def test_reference_request_run_surfaces_request_validation_block(tmp_path):
