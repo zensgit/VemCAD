@@ -216,7 +216,11 @@ compare CLIs. It also writes
 code, domain, source, triage bucket, view-space status, X3 band, and resolved
 handoff artifact. Each `case_actions` JSON row and TSV row includes the
 original action artifact plus `artifact_resolved` / `artifact_exists` when a
-handoff file is available.
+handoff file is available. Request-validation and returned-reference-intake
+actions also include per-case `issue_codes` such as
+`error:returned_png_size_mismatch` or
+`warning:long_edge_below_requested`, so spreadsheet triage can identify the
+input defect class without opening nested JSON or Markdown.
 When returned AutoCAD PNGs are still missing, `acad_reference_batch.py` writes
 `missing_references.tsv` beside the JSON/Markdown report so the expected
 source DXF, optional source hash, output filenames, paths, capture method, view
