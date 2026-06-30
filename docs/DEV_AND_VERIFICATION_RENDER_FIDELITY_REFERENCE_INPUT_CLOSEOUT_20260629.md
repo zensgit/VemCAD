@@ -3731,3 +3731,49 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
+
+## Follow-Up Request-Run Preflight Status In Route Artifacts
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make request-run `artifact_index.json` and route reports carry the same
+  preflight status/error/warning counts that `run_summary.json/md` already
+  carries.
+- Let artifact-route consumers understand request-validation and
+  returned-reference intake state without opening nested preflight JSON files.
+
+Changes:
+
+- Request-run artifact indexes now include:
+  - `reference_request_validation_status`;
+  - `reference_request_validation_error_count`;
+  - `reference_request_validation_warning_count`;
+  - `reference_intake_status`;
+  - `reference_intake_error_count`;
+  - `reference_intake_warning_count`.
+- `acad_artifact_route.py` preserves and prints those fields in JSON, text, and
+  Markdown route reports.
+- Regression coverage proves both direct route parsing and a full
+  request-run-generated route summary expose the new fields.
+
+Boundary:
+
+- Artifact/report metadata only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_reference_request_run.py \
+  tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```

@@ -178,6 +178,9 @@ def test_routes_run_case_actions(tmp_path):
         },
         "case_action_counts": {"recapture-autocad-or-provide-window": 1},
         "case_action_domain_counts": {"input": 1},
+        "reference_request_validation_status": "blocked",
+        "reference_request_validation_error_count": 1,
+        "reference_request_validation_warning_count": 0,
         "reference_request_validation_issue_code_counts": {
             "source_dxf_sha256_mismatch": 1,
         },
@@ -185,6 +188,9 @@ def test_routes_run_case_actions(tmp_path):
             "requires_returned_autocad_png": True,
             "autocad_equivalence_claim": False,
         },
+        "reference_intake_status": "review",
+        "reference_intake_error_count": 0,
+        "reference_intake_warning_count": 2,
         "reference_intake_issue_code_counts": {
             "candidate_render_blank": 1,
             "returned_reference_blank": 1,
@@ -205,6 +211,9 @@ def test_routes_run_case_actions(tmp_path):
     assert payload["recommended_next_action"]["domain"] == "input"
     assert payload["case_action_counts"] == {"recapture-autocad-or-provide-window": 1}
     assert payload["case_action_domain_counts"] == {"input": 1}
+    assert payload["reference_request_validation_status"] == "blocked"
+    assert payload["reference_request_validation_error_count"] == 1
+    assert payload["reference_request_validation_warning_count"] == 0
     assert payload["reference_request_validation_issue_code_counts"] == {
         "source_dxf_sha256_mismatch": 1,
     }
@@ -212,22 +221,37 @@ def test_routes_run_case_actions(tmp_path):
         "requires_returned_autocad_png": True,
         "autocad_equivalence_claim": False,
     }
+    assert payload["reference_intake_status"] == "review"
+    assert payload["reference_intake_error_count"] == 0
+    assert payload["reference_intake_warning_count"] == 2
     assert payload["reference_intake_issue_code_counts"] == {
         "candidate_render_blank": 1,
         "returned_reference_blank": 1,
     }
     assert "case_action_counts: recapture-autocad-or-provide-window=1" in text
     assert "case_action_domain_counts: input=1" in text
+    assert "reference_request_validation_status: blocked" in text
+    assert "reference_request_validation_errors: 1" in text
+    assert "reference_request_validation_warnings: 0" in text
     assert "reference_request_validation_issue_code_counts: source_dxf_sha256_mismatch=1" in text
     assert "source_request_boundary: autocad_equivalence_claim=False" in text
     assert "requires_returned_autocad_png=True" in text
+    assert "reference_intake_status: review" in text
+    assert "reference_intake_errors: 0" in text
+    assert "reference_intake_warnings: 2" in text
     assert (
         "reference_intake_issue_code_counts: candidate_render_blank=1, "
         "returned_reference_blank=1"
     ) in text
+    assert "- reference_request_validation_status: `blocked`" in markdown
+    assert "- reference_request_validation_errors: `1`" in markdown
+    assert "- reference_request_validation_warnings: `0`" in markdown
     assert "- reference_request_validation_issue_code_counts: `source_dxf_sha256_mismatch=1`" in markdown
     assert "- source_request_boundary: `autocad_equivalence_claim=False" in markdown
     assert "requires_returned_autocad_png=True" in markdown
+    assert "- reference_intake_status: `review`" in markdown
+    assert "- reference_intake_errors: `0`" in markdown
+    assert "- reference_intake_warnings: `2`" in markdown
     assert (
         "- reference_intake_issue_code_counts: `candidate_render_blank=1, "
         "returned_reference_blank=1`"

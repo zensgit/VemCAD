@@ -195,7 +195,13 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert artifact_index["recommended_next_action"]["code"] == "review-x3-pass"
     assert artifact_index["recommended_next_action"]["domain"] == "pass-review"
     assert artifact_index["case_action_domain_counts"] == {"pass-review": 1}
+    assert artifact_index["reference_request_validation_status"] == "pass"
+    assert artifact_index["reference_request_validation_error_count"] == 0
+    assert artifact_index["reference_request_validation_warning_count"] == 0
     assert artifact_index["source_request_boundary"] == REQUEST_BOUNDARY
+    assert artifact_index["reference_intake_status"] == "pass"
+    assert artifact_index["reference_intake_error_count"] == 0
+    assert artifact_index["reference_intake_warning_count"] == 0
     assert "recommended next action: review-x3-pass" in stdout
     assert "recommended next action domain: pass-review" in stdout
     assert "reference request validation issue codes: none" in stdout
@@ -216,6 +222,9 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert "route_recommended_action_counts: `continue-to-request-run=1, review-x3-pass=2`" in summary_md
     assert "route_recommended_action_domain_counts: `continue=1, pass-review=2`" in summary_md
     assert "case actions tsv" in summary_md
+    route_summary_md = (out / "route_summary.md").read_text(encoding="utf-8")
+    assert "- reference_request_validation_status: `pass`" in route_summary_md
+    assert "- reference_intake_status: `pass`" in route_summary_md
     case_actions_tsv = (out / "case_actions.tsv").read_text(encoding="utf-8").splitlines()
     assert case_actions_tsv[0] == (
         "id\tdrawing_id\tcode\tdomain\tsource\ttriage_bucket\t"
