@@ -994,6 +994,23 @@ def _optional_int(payload: dict[str, Any], *keys: str) -> int | None:
     return None
 
 
+def _final_exit_code_counts(payload: dict[str, Any]) -> dict[str, int]:
+    counts = payload.get("final_exit_code_counts")
+    if isinstance(counts, dict):
+        parsed: dict[str, int] = {}
+        for code, count in counts.items():
+            code_text = str(code)
+            if not code_text:
+                continue
+            try:
+                parsed[code_text] = int(count)
+            except Exception:
+                continue
+        return dict(sorted(parsed.items()))
+    final_exit_code = _optional_int(payload, "final_exit_code")
+    return {str(final_exit_code): 1} if final_exit_code is not None else {}
+
+
 def _compare_case_count(payload: dict[str, Any]) -> int | None:
     if payload.get("schema") == BATCH_SCHEMA:
         return _optional_int(payload, "compare_case_count")
@@ -1198,6 +1215,15 @@ def main(argv: list[str] | None = None) -> int:
                         help="exit 2 unless the routed status counts include this status; may repeat")
     parser.add_argument("--forbid-status", action="append", default=[],
                         help="exit 2 if the routed status counts include this status; may repeat")
+    parser.add_argument("--require-final-exit-code", action="append", default=[],
+                        help="exit 2 unless routed final_exit_code counts include this code; may repeat")
+    parser.add_argument("--forbid-final-exit-code", action="append", default=[],
+                        help="exit 2 if routed final_exit_code counts include this code; may repeat")
+    parser.add_argument("--require-final-exit-code-count", action="append", default=[],
+                        help=(
+                            "exit 2 unless routed final_exit_code counts contain code=count; "
+                            "may repeat"
+                        ))
     parser.add_argument("--require-kind", action="append", default=[],
                         help="exit 2 unless the routed kind counts include this kind; may repeat")
     parser.add_argument("--forbid-kind", action="append", default=[],
@@ -1289,6 +1315,9 @@ def main(argv: list[str] | None = None) -> int:
         ]
         action_domain_count_expectations = [
             _parse_count_expectation(item) for item in args.require_action_domain_count
+        ]
+        final_exit_code_count_expectations = [
+            _parse_count_expectation(item) for item in args.require_final_exit_code_count
         ]
         triage_bucket_expectations = [
             _parse_count_expectation(item) for item in args.require_triage_bucket
@@ -1427,6 +1456,42 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(
                 "acad_artifact_route: status counts: "
+                + _format_counts(counts),
+                file=sys.stderr,
+            )
+            return 2
+    if (
+        args.require_final_exit_code
+        or args.forbid_final_exit_code
+        or final_exit_code_count_expectations
+    ):
+        counts = _final_exit_code_counts(payload)
+        missing = [code for code in args.require_final_exit_code if not counts.get(str(code), 0)]
+        if missing:
+            print(
+                "acad_artifact_route: required final exit code missing: "
+                + ", ".join(str(code) for code in missing),
+                file=sys.stderr,
+            )
+            print(
+                "acad_artifact_route: final exit code counts: "
+                + _format_counts(counts),
+                file=sys.stderr,
+            )
+            return 2
+        failures = _check_count_guards(
+            label="final exit code",
+            counts=counts,
+            required=final_exit_code_count_expectations,
+            forbidden=[str(code) for code in args.forbid_final_exit_code],
+        )
+        if failures:
+            print(
+                "acad_artifact_route: " + "; ".join(failures),
+                file=sys.stderr,
+            )
+            print(
+                "acad_artifact_route: final exit code counts: "
                 + _format_counts(counts),
                 file=sys.stderr,
             )

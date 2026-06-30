@@ -361,6 +361,18 @@ operator gate must prove the route contains only the expected mix of `input`,
 `renderer-candidate`, `pass-review`, and `continue` work without enumerating
 every specific action code.
 
+Use `--require-final-exit-code <code>` /
+`--forbid-final-exit-code <code>` when a workflow needs to fail closed on the
+directly routed final-exit-code distribution. Use
+`--require-final-exit-code-count <code=count>` when the exact distribution
+matters, for example after an opt-in input-review hard gate:
+
+```bash
+python3 tools/render_regression/acad_artifact_route.py <run-dir> \
+  --recursive \
+  --forbid-final-exit-code 2
+```
+
 Use `--require-status <status>` / `--forbid-status <status>` when a workflow
 needs to assert the routed status distribution itself, such as requiring
 `viewspace_mismatch` in a recapture test or forbidding any nested `blocked`

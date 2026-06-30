@@ -1514,6 +1514,119 @@ def test_cli_forbid_status_fails_closed_when_present(tmp_path, capsys):
     assert "status counts: blocked=1, viewspace_mismatch=1" in stderr
 
 
+def test_cli_require_final_exit_code_passes_when_present(tmp_path):
+    input_dir = tmp_path / "input"
+    run_dir = tmp_path / "run"
+    input_dir.mkdir()
+    run_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "pass",
+        "final_exit_code": 0,
+        "case_count": 1,
+        "artifacts": [],
+    })
+    _write(run_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_request_run_artifact_index/v1",
+        "status": "pass",
+        "final_exit_code": 2,
+        "recommended_next_action": {
+            "code": "inspect-returned-reference-warnings",
+            "message": "review input",
+            "domain": "input-review",
+        },
+        "case_actions": [],
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        str(run_dir),
+        "--require-final-exit-code",
+        "0",
+        "--require-final-exit-code",
+        "2",
+        "--require-final-exit-code-count",
+        "0=1",
+        "--require-final-exit-code-count",
+        "2=1",
+    ]) == 0
+
+
+def test_cli_require_final_exit_code_fails_when_missing(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "pass",
+        "final_exit_code": 0,
+        "case_count": 1,
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--require-final-exit-code",
+        "2",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "required final exit code missing: 2" in stderr
+    assert "final exit code counts: 0=1" in stderr
+
+
+def test_cli_forbid_final_exit_code_fails_when_present(tmp_path, capsys):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    _write(run_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_request_run_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "final_exit_code": 2,
+        "recommended_next_action": {
+            "code": "recapture-autocad-or-provide-window",
+            "message": "recapture",
+            "domain": "input",
+        },
+        "case_actions": [],
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(run_dir),
+        "--forbid-final-exit-code",
+        "2",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "forbidden final exit code present: 2=1" in stderr
+    assert "final exit code counts: 2=1" in stderr
+
+
+def test_cli_require_final_exit_code_count_fails_on_count_mismatch(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "pass",
+        "final_exit_code": 0,
+        "case_count": 1,
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--require-final-exit-code-count",
+        "0=2",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "required final exit code count mismatch: 0=2 (got 1)" in stderr
+    assert "final exit code counts: 0=1" in stderr
+
+
 def test_cli_require_kind_passes_when_present(tmp_path):
     input_dir = tmp_path / "input"
     compare_dir = tmp_path / "compare"
