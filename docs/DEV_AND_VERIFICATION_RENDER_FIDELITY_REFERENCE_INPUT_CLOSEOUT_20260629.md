@@ -1154,6 +1154,44 @@ python3 -m pytest \
 # 39 passed
 ```
 
+## Follow-Up Per-Case Recapture Action Artifact
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Align the one-command runner's per-case action table with the top-level
+  recapture handoff.
+- Avoid sending operators from a specific recapture case back to
+  `compare/summary.md` when the concrete `compare/reference_request.md` handoff
+  exists.
+
+Changes:
+
+- `acad_reference_request_run.py` now uses `compare/reference_request.md` as
+  the artifact for per-case `recapture-autocad-or-provide-window` actions when
+  that file exists.
+- Other compare-derived actions still point at `compare/summary.md`; for
+  example, `review-x3-pass` rows keep the compare summary artifact.
+- Regression coverage asserts the JSON `case_actions[]`, Markdown case-action
+  table, and `case_actions.tsv` all carry the correct per-case artifacts.
+- `tools/render_regression/README.md` documents the per-case artifact behavior.
+
+Boundary:
+
+- Operator routing/reporting only.
+- No renderer change.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- No private drawing or AutoCAD PNG committed.
+- No generated request JSON schema/content change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 10 passed
+```
+
 ## Follow-Up Legacy Batch Compare Optional Report Cleanup
 
 Status: implemented in this branch.

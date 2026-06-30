@@ -456,9 +456,11 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert summary["case_actions"][0]["domain"] == "input"
     assert summary["case_actions"][0]["source"] == "compare"
     assert summary["case_actions"][0]["triage_bucket"] == "recapture-required"
+    assert summary["case_actions"][0]["artifact"].endswith("compare/reference_request.md")
     assert summary["case_actions"][1]["code"] == "review-x3-pass"
     assert summary["case_actions"][1]["domain"] == "pass-review"
     assert summary["case_actions"][1]["triage_bucket"] == "matched-pass"
+    assert summary["case_actions"][1]["artifact"].endswith("compare/summary.md")
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
     assert f"recommended next action artifact: `{out / 'compare' / 'reference_request.md'}`" in summary_md
     assert "route_status_counts: `pass=1, viewspace_mismatch=2`" in summary_md
@@ -472,15 +474,23 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert "route_viewspace_status_counts: `match=1, mismatch=1`" in summary_md
     assert "route_x3_band_counts: `pass=2`" in summary_md
     assert "## Case Actions" in summary_md
-    assert "| `G12` | G12/B12 | `recapture-autocad-or-provide-window`" in summary_md
-    assert "| `G11` | G11/B11 | `review-x3-pass`" in summary_md
+    assert (
+        f"| `G12` | G12/B12 | `recapture-autocad-or-provide-window` | "
+        f"`input` | `compare` | `recapture-required` | `{out / 'compare' / 'reference_request.md'}` |"
+    ) in summary_md
+    assert (
+        f"| `G11` | G11/B11 | `review-x3-pass` | "
+        f"`pass-review` | `compare` | `matched-pass` | `{out / 'compare' / 'summary.md'}` |"
+    ) in summary_md
     case_actions_tsv = (out / "case_actions.tsv").read_text(encoding="utf-8").splitlines()
     assert case_actions_tsv[1].startswith(
         "G12\tG12/B12\trecapture-autocad-or-provide-window\tinput\tcompare\trecapture-required\tmismatch\tpass\t"
     )
+    assert case_actions_tsv[1].endswith(f"\t{out / 'compare' / 'reference_request.md'}")
     assert case_actions_tsv[2].startswith(
         "G11\tG11/B11\treview-x3-pass\tpass-review\tcompare\tmatched-pass\tmatch\tpass\t"
     )
+    assert case_actions_tsv[2].endswith(f"\t{out / 'compare' / 'summary.md'}")
     route_summary = json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
     assert route_summary["recommended_action_counts"] == {
         "continue-to-request-run": 1,
