@@ -386,7 +386,28 @@ def _md(value: Any) -> str:
     text = _str(value)
     if not text:
         return ""
-    return text.replace("|", "\\|").replace("\n", " ")
+    return text.replace("\r\n", " ").replace("\n", " ").replace("\r", " ").replace("|", "\\|")
+
+
+def _md_table_cell(value: Any) -> str:
+    text = _md(value)
+    if not text:
+        return "-"
+    return text.replace("`", "\\`")
+
+
+def _md_code_cell(value: Any) -> str:
+    text = _md(value) or "-"
+    longest_backticks = 0
+    current = 0
+    for char in text:
+        if char == "`":
+            current += 1
+            longest_backticks = max(longest_backticks, current)
+        else:
+            current = 0
+    delimiter = "`" * (longest_backticks + 1)
+    return f"{delimiter}{text}{delimiter}"
 
 
 def _write_markdown_summary(path: Path, report: dict[str, Any], *, contact_sheet: str = "") -> None:
@@ -438,8 +459,8 @@ def _write_markdown_summary(path: Path, report: dict[str, Any], *, contact_sheet
         ])
         for issue in issues:
             lines.append(
-                f"| {_md(issue.get('case_id'))} | {_md(issue.get('severity'))} | "
-                f"`{_md(issue.get('code'))}` | {_md(issue.get('message'))} |"
+                f"| {_md_table_cell(issue.get('case_id'))} | {_md_table_cell(issue.get('severity'))} | "
+                f"{_md_code_cell(issue.get('code'))} | {_md_table_cell(issue.get('message'))} |"
             )
         lines.append("")
     rows = report.get("rows") or []
@@ -465,11 +486,11 @@ def _write_markdown_summary(path: Path, report: dict[str, Any], *, contact_sheet
                 f"{key}:{value}" for key, value in sorted(note_counts.items())
             ) or "-"
             lines.append(
-                f"| `{_md(row.get('id'))}` | {_md(row.get('drawing_id'))} | "
-                f"`{_md(row.get('viewspace_status'))}` | `{_md(summary.get('band'))}` | "
-                f"{_md(summary.get('ink_iou'))} | {_md(summary.get('color_dist'))} | "
-                f"{_md(text_flags)} | {_md(text_notes)} | "
-                f"`{_md(row.get('recommended_action_domain'))}` | {_md(row.get('recommended_action'))} |"
+                f"| {_md_code_cell(row.get('id'))} | {_md_table_cell(row.get('drawing_id'))} | "
+                f"{_md_code_cell(row.get('viewspace_status'))} | {_md_code_cell(summary.get('band'))} | "
+                f"{_md_table_cell(summary.get('ink_iou'))} | {_md_table_cell(summary.get('color_dist'))} | "
+                f"{_md_table_cell(text_flags)} | {_md_table_cell(text_notes)} | "
+                f"{_md_code_cell(row.get('recommended_action_domain'))} | {_md_table_cell(row.get('recommended_action'))} |"
             )
         lines.extend([
             "",
@@ -486,14 +507,14 @@ def _write_markdown_summary(path: Path, report: dict[str, Any], *, contact_sheet
             bucket = _str(row.get("triage_bucket")) or _triage_bucket(row)
             display_rank = row.get("triage_rank") or rank
             lines.append(
-                f"| {display_rank} | `{_md(row.get('id'))}` | `{bucket}` | "
-                f"`{_md(row.get('viewspace_status'))}` | `{_md(summary.get('band'))}` | "
-                f"{_md(summary.get('ink_iou'))} | "
-                f"`{_md(row.get('recommended_action_domain'))}` | {_md(row.get('recommended_action'))} |"
+                f"| {_md_table_cell(display_rank)} | {_md_code_cell(row.get('id'))} | {_md_code_cell(bucket)} | "
+                f"{_md_code_cell(row.get('viewspace_status'))} | {_md_code_cell(summary.get('band'))} | "
+                f"{_md_table_cell(summary.get('ink_iou'))} | "
+                f"{_md_code_cell(row.get('recommended_action_domain'))} | {_md_table_cell(row.get('recommended_action'))} |"
             )
         lines.extend(["", "## Artifact Paths", ""])
         for row in rows:
-            lines.append(f"### `{_md(row.get('id'))}`")
+            lines.append(f"### {_md_code_cell(row.get('id'))}")
             for label, key in (
                 ("AutoCAD reference", "acad_png"),
                 ("VemCAD candidate", "ours"),
@@ -505,10 +526,10 @@ def _write_markdown_summary(path: Path, report: dict[str, Any], *, contact_sheet
             ):
                 value = _str(row.get(key))
                 if value:
-                    lines.append(f"- {label}: `{_md(value)}`")
+                    lines.append(f"- {label}: {_md_code_cell(value)}")
             text_summary = (row.get("text_provenance") or {}).get("summary")
             if text_summary:
-                lines.append(f"- text provenance summary: `{_md(text_summary)}`")
+                lines.append(f"- text provenance summary: {_md_code_cell(text_summary)}")
             lines.append("")
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 
@@ -606,8 +627,9 @@ def _write_reference_request(
     ]
     for case in cases:
         lines.append(
-            f"| {case['triage_rank']} | `{_md(case['id'])}` | {_md(case['drawing_id'])} | "
-            f"`{_md(case['recommended_output_name'])}` | `{_md(case['source_dxf'])}` |"
+            f"| {_md_table_cell(case['triage_rank'])} | {_md_code_cell(case['id'])} | "
+            f"{_md_table_cell(case['drawing_id'])} | "
+            f"{_md_code_cell(case['recommended_output_name'])} | {_md_code_cell(case['source_dxf'])} |"
         )
     lines.extend([
         "",

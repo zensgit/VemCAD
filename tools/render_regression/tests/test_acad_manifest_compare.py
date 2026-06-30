@@ -29,6 +29,19 @@ def _sha256(path: str) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def _unescaped_pipe_count(line: str) -> int:
+    count = 0
+    escaped = False
+    for char in line:
+        if char == "\\" and not escaped:
+            escaped = True
+            continue
+        if char == "|" and not escaped:
+            count += 1
+        escaped = False
+    return count
+
+
 def _manifest(
     path: Path,
     *,
@@ -365,6 +378,48 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
         "route_summary_json",
         "route_summary_markdown",
     }
+
+
+def test_manifest_harness_escapes_markdown_table_cells(tmp_path):
+    acad = _png(tmp_path / "acad.png", size=(800, 600), box=[220, 165, 580, 435])
+    ours = _png(tmp_path / "ours.png", size=(760, 570), box=[20, 15, 740, 555])
+    dxf = _dxf(tmp_path / "B11.dxf")
+    manifest = tmp_path / "manifest.json"
+    manifest.write_text(json.dumps({
+        "schema": arm.SCHEMA,
+        "cases": [{
+            "id": "G|11",
+            "drawing_id": "G11|bearing\ncap",
+            "source_dxf": dxf,
+            "acad_png": acad,
+            "capture_method": "plot-export",
+            "view_contract": "model-extents",
+            "expected_size": [800, 600],
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidates.json"
+    candidates.write_text(json.dumps([{"id": "G|11", "ours": ours}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert harness.main([
+        "--manifest", str(manifest),
+        "--candidate-cases", str(candidates),
+        "--out-dir", str(out),
+    ]) == 2
+
+    summary_md = (out / "summary.md").read_text(encoding="utf-8")
+    case_row = next(line for line in summary_md.splitlines() if "G11\\|bearing cap" in line)
+    assert "`G\\|11`" in case_row
+    assert _unescaped_pipe_count(case_row) == 11
+    triage_row = next(line for line in summary_md.splitlines() if "`recapture-required`" in line)
+    assert "`G\\|11`" in triage_row
+    assert _unescaped_pipe_count(triage_row) == 9
+
+    request_md = (out / "reference_request.md").read_text(encoding="utf-8")
+    request_row = next(line for line in request_md.splitlines() if "G11\\|bearing cap" in line)
+    assert "`G\\|11`" in request_row
+    assert "`G_11_autocad_model_extents.png`" in request_row
+    assert _unescaped_pipe_count(request_row) == 6
 
 
 def test_manifest_harness_stops_on_blocked_manifest(tmp_path, capsys):
