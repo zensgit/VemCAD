@@ -223,6 +223,10 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --require-action-artifact missing_references.md
 ```
 
+Add `--require-action-artifact-exists` when the workflow should also prove the
+handoff file is present. Relative action artifacts resolve from the source
+`artifact_index.json` directory, not from the shell's current directory.
+
 To assert source artifact boundaries as part of the same route step, repeat
 `--require-source-boundary key=value`. For example, this guarantees every
 routed source artifact explicitly says it is not an AutoCAD-equivalence claim:
