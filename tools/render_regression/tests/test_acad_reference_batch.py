@@ -365,6 +365,44 @@ def test_batch_generator_validates_request_case_count(tmp_path):
     }
 
 
+def test_batch_generator_rejects_invalid_request_case_count(tmp_path):
+    source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
+    ours = Path(_png(tmp_path / "ours" / "G11.png", (760, 570)))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "case_count": "two",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "source_dxf_sha256": _sha256(source),
+            "candidate_png_sha256": _sha256(ours),
+            "recommended_output_name": "G11_autocad_model_extents.png",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--validate-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--out-dir", str(out),
+    ]) == 2
+
+    validation = json.loads((out / "reference_request_validation.json").read_text(encoding="utf-8"))
+    assert validation["issue_code_counts"] == {"request_case_count_invalid": 1}
+    assert validation["issues"] == [{
+        "severity": "error",
+        "case_id": "<request>",
+        "code": "request_case_count_invalid",
+        "message": "request case_count must be an integer when present",
+    }]
+    validation_md = (out / "reference_request_validation.md").read_text(encoding="utf-8")
+    assert "request_case_count_invalid=1" in validation_md
+
+
 def test_batch_generator_case_count_validation_uses_full_request_before_case_filter(tmp_path):
     source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
     _dxf(tmp_path / "dxf" / "G12.dxf")
