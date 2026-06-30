@@ -803,9 +803,12 @@ def _write_missing_references_report(
         expected_path = (reference_dir / output_name).resolve()
         if not expected_path.is_file():
             expected_size = request.get("requested_expected_size") or request.get("expected_size")
+            source_dxf = _resolve(request_json.parent, request.get("source_dxf"))
             missing.append({
                 "id": case_id,
                 "drawing_id": _str(request.get("drawing_id")),
+                "source_dxf": source_dxf,
+                "source_dxf_sha256": _str(request.get("source_dxf_sha256")),
                 "recommended_output_name": output_name,
                 "expected_path": str(expected_path),
                 "requested_capture_method": _str(request.get("requested_capture_method") or "plot-export"),
@@ -828,13 +831,15 @@ def _write_missing_references_report(
     json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     with tsv_path.open("w", encoding="utf-8") as handle:
         handle.write(
-            "id\tdrawing_id\trecommended_output_name\texpected_path\t"
+            "id\tdrawing_id\tsource_dxf\tsource_dxf_sha256\trecommended_output_name\texpected_path\t"
             "requested_capture_method\trequested_view_contract\trequested_expected_size\n"
         )
         for item in missing:
             handle.write(
                 f"{_tsv(item['id'])}\t"
                 f"{_tsv(item.get('drawing_id'))}\t"
+                f"{_tsv(item.get('source_dxf'))}\t"
+                f"{_tsv(item.get('source_dxf_sha256'))}\t"
                 f"{_tsv(item['recommended_output_name'])}\t"
                 f"{_tsv(item['expected_path'])}\t"
                 f"{_tsv(item.get('requested_capture_method'))}\t"
@@ -849,12 +854,13 @@ def _write_missing_references_report(
         f"- missing_count: `{len(missing)}`",
         f"- missing_references_tsv: `{tsv_path}`",
         "",
-        "| Case | Drawing | Expected PNG | Capture | View | Expected size | Expected path |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| Case | Drawing | Source DXF | Expected PNG | Capture | View | Expected size | Expected path |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for item in missing:
         lines.append(
             f"| `{item['id']}` | {_str(item.get('drawing_id'))} | "
+            f"`{item.get('source_dxf') or '-'}` | "
             f"`{item['recommended_output_name']}` | "
             f"`{item.get('requested_capture_method') or '-'}` | "
             f"`{item.get('requested_view_contract') or '-'}` | "

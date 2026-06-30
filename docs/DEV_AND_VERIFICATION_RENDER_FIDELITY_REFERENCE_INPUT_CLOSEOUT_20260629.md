@@ -2011,6 +2011,42 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Missing Reference Source DXF Handoff
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make the missing-reference handoff self-contained for AutoCAD export.
+- Keep the source DXF path and optional source hash on the same row as the
+  requested output PNG and capture contract.
+
+Changes:
+
+- `missing_references.json` rows now include:
+  - `source_dxf`;
+  - `source_dxf_sha256` when the request package already has it.
+- `missing_references.tsv` adds `source_dxf` and `source_dxf_sha256` columns.
+- `missing_references.md` includes the source DXF in its table.
+
+Boundary:
+
+- Missing-input handoff artifact only.
+- No route priority change.
+- No renderer change.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- No private drawing or AutoCAD PNG committed.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up CLI Action Domain Logs
 
 Status: implemented in this branch.
