@@ -5158,3 +5158,51 @@ python3 -m pytest \
 python3 -m pytest tools/render_regression/tests -q
 # 183 passed
 ```
+
+## Follow-Up Route Final Exit Code Guards
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let CI/operator scripts fail closed directly from `acad_artifact_route.py`
+  when routed artifacts include an undesirable final exit code, such as an
+  opt-in input-review hard failure returning `2`.
+- Avoid requiring downstream jobs to parse `route_summary.json` with `jq` after
+  `final_exit_code_counts` has already been computed by the route tool.
+- Preserve default behavior: route commands still only fail on these exit-code
+  distributions when an explicit guard flag is supplied.
+
+Changes:
+
+- `acad_artifact_route.py` now accepts:
+  - `--require-final-exit-code <code>`;
+  - `--forbid-final-exit-code <code>`;
+  - `--require-final-exit-code-count <code=count>`.
+- Multi-route payloads check top-level `final_exit_code_counts`.
+- Single batch/request-run routes check their own `final_exit_code`.
+- Guards intentionally do not recursively count
+  `route_final_exit_code_counts`, avoiding double-counting the same nested
+  evidence.
+- `tools/render_regression/README.md` documents the new guard flags and a
+  `--forbid-final-exit-code 2` example.
+
+Boundary:
+
+- Opt-in route guard only.
+- No route priority change.
+- No default exit-code behavior change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# 68 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 187 passed
+```
