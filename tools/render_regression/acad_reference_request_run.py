@@ -401,6 +401,7 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"`{_format_case_action_counts(summary['reference_request_validation_issue_code_counts'])}`",
         f"- source_request_boundary: `{_format_case_action_counts(summary.get('source_request_boundary') or {})}`",
         f"- reference_intake_status: `{summary['reference_intake_status']}`",
+        f"- reference_intake_errors: `{summary['reference_intake_error_count']}`",
         f"- reference_intake_warnings: `{summary['reference_intake_warning_count']}`",
         f"- reference_intake_issue_codes: `{_format_case_action_counts(summary['reference_intake_issue_code_counts'])}`",
         f"- recommended_next_action: `{next_action['code']}`",

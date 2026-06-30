@@ -3659,3 +3659,39 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
+
+## Follow-Up Request-Run Intake Error Visibility
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep `run_summary.md` explicit when returned-reference intake is blocked.
+- Avoid relying on `reference_intake_status` plus issue-code inference to know
+  whether the returned AutoCAD PNG preflight has actual errors.
+
+Changes:
+
+- `run_summary.md` now prints `reference_intake_errors` beside
+  `reference_intake_warnings`.
+- Regression coverage proves:
+  - pass runs show `reference_intake_errors: 0`;
+  - returned PNG size mismatch runs show `reference_intake_errors: 1`.
+
+Boundary:
+
+- Operator Markdown visibility only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
