@@ -2085,6 +2085,44 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Route Action Artifact Exists Gate
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let unattended checks prove the selected route action's handoff artifact is
+  actually present, not just named.
+- Resolve relative action artifacts from the source `artifact_index.json`
+  directory so checks do not depend on the shell's current working directory.
+
+Changes:
+
+- Batch route top-level actions now record their selected
+  `source_artifact_index` and `source_route_index`.
+- `acad_artifact_route.py` now accepts `--require-action-artifact-exists`.
+- The existence check resolves `recommended_next_action.artifact` relative to
+  the selected source artifact index when the artifact path is relative.
+- Tests cover both the pass path and fail-closed missing-file path.
+
+Boundary:
+
+- Route-gate assertion only.
+- No route priority change.
+- No renderer change.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- No private drawing or AutoCAD PNG committed.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up CLI Action Domain Logs
 
 Status: implemented in this branch.

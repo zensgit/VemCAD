@@ -299,12 +299,17 @@ def _recommended_batch_action(routes: list[dict[str, Any]]) -> dict[str, str]:
     priority, index, action = min(ranked, key=lambda item: (item[0], item[1]))
     artifact = action.get("artifact") or str(routes[index].get("artifact_index") or "")
     message = action.get("message") or "Inspect route artifacts before choosing the next action."
-    return {
+    payload = {
         "code": action.get("code") or "inspect-artifact-index",
         "message": message,
         "artifact": artifact,
         "domain": action.get("domain") or _action_domain(action.get("code") or "inspect-artifact-index"),
     }
+    source_artifact_index = str(routes[index].get("artifact_index") or "")
+    if source_artifact_index:
+        payload["source_artifact_index"] = source_artifact_index
+        payload["source_route_index"] = str(index + 1)
+    return payload
 
 
 def route_artifact_indexes(paths: list[Path]) -> dict[str, Any]:
@@ -485,12 +490,37 @@ def _recommended_action_artifact(payload: dict[str, Any]) -> str:
     return str((payload.get("recommended_next_action") or {}).get("artifact") or "")
 
 
+def _recommended_action_source_index(payload: dict[str, Any]) -> str:
+    action = payload.get("recommended_next_action") or {}
+    source = str(action.get("source_artifact_index") or "")
+    if source:
+        return source
+    if payload.get("schema") != BATCH_SCHEMA:
+        return str(payload.get("artifact_index") or "")
+    return ""
+
+
 def _artifact_matches(actual: str, expected: str) -> bool:
     actual_norm = actual.replace("\\", "/")
     expected_norm = expected.replace("\\", "/").lstrip("/")
     if not expected_norm:
         return not actual_norm
     return actual_norm == expected_norm or actual_norm.endswith(f"/{expected_norm}")
+
+
+def _resolve_action_artifact(payload: dict[str, Any]) -> Path | None:
+    artifact = _recommended_action_artifact(payload)
+    if not artifact:
+        return None
+    artifact_path = Path(artifact)
+    if artifact_path.is_absolute():
+        return artifact_path
+    source_index = _recommended_action_source_index(payload)
+    if source_index:
+        if artifact == source_index:
+            return Path(artifact).resolve()
+        return (Path(source_index).parent / artifact).resolve()
+    return artifact_path.resolve()
 
 
 def _recommended_action_domain(payload: dict[str, Any]) -> str:
@@ -559,6 +589,11 @@ def main(argv: list[str] | None = None) -> int:
                             "exit 2 unless the top-level recommended_next_action.artifact "
                             "matches or ends with this path"
                         ))
+    parser.add_argument("--require-action-artifact-exists", action="store_true",
+                        help=(
+                            "exit 2 unless the top-level recommended_next_action.artifact "
+                            "resolves to an existing file"
+                        ))
     parser.add_argument("--require-source-boundary", action="append", default=[],
                         help="exit 2 unless every routed source artifact boundary has key=value; may repeat")
     args = parser.parse_args(argv)
@@ -619,6 +654,25 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 f"acad_artifact_route: required action artifact {args.require_action_artifact!r} "
                 f"but got {actual!r} for action {action!r}",
+                file=sys.stderr,
+            )
+            return 2
+    if args.require_action_artifact_exists:
+        actual = _recommended_action_artifact(payload)
+        resolved = _resolve_action_artifact(payload)
+        if not actual or resolved is None:
+            action = _recommended_action_code(payload)
+            print(
+                f"acad_artifact_route: required action artifact to exist "
+                f"but action {action!r} has no artifact",
+                file=sys.stderr,
+            )
+            return 2
+        if not resolved.is_file():
+            action = _recommended_action_code(payload)
+            print(
+                f"acad_artifact_route: required action artifact to exist "
+                f"but {resolved} is not a file for action {action!r}",
                 file=sys.stderr,
             )
             return 2
