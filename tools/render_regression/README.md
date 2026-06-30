@@ -190,7 +190,10 @@ failure distribution without drilling into the nested route summary. The wrapper
 prints those same route compare distributions to stdout when they are present,
 so CI logs also show the compare portion without opening uploaded artifacts. It also writes
 `case_actions.tsv` for spreadsheet-friendly per-case sorting/filtering by action
-code, domain, source, triage bucket, view-space status, and X3 band.
+code, domain, source, triage bucket, view-space status, X3 band, and resolved
+handoff artifact. Each `case_actions` JSON row and TSV row includes the
+original action artifact plus `artifact_resolved` / `artifact_exists` when a
+handoff file is available.
 When returned AutoCAD PNGs are still missing, `acad_reference_batch.py` writes
 `missing_references.tsv` beside the JSON/Markdown report so the expected
 source DXF, optional source hash, output filenames, paths, capture method, view

@@ -1112,6 +1112,49 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 10 passed
 ```
 
+## Follow-Up Per-Case Action Artifact Resolution
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make `case_actions` useful as a standalone batch triage table.
+- Let operators sort/filter per-case actions and still copy a resolved handoff
+  file path without opening route reports or resolving relative paths by hand.
+- Keep the top-level recommended-action artifact resolution and per-case
+  action rows aligned.
+
+Changes:
+
+- Each `case_actions[]` row now includes `artifact_resolved` and
+  `artifact_exists` when the action has a handoff artifact.
+- `case_actions.tsv` adds `artifact_resolved` and `artifact_exists` columns.
+- The `run_summary.md` case-action table displays the resolved artifact path
+  when available.
+- Regression coverage pins:
+  - pass-review / matched-pass rows resolve to `compare/summary.md`;
+  - recapture rows resolve to `compare/reference_request.md`;
+  - missing-reference rows resolve to `input/missing_references.md`.
+- `tools/render_regression/README.md` documents the per-case resolved artifact
+  fields.
+
+Boundary:
+
+- Per-case operator evidence only.
+- No route priority change.
+- No renderer change.
+- No compare metric change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 10 passed
+```
+
 ## Follow-Up Recapture Route Action Artifact
 
 Status: implemented in this branch.

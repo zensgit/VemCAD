@@ -332,12 +332,23 @@ def _tsv(value: Any) -> str:
     return str(value or "").replace("\t", " ").replace("\r", " ").replace("\n", " ")
 
 
+def _artifact_resolution(artifact: str) -> dict[str, Any]:
+    if not artifact:
+        return {}
+    resolved = Path(artifact).resolve()
+    return {
+        "artifact_resolved": str(resolved),
+        "artifact_exists": resolved.is_file(),
+    }
+
+
 def _write_case_actions_tsv(path: Path, case_actions: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         handle.write(
             "id\tdrawing_id\tcode\tdomain\tsource\ttriage_bucket\t"
-            "viewspace_status\tx3_band\tissue_count\trecommended_output_name\tartifact\n"
+            "viewspace_status\tx3_band\tissue_count\trecommended_output_name\t"
+            "artifact\tartifact_resolved\tartifact_exists\n"
         )
         for action in case_actions:
             handle.write(
@@ -351,7 +362,9 @@ def _write_case_actions_tsv(path: Path, case_actions: list[dict[str, Any]]) -> N
                 f"{_tsv(action.get('x3_band'))}\t"
                 f"{_tsv(action.get('issue_count'))}\t"
                 f"{_tsv(action.get('recommended_output_name'))}\t"
-                f"{_tsv(action.get('artifact'))}\n"
+                f"{_tsv(action.get('artifact'))}\t"
+                f"{_tsv(action.get('artifact_resolved'))}\t"
+                f"{_tsv(action.get('artifact_exists'))}\n"
             )
 
 
@@ -377,6 +390,7 @@ def _put_case_action(
         "source": source,
         "artifact": artifact,
     }
+    payload.update(_artifact_resolution(artifact))
     if extra:
         payload.update(extra)
     actions[case_id] = payload
@@ -605,7 +619,7 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         ])
         for action in case_actions:
             triage = action.get("triage_bucket") or action.get("issue_count") or "-"
-            artifact = action.get("artifact") or ""
+            artifact = action.get("artifact_resolved") or action.get("artifact") or ""
             lines.append(
                 f"| {_md_code_cell(action.get('id', ''))} | {_md_table_cell(action.get('drawing_id', ''))} | "
                 f"{_md_code_cell(action.get('code', ''))} | {_md_code_cell(action.get('domain', ''))} | "
