@@ -1112,6 +1112,49 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 10 passed
 ```
 
+## Follow-Up Request-Run Route Summary Stdout
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Align the one-command `acad_reference_request_run.py` wrapper with the batch
+  and compare CLIs, which already print their route report path.
+- Give CI logs a direct pointer to `<run-dir>/route_summary.md`, not only
+  `<run-dir>/run_summary.md`.
+- Make the route report discoverable even when uploaded artifacts are browsed
+  from stdout alone.
+
+Changes:
+
+- `acad_reference_request_run.py` now prints
+  `route summary  : <run-dir>/route_summary.md` after route counts and before
+  the run summary path.
+- Regression coverage asserts the stdout route-summary path for:
+  - pass;
+  - `viewspace_mismatch`;
+  - missing returned AutoCAD PNG input-blocked runs.
+- `tools/render_regression/README.md` documents the request-run route summary
+  stdout behavior.
+
+Boundary:
+
+- Operator stdout/report discovery only.
+- No JSON schema change.
+- No route priority change.
+- No renderer change.
+- No compare metric change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 10 passed
+```
+
 ## Follow-Up Per-Case Action Artifact Resolution
 
 Status: implemented in this branch.

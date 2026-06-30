@@ -188,7 +188,9 @@ are present, the same run summary and artifact index also surface
 see whether the compare portion is matched, recapture-required, or an X3
 failure distribution without drilling into the nested route summary. The wrapper
 prints those same route compare distributions to stdout when they are present,
-so CI logs also show the compare portion without opening uploaded artifacts. It also writes
+so CI logs also show the compare portion without opening uploaded artifacts.
+It also prints the run-level `route_summary.md` path, matching the batch and
+compare CLIs. It also writes
 `case_actions.tsv` for spreadsheet-friendly per-case sorting/filtering by action
 code, domain, source, triage bucket, view-space status, X3 band, and resolved
 handoff artifact. Each `case_actions` JSON row and TSV row includes the
