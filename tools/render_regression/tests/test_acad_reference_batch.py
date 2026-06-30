@@ -246,6 +246,20 @@ def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(t
     assert artifact_index["status"] == "blocked"
     assert artifact_index["error_count"] >= 1
     assert artifact_index["reference_request_validation_status"] == "blocked"
+    assert artifact_index["reference_request_validation_issue_code_counts"] == {
+        "candidate_missing": 1,
+        "candidate_png_sha256_mismatch": 1,
+        "candidate_png_size_mismatch": 1,
+        "duplicate_candidate_id": 1,
+        "duplicate_recommended_output_name": 1,
+        "diagnostic_requested_capture_method": 1,
+        "invalid_requested_expected_size": 1,
+        "source_dxf_missing": 1,
+        "source_dxf_sha256_mismatch": 1,
+        "source_dxf_size_mismatch": 1,
+        "unmatched_requested_view_contract": 1,
+        "unsafe_recommended_output_name": 2,
+    }
     assert "reference_request_validation_markdown" in {item["kind"] for item in artifact_index["artifacts"]}
 
 
@@ -697,6 +711,11 @@ def test_batch_generator_intake_warns_on_low_resolution_or_non_white_png(tmp_pat
     assert artifact_index["status"] == "review"
     assert artifact_index["warning_count"] == 2
     assert artifact_index["reference_intake_status"] == "review"
+    assert artifact_index["reference_request_validation_issue_code_counts"] == {}
+    assert artifact_index["reference_intake_issue_code_counts"] == {
+        "corner_background_not_white": 1,
+        "long_edge_below_requested": 1,
+    }
     issue_codes = {issue["code"] for issue in intake["cases"][0]["issues"]}
     assert issue_codes == {"long_edge_below_requested", "corner_background_not_white"}
     intake_md = (out / "reference_intake.md").read_text(encoding="utf-8")

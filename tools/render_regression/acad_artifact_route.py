@@ -159,6 +159,10 @@ def _route_batch(payload: dict[str, Any]) -> dict[str, Any]:
         "status": status,
         "stage": stage,
         "case_count": payload.get("case_count"),
+        "reference_request_validation_issue_code_counts": (
+            payload.get("reference_request_validation_issue_code_counts") or {}
+        ),
+        "reference_intake_issue_code_counts": payload.get("reference_intake_issue_code_counts") or {},
         "recommended_next_action": action,
     }
 
