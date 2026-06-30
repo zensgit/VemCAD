@@ -899,6 +899,48 @@ python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
 # passed
 ```
 
+## Follow-Up Legacy Batch Compare Optional Report Cleanup
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Prevent `autocad_batch_compare.py` diagnostic reruns against the same
+  `--out-dir` from carrying stale optional reports into a later simpler run.
+- Keep legacy batch-comparison evidence from implying that semantic/tile
+  diagnostics ran when the current invocation did not request them.
+
+Bug reproduced:
+
+- First run uses semantic masks and `--tile-grid`, writing
+  `semantic_summary.*`, `semantic_tile_summary.*`, `tile_summary.*`, and
+  `tile_heatmaps/`.
+- Second run reuses the same `--out-dir` with plain cases and no tile grid.
+- Before this fix, stale optional reports and heatmaps remained on disk.
+
+Changes:
+
+- `autocad_batch_compare.py` now clears known batch outputs and optional
+  artifact directories before each run.
+- A regression test now proves a semantic/tile run followed by a plain run
+  leaves no stale semantic or tile reports.
+
+Boundary:
+
+- Legacy diagnostic artifact hygiene only.
+- No renderer change.
+- No X3 scoring change.
+- No compare metric behavior change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_autocad_batch_compare.py -q
+# passed
+```
+
 ## Follow-Up Request-Run Stale Compare Cleanup
 
 Status: implemented in this branch.

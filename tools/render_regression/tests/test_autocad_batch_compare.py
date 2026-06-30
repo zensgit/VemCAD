@@ -279,3 +279,64 @@ def test_batch_semantic_tile_grid_reports_class_locality(tmp_path):
     assert "candidate_precision" in (
         out / "semantic_tile_summary.tsv"
     ).read_text(encoding="utf-8").splitlines()[0]
+
+
+def test_batch_compare_clears_stale_optional_reports_on_plain_rerun(tmp_path):
+    acad = _framed(tmp_path / "acad.png", (400, 300), [20, 20, 380, 280])
+    ours = _framed(tmp_path / "ours.png", (400, 300), [20, 20, 380, 280])
+
+    mask = tmp_path / "semantic_mask.png"
+    sem = Image.new("RGB", (400, 300), (0, 0, 0))
+    sd = ImageDraw.Draw(sem)
+    sd.rectangle([20, 20, 380, 280], outline=(31, 119, 180), width=3)
+    sem.save(mask)
+
+    report = tmp_path / "render_report.json"
+    report.write_text(json.dumps({
+        "semantic_classes": {
+            "schema": "vemcad.render_semantic_classes",
+            "schema_version": "0.1",
+            "mask_kind": "candidate-renderer-semantic-class-buffer",
+            "reference_semantics": "unknown",
+            "palette": [
+                {"name": "geometry", "rgb": "#1F77B4"},
+            ],
+        }
+    }), encoding="utf-8")
+
+    rich_cases = tmp_path / "rich_cases.json"
+    rich_cases.write_text(json.dumps([{
+        "id": "Gx",
+        "acad": acad,
+        "ours": ours,
+        "semantic_mask": str(mask),
+        "semantic_report": str(report),
+    }]), encoding="utf-8")
+    plain_cases = tmp_path / "plain_cases.json"
+    plain_cases.write_text(json.dumps([{"id": "Gx", "acad": acad, "ours": ours}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--cases", str(rich_cases),
+        "--out-dir", str(out),
+        "--tile-grid", "2x2",
+    ]) == 0
+    assert (out / "semantic_summary.json").is_file()
+    assert (out / "semantic_tile_summary.json").is_file()
+    assert (out / "tile_summary.json").is_file()
+    assert any((out / "tile_heatmaps").glob("*"))
+
+    assert batch.main(["--cases", str(plain_cases), "--out-dir", str(out)]) == 0
+
+    summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
+    row = summary["rows"][0]
+    assert "semantic" not in row
+    assert "tile_report" not in row
+    assert "semantic_tile_report" not in row
+    assert not (out / "semantic_summary.json").exists()
+    assert not (out / "semantic_summary.tsv").exists()
+    assert not (out / "semantic_tile_summary.json").exists()
+    assert not (out / "semantic_tile_summary.tsv").exists()
+    assert not (out / "tile_summary.json").exists()
+    assert not (out / "tile_summary.tsv").exists()
+    assert not (out / "tile_heatmaps").exists()
