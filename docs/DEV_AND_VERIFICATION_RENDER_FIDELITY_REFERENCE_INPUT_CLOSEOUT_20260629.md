@@ -3981,3 +3981,42 @@ python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
 python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
+
+## Follow-Up Compare Distribution Guard README
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep the operator-facing render-regression README aligned with the
+  compare-distribution route guards.
+- Avoid hiding the new fail-closed guard syntax only in `--help` output or this
+  closeout ledger.
+
+Changes:
+
+- `tools/render_regression/README.md` now documents:
+  - `--require-triage-bucket` / `--forbid-triage-bucket`;
+  - `--require-viewspace-status` / `--forbid-viewspace-status`;
+  - `--require-x3-band` / `--forbid-x3-band`.
+- The README includes examples for:
+  - failing closed on any nested `viewspace_status_counts.mismatch`;
+  - asserting a matched renderer-candidate distribution exactly.
+
+Boundary:
+
+- Documentation only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```

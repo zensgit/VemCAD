@@ -339,6 +339,35 @@ route step must fail closed on specific request/intake issue classes. These
 guards inspect only routed request/intake issue-code counts; they do not parse
 action codes or triage buckets.
 
+Use compare-distribution guards when a workflow needs to assert the compare
+portion itself, even if a higher-priority input route controls the top-level
+recommendation:
+
+- `--require-triage-bucket <bucket=count>` /
+  `--forbid-triage-bucket <bucket>`;
+- `--require-viewspace-status <status=count>` /
+  `--forbid-viewspace-status <status>`;
+- `--require-x3-band <band=count>` / `--forbid-x3-band <band>`.
+
+For example, this fails closed if any nested compare route still has a
+view-space mismatch, even when the top-level action is an input repair:
+
+```bash
+python3 tools/render_regression/acad_artifact_route.py <run-dir> \
+  --recursive \
+  --forbid-viewspace-status mismatch
+```
+
+And this asserts a matched renderer-candidate distribution exactly:
+
+```bash
+python3 tools/render_regression/acad_artifact_route.py <run-dir> \
+  --recursive \
+  --require-triage-bucket renderer-candidate=1 \
+  --require-viewspace-status match=1 \
+  --require-x3-band fail=1
+```
+
 To assert source artifact boundaries as part of the same route step, repeat
 `--require-source-boundary key=value`. For example, this guarantees every
 routed source artifact explicitly says it is not an AutoCAD-equivalence claim:
