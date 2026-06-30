@@ -1346,6 +1346,17 @@ def _write_reference_intake_report(
                     f"{expected_size_dims[0]}x{expected_size_dims[1]}"
                 ),
             })
+        rejected_sha = _str(request.get("current_acad_png_sha256"))
+        returned_sha = _str(inspection.get("sha256"))
+        if rejected_sha and returned_sha and returned_sha == rejected_sha:
+            row_issues.append({
+                "severity": "error",
+                "code": "returned_png_matches_rejected_reference",
+                "message": (
+                    "returned AutoCAD PNG is byte-identical to the rejected current_acad_png; "
+                    "provide a fresh model-extents export or an explicit verified world window"
+                ),
+            })
         candidate = candidates.get(case_id)
         candidate_png = None
         if candidate is not None:

@@ -285,9 +285,14 @@ handoff safe for unusual drawing IDs or output paths.
 The manifest-compare summary and generated recapture request tables use the
 same safe Markdown table/code-cell formatting for case IDs, drawing IDs, and
 requested output names.
-Generated recapture request Markdown also surfaces the source DXF and candidate
-PNG SHA256 values already stored in `reference_request.json`, so handoffs can
-verify identity without opening the JSON first.
+Generated recapture request Markdown also surfaces the current rejected AutoCAD
+PNG, source DXF, and candidate PNG SHA256 values stored in
+`reference_request.json`, so handoffs can verify identity without opening the
+JSON first. When a returned PNG is byte-identical to the rejected
+`current_acad_png_sha256`, returned-reference intake fails closed with
+`returned_png_matches_rejected_reference`; this prevents accidentally rerunning
+the same chrome-cropped or stale AutoCAD reference as if it were a fresh
+model-extents export.
 It also shows the current view-space status, current X3 band, and requested
 expected size for each recapture case, so the handoff explains why a fresh
 AutoCAD export is needed and what size contract it should satisfy.

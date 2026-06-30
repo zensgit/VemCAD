@@ -524,6 +524,65 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
     ]) == 0
 
 
+def test_batch_generator_blocks_reusing_rejected_reference_png(tmp_path):
+    source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
+    _png(tmp_path / "ours" / "G11.png", (760, 570), box=[20, 15, 740, 555])
+    rejected = Path(_png(
+        tmp_path / "returned" / "G11_autocad_model_extents.png",
+        (1600, 1131),
+        box=[40, 30, 1560, 1100],
+    ))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "reason": "recapture-required",
+        "case_count": 1,
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "source_dxf_sha256": _sha256(source),
+            "current_acad_png_sha256": _sha256(rejected),
+            "current_acad_png_size_bytes": rejected.stat().st_size,
+            "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_capture_method": "plot-export",
+            "requested_view_contract": "model-extents",
+            "requested_expected_size": {"width": 1600, "height": 1131},
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{
+        "id": "G11",
+        "ours": "ours/G11.png",
+        "diagnostics": {"window_source": "content_bbox"},
+    }]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--out-dir", str(out),
+    ]) == 2
+
+    intake = json.loads((out / "reference_intake.json").read_text(encoding="utf-8"))
+    assert intake["status"] == "blocked"
+    assert intake["error_count"] == 1
+    assert intake["issue_code_counts"] == {"returned_png_matches_rejected_reference": 1}
+    assert intake["cases"][0]["issues"] == [{
+        "severity": "error",
+        "code": "returned_png_matches_rejected_reference",
+        "message": (
+            "returned AutoCAD PNG is byte-identical to the rejected current_acad_png; "
+            "provide a fresh model-extents export or an explicit verified world window"
+        ),
+    }]
+    intake_md = (out / "reference_intake.md").read_text(encoding="utf-8")
+    assert "returned_png_matches_rejected_reference" in intake_md
+    intake_tsv = (out / "reference_intake.tsv").read_text(encoding="utf-8")
+    assert "returned_png_matches_rejected_reference" in intake_tsv
+
+
 def test_batch_generator_escapes_reference_intake_markdown_table_cells(tmp_path):
     source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
     _png(tmp_path / "ours" / "G11.png", (760, 570), box=[20, 15, 740, 555])
