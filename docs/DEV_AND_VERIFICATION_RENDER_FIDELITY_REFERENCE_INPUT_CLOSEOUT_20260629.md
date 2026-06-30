@@ -3695,3 +3695,39 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
+
+## Follow-Up Request-Run Case Action Count Visibility
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep `run_summary.md` as specific as `run_summary.json` and CLI stdout.
+- Let operators see the exact next-action distribution from Markdown without
+  opening JSON or TSV artifacts.
+
+Changes:
+
+- `run_summary.md` now prints `case_action_counts` beside
+  `case_action_domain_counts`.
+- Regression coverage proves:
+  - pass runs show `review-x3-pass=1`;
+  - returned-reference input errors show `fix-returned-reference-input=1`.
+
+Boundary:
+
+- Operator Markdown visibility only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```

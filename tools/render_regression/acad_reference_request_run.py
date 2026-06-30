@@ -407,6 +407,7 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- recommended_next_action: `{next_action['code']}`",
         f"- recommended_next_action_domain: `{next_action['domain']}`",
         f"- recommended_next_action_message: {next_action['message']}",
+        f"- case_action_counts: `{_format_case_action_counts(summary['case_action_counts'])}`",
         f"- case_action_domain_counts: `{_format_case_action_counts(summary['case_action_domain_counts'])}`",
     ]
     if summary.get("route_count") is not None:
