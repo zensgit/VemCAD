@@ -353,6 +353,45 @@ python3 -m pytest tools/render_regression/tests -q
 # 98 passed
 ```
 
+## Follow-Up Blank Returned Reference Advisory
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Prevent a white, correctly sized, but blank returned AutoCAD PNG from passing
+  intake quietly.
+- Keep the finding as input-quality review, not renderer evidence.
+
+Changes:
+
+- `inspection.identity_advisory.returned_ink.status=blank` now adds a warning:
+  `returned_reference_blank`.
+- The warning moves returned-reference intake to `status=review`, which routes
+  the one-command run to `inspect-returned-reference-warnings` before trusting
+  any X3 conclusion.
+- The candidate ink profile remains recorded for context, but this warning is
+  specifically about the returned AutoCAD reference being unusable as
+  ground-truth evidence.
+
+Boundary:
+
+- Returned-reference intake preflight only.
+- Diagnostic warning, not an AutoCAD-equivalence gate.
+- No renderer change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Request Package Validation
 
 Status: implemented in this branch.

@@ -251,8 +251,8 @@ def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(t
 
 def test_batch_generator_fulfills_reference_request(tmp_path):
     source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
-    _png(tmp_path / "ours" / "G11.png", (760, 570))
-    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1600, 1131))
+    _png(tmp_path / "ours" / "G11.png", (760, 570), box=[20, 15, 740, 555])
+    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1600, 1131), box=[40, 30, 1560, 1100])
     request = tmp_path / "reference_request.json"
     request.write_text(json.dumps({
         "schema": "vemcad.acad_reference_request/v1",
@@ -384,8 +384,8 @@ def test_batch_generator_validation_blocks_unmatched_capture_contract_before_cap
 
 def test_batch_generator_blocks_request_when_source_dxf_provenance_drifts(tmp_path):
     _dxf(tmp_path / "dxf" / "G11.dxf")
-    _png(tmp_path / "ours" / "G11.png", (760, 570))
-    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1600, 1131))
+    _png(tmp_path / "ours" / "G11.png", (760, 570), box=[20, 15, 740, 555])
+    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1600, 1131), box=[40, 30, 1560, 1100])
     request = tmp_path / "reference_request.json"
     request.write_text(json.dumps({
         "schema": "vemcad.acad_reference_request/v1",
@@ -420,8 +420,8 @@ def test_batch_generator_blocks_request_when_source_dxf_provenance_drifts(tmp_pa
 
 def test_batch_generator_blocks_request_when_candidate_png_provenance_drifts(tmp_path):
     _dxf(tmp_path / "dxf" / "G11.dxf")
-    _png(tmp_path / "ours" / "G11.png", (760, 570))
-    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1600, 1131))
+    _png(tmp_path / "ours" / "G11.png", (760, 570), box=[20, 15, 740, 555])
+    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1600, 1131), box=[40, 30, 1560, 1100])
     request = tmp_path / "reference_request.json"
     request.write_text(json.dumps({
         "schema": "vemcad.acad_reference_request/v1",
@@ -569,7 +569,7 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path, capsys):
 
 def test_batch_generator_clears_stale_missing_reports_on_successful_rerun(tmp_path):
     _dxf(tmp_path / "dxf" / "G11.dxf")
-    _png(tmp_path / "ours" / "G11.png", (760, 570))
+    _png(tmp_path / "ours" / "G11.png", (760, 570), box=[20, 15, 740, 555])
     request = tmp_path / "reference_request.json"
     request.write_text(json.dumps({
         "schema": "vemcad.acad_reference_request/v1",
@@ -593,7 +593,7 @@ def test_batch_generator_clears_stale_missing_reports_on_successful_rerun(tmp_pa
     assert (out / "missing_references.md").is_file()
     assert (out / "missing_references.tsv").is_file()
 
-    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1600, 1131))
+    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1600, 1131), box=[40, 30, 1560, 1100])
     assert batch.main([
         "--from-request", str(request),
         "--candidate-cases", str(candidates),
@@ -737,3 +737,41 @@ def test_batch_generator_intake_warns_on_candidate_returned_ink_aspect_divergenc
     advisory = row["inspection"]["identity_advisory"]
     assert advisory["diagnostic_only"] is True
     assert advisory["ink_bbox_aspect_delta"] > 0.25
+
+
+def test_batch_generator_intake_warns_on_blank_returned_reference(tmp_path):
+    _dxf(tmp_path / "dxf" / "G11.dxf")
+    _png(tmp_path / "ours" / "G11.png", (1600, 1131), box=[40, 30, 1560, 1100])
+    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1600, 1131))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "recommended_output_name": "G11_autocad_model_extents.png",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--out-dir", str(out),
+    ]) == 0
+
+    intake = json.loads((out / "reference_intake.json").read_text(encoding="utf-8"))
+    assert intake["status"] == "review"
+    assert intake["warning_count"] == 1
+    row = intake["cases"][0]
+    assert row["issues"][0]["code"] == "returned_reference_blank"
+    advisory = row["inspection"]["identity_advisory"]
+    assert advisory["diagnostic_only"] is True
+    assert advisory["returned_ink"]["status"] == "blank"
+    assert advisory["candidate_ink"]["status"] == "available"
+    intake_md = (out / "reference_intake.md").read_text(encoding="utf-8")
+    assert "warning:returned_reference_blank" in intake_md
