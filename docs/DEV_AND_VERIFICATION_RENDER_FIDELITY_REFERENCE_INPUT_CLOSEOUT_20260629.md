@@ -3582,3 +3582,37 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 python3 -m pytest tools/render_regression/tests -q
 # 101 passed
 ```
+
+## Follow-Up Render Regression README Test Count Drift
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep the operator README from hard-coding a stale render-regression test
+  count.
+- Make the pytest command itself the authoritative verification instruction as
+  evidence/operator hardening slices continue to add tests.
+
+Changes:
+
+- `tools/render_regression/README.md` now says to run
+  `python3 -m pytest tools/render_regression/tests -q` and trust pytest's live
+  output for the test count.
+- The note still preserves the important operator property: the suite uses
+  synthetic images and does not require `render_cli`.
+
+Boundary:
+
+- Documentation-only drift repair.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests -q
+# 169 passed
+```

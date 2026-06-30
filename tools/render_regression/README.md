@@ -399,5 +399,6 @@ candidate-renderer semantic classes emitted by `render_cli` (for example
 so the values are candidate-class overlap with AutoCAD ink, not true
 reference-vs-candidate semantic IoU.
 
-测试：`python3 -m pytest tools/render_regression/tests -q`（58 tests，合成图，
-无需 render_cli）。
+测试：`python3 -m pytest tools/render_regression/tests -q`。测试数量随
+evidence/operator hardening 增长，以 pytest 输出为准；这些测试使用合成图，
+无需 render_cli。
