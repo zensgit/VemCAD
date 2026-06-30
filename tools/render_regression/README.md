@@ -203,6 +203,17 @@ values into `summary.json`, `summary.tsv`, `summary.md`, and the compare
 artifact index counts. A `viewspace_mismatch` case therefore remains an
 `input` domain case even when its raw X3 pixels look bad.
 
+These operator-facing tools are safe to rerun against the same generated
+`--out-dir`; they clear their own known generated outputs before writing the new
+run. `acad_manifest_compare.py` clears compare summaries, contact sheets,
+reference requests, overlays, viewspace, semantic, and text diagnostics.
+`acad_reference_request_run.py` clears run-level reports and the stale
+`compare/` directory while leaving `input/` ownership to
+`acad_reference_batch.py`, which clears and rewrites its own batch artifacts.
+The legacy `autocad_batch_compare.py` clears its summaries, contact sheets, and
+optional semantic/tile output directories. Do not place hand-authored files
+inside these generated output directories if they need to survive a rerun.
+
 `artifact_index.json` 与 `route_summary.json/md` 都是机器可读的操作入口：
 
 - artifact indexes carry `boundary` metadata (`renders_dxf`,
