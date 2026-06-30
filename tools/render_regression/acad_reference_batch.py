@@ -43,6 +43,16 @@ def _file_provenance(path: Path) -> dict[str, Any]:
     }
 
 
+def _read_json(path: Path) -> dict[str, Any]:
+    if not path.is_file():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
 def _near_white(rgb: tuple[int, int, int]) -> bool:
     return min(rgb) >= 245 and (max(rgb) - min(rgb)) <= 10
 
@@ -804,18 +814,81 @@ def _clear_batch_outputs(out_dir: Path) -> None:
             path.unlink()
 
 
-def _write_batch_artifact_index(out_dir: Path) -> Path | None:
+def _write_batch_artifact_index(out_dir: Path, validation: dict[str, Any] | None = None) -> Path | None:
     artifacts = _existing_batch_artifacts(out_dir)
     if not artifacts:
         return None
     path = out_dir / "artifact_index.json"
+    metadata = _batch_index_metadata(out_dir, batch_validation=validation)
     payload = {
         "schema": BATCH_ARTIFACT_INDEX_SCHEMA,
+        **metadata,
         "count": len(artifacts),
         "artifacts": artifacts,
     }
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return path
+
+
+def _batch_index_metadata(out_dir: Path, batch_validation: dict[str, Any] | None = None) -> dict[str, Any]:
+    request_validation = _read_json(out_dir / "reference_request_validation.json")
+    intake = _read_json(out_dir / "reference_intake.json")
+    missing = _read_json(out_dir / "missing_references.json")
+    manifest = _read_json(out_dir / "acad_manifest.json")
+
+    metadata: dict[str, Any] = {
+        "stage": "",
+        "status": "",
+        "case_count": None,
+        "error_count": None,
+        "warning_count": None,
+    }
+    if request_validation:
+        metadata.update({
+            "stage": "request_validation",
+            "status": str(request_validation.get("status") or ""),
+            "case_count": request_validation.get("case_count"),
+            "error_count": request_validation.get("error_count"),
+            "warning_count": request_validation.get("warning_count"),
+            "reference_request_validation_status": str(request_validation.get("status") or ""),
+        })
+    if missing:
+        metadata.update({
+            "stage": "missing_references",
+            "status": "blocked",
+            "case_count": missing.get("missing_count"),
+            "error_count": missing.get("missing_count"),
+            "warning_count": 0,
+            "missing_count": missing.get("missing_count"),
+        })
+    if intake:
+        metadata.update({
+            "stage": "reference_intake",
+            "status": str(intake.get("status") or ""),
+            "case_count": intake.get("case_count"),
+            "error_count": intake.get("error_count"),
+            "warning_count": intake.get("warning_count"),
+            "reference_intake_status": str(intake.get("status") or ""),
+        })
+    if not request_validation and not missing and not intake and manifest:
+        metadata.update({
+            "stage": "manifest",
+            "status": "pass",
+            "case_count": len(manifest.get("cases") or []),
+            "error_count": 0,
+            "warning_count": 0,
+        })
+    if batch_validation:
+        batch_status = str(batch_validation.get("status") or "")
+        metadata["batch_validation_status"] = batch_status
+        if batch_status != "pass":
+            metadata.update({
+                "status": batch_status,
+                "case_count": batch_validation.get("case_count"),
+                "error_count": sum(1 for issue in batch_validation.get("issues") or [] if issue.get("severity") == "error"),
+                "warning_count": sum(1 for issue in batch_validation.get("issues") or [] if issue.get("severity") == "warning"),
+            })
+    return metadata
 
 
 def _write_reference_intake_report(
@@ -1005,7 +1078,7 @@ def main(argv: list[str] | None = None) -> int:
                 candidate_cases=args.candidate_cases,
                 case_ids=set(args.case_id or []) or None,
             )
-            index_path = _write_batch_artifact_index(args.out_dir)
+            index_path = _write_batch_artifact_index(args.out_dir, validation=validation)
             print(f"AutoCAD reference request validation: {validation['status']} ({validation['case_count']} cases)")
             print(f"  validation     : {args.out_dir / 'reference_request_validation.json'}")
             if index_path is not None:
@@ -1033,7 +1106,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  artifact index : {index_path}", file=sys.stderr)
         return 2
 
-    index_path = _write_batch_artifact_index(args.out_dir)
+    index_path = _write_batch_artifact_index(args.out_dir, validation=validation)
     print(f"AutoCAD reference batch: {validation['status']} ({validation['case_count']} cases)")
     print(f"  manifest       : {manifest_path}")
     print(f"  candidate cases: {candidates_path}")

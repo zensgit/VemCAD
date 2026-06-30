@@ -74,6 +74,11 @@ def test_batch_generator_writes_manifest_and_candidates(tmp_path):
     assert candidates[1]["render_image"] == "ghcr.io/zensgit/vemcad-render:main"
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["schema"] == "vemcad.acad_reference_batch_artifact_index/v1"
+    assert artifact_index["stage"] == "manifest"
+    assert artifact_index["status"] == "pass"
+    assert artifact_index["case_count"] == 2
+    assert artifact_index["error_count"] == 0
+    assert artifact_index["warning_count"] == 0
     assert {item["kind"] for item in artifact_index["artifacts"]} == {
         "acad_manifest",
         "candidate_cases",
@@ -135,6 +140,12 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
     assert "AutoCAD Reference Request Validation" in validation_md
     assert "G11_autocad_model_extents.png" in validation_md
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert artifact_index["stage"] == "request_validation"
+    assert artifact_index["status"] == "pass"
+    assert artifact_index["case_count"] == 1
+    assert artifact_index["error_count"] == 0
+    assert artifact_index["warning_count"] == 0
+    assert artifact_index["reference_request_validation_status"] == "pass"
     assert {item["kind"] for item in artifact_index["artifacts"]} == {
         "reference_request_validation_json",
         "reference_request_validation_markdown",
@@ -196,6 +207,10 @@ def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(t
         "candidate_missing",
     } <= issue_codes
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert artifact_index["stage"] == "request_validation"
+    assert artifact_index["status"] == "blocked"
+    assert artifact_index["error_count"] >= 1
+    assert artifact_index["reference_request_validation_status"] == "blocked"
     assert "reference_request_validation_markdown" in {item["kind"] for item in artifact_index["artifacts"]}
 
 
@@ -255,6 +270,13 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
     assert "AutoCAD Reference Intake Preflight" in intake_md
     assert "G11_autocad_model_extents.png" in intake_md
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert artifact_index["stage"] == "reference_intake"
+    assert artifact_index["status"] == "pass"
+    assert artifact_index["case_count"] == 1
+    assert artifact_index["error_count"] == 0
+    assert artifact_index["warning_count"] == 0
+    assert artifact_index["reference_request_validation_status"] == "pass"
+    assert artifact_index["reference_intake_status"] == "pass"
     assert {item["kind"] for item in artifact_index["artifacts"]} == {
         "acad_manifest",
         "candidate_cases",
@@ -302,6 +324,9 @@ def test_batch_generator_blocks_request_when_source_dxf_provenance_drifts(tmp_pa
     validation = json.loads((out / "reference_request_validation.json").read_text(encoding="utf-8"))
     assert validation["status"] == "blocked"
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert artifact_index["stage"] == "request_validation"
+    assert artifact_index["status"] == "blocked"
+    assert artifact_index["reference_request_validation_status"] == "blocked"
     assert "reference_request_validation_json" in {item["kind"] for item in artifact_index["artifacts"]}
 
 
@@ -360,6 +385,10 @@ def test_batch_generator_blocks_returned_png_size_mismatch_when_request_declares
     manifest = json.loads((out / "acad_manifest.json").read_text(encoding="utf-8"))
     assert manifest["cases"][0]["expected_size"] == {"width": 1600, "height": 1131}
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert artifact_index["stage"] == "reference_intake"
+    assert artifact_index["status"] == "blocked"
+    assert artifact_index["batch_validation_status"] == "blocked"
+    assert artifact_index["reference_intake_status"] == "review"
     assert {item["kind"] for item in artifact_index["artifacts"]} >= {
         "acad_manifest",
         "candidate_cases",
@@ -403,6 +432,11 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path):
     assert "Missing AutoCAD Reference PNGs" in missing_md
     assert "G11_autocad_model_extents.png" in missing_md
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert artifact_index["stage"] == "missing_references"
+    assert artifact_index["status"] == "blocked"
+    assert artifact_index["case_count"] == 1
+    assert artifact_index["missing_count"] == 1
+    assert artifact_index["reference_request_validation_status"] == "pass"
     assert {item["kind"] for item in artifact_index["artifacts"]} == {
         "missing_references_json",
         "missing_references_markdown",
@@ -447,6 +481,8 @@ def test_batch_generator_clears_stale_missing_reports_on_successful_rerun(tmp_pa
     assert not (out / "missing_references.json").exists()
     assert not (out / "missing_references.md").exists()
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert artifact_index["stage"] == "reference_intake"
+    assert artifact_index["status"] == "pass"
     assert "missing_references_markdown" not in {item["kind"] for item in artifact_index["artifacts"]}
 
 
@@ -531,6 +567,11 @@ def test_batch_generator_intake_warns_on_low_resolution_or_non_white_png(tmp_pat
     intake = json.loads((out / "reference_intake.json").read_text(encoding="utf-8"))
     assert intake["status"] == "review"
     assert intake["warning_count"] == 2
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert artifact_index["stage"] == "reference_intake"
+    assert artifact_index["status"] == "review"
+    assert artifact_index["warning_count"] == 2
+    assert artifact_index["reference_intake_status"] == "review"
     issue_codes = {issue["code"] for issue in intake["cases"][0]["issues"]}
     assert issue_codes == {"long_edge_below_requested", "corner_background_not_white"}
     intake_md = (out / "reference_intake.md").read_text(encoding="utf-8")
