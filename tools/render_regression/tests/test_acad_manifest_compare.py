@@ -371,6 +371,8 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert request_md.count("--require-request-boundary requires_viewspace_match=true") == 3
     assert f"--candidate-cases {candidates}" in request_md
     assert "viewspace_mismatch` still exits `2`" in request_md
+    assert _sha256(dxf) in request_md
+    assert _sha256(ours) in request_md
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert {item["kind"] for item in artifact_index["artifacts"]} >= {
         "reference_request_json",
@@ -419,7 +421,7 @@ def test_manifest_harness_escapes_markdown_table_cells(tmp_path):
     request_row = next(line for line in request_md.splitlines() if "G11\\|bearing cap" in line)
     assert "`G\\|11`" in request_row
     assert "`G_11_autocad_model_extents.png`" in request_row
-    assert _unescaped_pipe_count(request_row) == 6
+    assert _unescaped_pipe_count(request_row) == 8
 
 
 def test_manifest_harness_stops_on_blocked_manifest(tmp_path, capsys):

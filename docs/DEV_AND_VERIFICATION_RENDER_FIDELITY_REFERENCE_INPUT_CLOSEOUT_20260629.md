@@ -4532,3 +4532,45 @@ Verification:
 python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
 # passed
 ```
+
+## Follow-Up Recapture Request Markdown Provenance Columns
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Surface the source/candidate identity evidence already present in
+  `reference_request.json` directly in the operator-facing recapture request
+  Markdown.
+- Let handoffs verify the source DXF and candidate PNG provenance without
+  opening JSON first.
+
+Changes:
+
+- `acad_manifest_compare.py` now adds `Source SHA256` and `Candidate SHA256`
+  columns to generated `reference_request.md`.
+- The values are sourced from the existing `source_dxf_sha256` and
+  `candidate_png_sha256` fields already written to each request case.
+- Regression coverage asserts the generated Markdown includes both hashes in
+  the normal `viewspace_mismatch` request path.
+- The Markdown escaping regression was updated for the wider recapture request
+  table.
+- `tools/render_regression/README.md` now documents that the recapture request
+  Markdown surfaces these provenance values.
+
+Boundary:
+
+- Operator evidence surfacing only.
+- `reference_request.json` schema/content is unchanged.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# passed
+```
