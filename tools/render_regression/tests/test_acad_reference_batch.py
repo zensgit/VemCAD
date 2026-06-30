@@ -80,6 +80,14 @@ def test_batch_generator_writes_manifest_and_candidates(tmp_path, capsys):
     assert candidates[1]["render_image"] == "ghcr.io/zensgit/vemcad-render:main"
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["schema"] == "vemcad.acad_reference_batch_artifact_index/v1"
+    assert artifact_index["boundary"] == {
+        "renders_dxf": False,
+        "compares_renders": False,
+        "changes_x3_scoring": False,
+        "changes_renderer": False,
+        "requires_viewspace_match": False,
+        "autocad_equivalence_claim": False,
+    }
     assert artifact_index["stage"] == "manifest"
     assert artifact_index["status"] == "pass"
     assert artifact_index["case_count"] == 2
@@ -295,6 +303,8 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
     assert "AutoCAD Reference Intake Preflight" in intake_md
     assert "G11_autocad_model_extents.png" in intake_md
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert artifact_index["boundary"]["compares_renders"] is False
+    assert artifact_index["boundary"]["autocad_equivalence_claim"] is False
     assert artifact_index["stage"] == "reference_intake"
     assert artifact_index["status"] == "pass"
     assert artifact_index["case_count"] == 1

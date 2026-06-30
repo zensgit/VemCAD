@@ -32,6 +32,18 @@ import text_provenance_diagnostics as tpd  # noqa: E402
 SCHEMA = "vemcad.acad_manifest_compare/v1"
 
 
+def _artifact_index_boundary(report: dict[str, Any] | None) -> dict[str, bool]:
+    compared_count = int((report or {}).get("compared_count") or 0)
+    return {
+        "renders_dxf": False,
+        "compares_renders": compared_count > 0,
+        "changes_x3_scoring": False,
+        "changes_renderer": False,
+        "requires_viewspace_match": True,
+        "autocad_equivalence_claim": False,
+    }
+
+
 def _str(value: Any) -> str:
     if value is None:
         return ""
@@ -300,6 +312,7 @@ def _artifact_index(
             artifacts.append({"id": row["id"], "kind": "text_provenance_summary", "path": str(text_summary)})
     payload: dict[str, Any] = {
         "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "boundary": _artifact_index_boundary(report),
         "count": len(artifacts),
         "artifacts": artifacts,
     }

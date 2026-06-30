@@ -20,6 +20,14 @@ import acad_artifact_route as artifact_route  # noqa: E402
 INTAKE_SCHEMA = "vemcad.acad_reference_intake/v1"
 BATCH_ARTIFACT_INDEX_SCHEMA = "vemcad.acad_reference_batch_artifact_index/v1"
 REQUEST_VALIDATION_SCHEMA = "vemcad.acad_reference_request_validation/v1"
+BATCH_ARTIFACT_BOUNDARY = {
+    "renders_dxf": False,
+    "compares_renders": False,
+    "changes_x3_scoring": False,
+    "changes_renderer": False,
+    "requires_viewspace_match": False,
+    "autocad_equivalence_claim": False,
+}
 
 
 def _str(value: Any) -> str:
@@ -870,6 +878,7 @@ def _write_batch_artifact_index(out_dir: Path, validation: dict[str, Any] | None
     metadata = _batch_index_metadata(out_dir, batch_validation=validation)
     payload = {
         "schema": BATCH_ARTIFACT_INDEX_SCHEMA,
+        "boundary": dict(BATCH_ARTIFACT_BOUNDARY),
         **metadata,
         "count": len(artifacts),
         "artifacts": artifacts,

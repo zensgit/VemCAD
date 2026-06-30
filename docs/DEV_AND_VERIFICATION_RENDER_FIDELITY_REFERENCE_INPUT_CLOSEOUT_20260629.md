@@ -1512,6 +1512,53 @@ python3 -m pytest tools/render_regression/tests -q
 # 115 passed
 ```
 
+## Follow-Up Artifact Index Boundary
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make the primary `artifact_index.json` files self-describing before a route
+  report is opened.
+- Let CI/artifact consumers distinguish input-prep indexes, compare indexes,
+  and one-command run indexes without inferring whether they rendered DXFs,
+  compared images, changed scoring, or claimed AutoCAD equivalence.
+
+Changes:
+
+- Batch artifact indexes now include a `boundary` object with:
+  `renders_dxf=false`, `compares_renders=false`, `changes_x3_scoring=false`,
+  `changes_renderer=false`, `requires_viewspace_match=false`, and
+  `autocad_equivalence_claim=false`.
+- Compare artifact indexes now include a `boundary` object with:
+  `renders_dxf=false`, `changes_x3_scoring=false`,
+  `changes_renderer=false`, `requires_viewspace_match=true`, and
+  `autocad_equivalence_claim=false`.
+- Compare `compares_renders` is true only when `compared_count > 0`; blocked
+  manifest/input runs do not pretend a comparison occurred.
+- Request-run artifact indexes now include a `boundary` object and set
+  `compares_renders` only when a compare artifact index exists.
+
+Boundary:
+
+- Artifact metadata only.
+- No routing-rule change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py \
+  tools/render_regression/tests/test_acad_manifest_compare.py \
+  tools/render_regression/tests/test_acad_reference_request_run.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 Private compatibility smoke:
 
 ```bash

@@ -153,6 +153,14 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path, capsys):
     assert (out / "contact_sheet.png").stat().st_size > 1000
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["schema"] == "vemcad.acad_manifest_compare_artifact_index/v1"
+    assert artifact_index["boundary"] == {
+        "renders_dxf": False,
+        "compares_renders": True,
+        "changes_x3_scoring": False,
+        "changes_renderer": False,
+        "requires_viewspace_match": True,
+        "autocad_equivalence_claim": False,
+    }
     assert artifact_index["status"] == "pass"
     assert artifact_index["case_count"] == 1
     assert artifact_index["compared_count"] == 1
@@ -307,6 +315,8 @@ def test_manifest_harness_stops_on_blocked_manifest(tmp_path, capsys):
     assert "status: `blocked`" in summary_md
     assert "`diagnostic_capture_method`" in summary_md
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert artifact_index["boundary"]["compares_renders"] is False
+    assert artifact_index["boundary"]["autocad_equivalence_claim"] is False
     assert {item["kind"] for item in artifact_index["artifacts"]} == {
         "summary_json",
         "summary_markdown",
