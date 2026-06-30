@@ -193,6 +193,15 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
     assert artifact_index["error_count"] == 0
     assert artifact_index["warning_count"] == 0
     assert artifact_index["reference_request_validation_status"] == "pass"
+    assert artifact_index["source_request_boundary"] == {
+        "renders_dxf": False,
+        "compares_renders": False,
+        "changes_x3_scoring": False,
+        "changes_renderer": False,
+        "requires_returned_autocad_png": True,
+        "requires_viewspace_match": True,
+        "autocad_equivalence_claim": False,
+    }
     assert {item["kind"] for item in artifact_index["artifacts"]} == {
         "reference_request_validation_json",
         "reference_request_validation_markdown",

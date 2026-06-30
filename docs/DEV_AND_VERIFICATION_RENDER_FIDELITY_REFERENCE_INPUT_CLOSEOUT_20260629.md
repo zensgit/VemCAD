@@ -903,6 +903,45 @@ python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py to
 # 22 passed
 ```
 
+## Follow-Up Source Request Boundary Propagation
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Carry the `reference_request.json` boundary added in the previous slice beyond
+  the validation JSON itself.
+- Let artifact-index and route consumers see whether the original request asked
+  for returned AutoCAD PNGs, required matched-view comparison, and explicitly
+  made no AutoCAD-equivalence claim.
+- Keep recursive route inspection useful even when operators only inspect the
+  generated `artifact_index.json` / `route_summary.*` files.
+
+Changes:
+
+- Batch `artifact_index.json` now includes `source_request_boundary` when
+  `reference_request_validation.json` recorded one.
+- `acad_reference_request_run.py` propagates that boundary into
+  `run_summary.json`, `run_summary.md`, and the run `artifact_index.json`.
+- `acad_artifact_route.py` carries `source_request_boundary` through batch and
+  request-run route payloads and prints it in text/Markdown route reports.
+
+Boundary:
+
+- Metadata/reporting only.
+- No renderer change.
+- No X3 scoring change.
+- No compare behavior change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py tools/render_regression/tests/test_acad_reference_request_run.py tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+```
+
 ## Follow-Up Source Report Issue Code Counts
 
 Status: implemented in this branch.

@@ -90,6 +90,7 @@ def _intake_status(intake_json: Path) -> dict[str, Any]:
             "error_count": None,
             "warning_count": None,
             "issue_code_counts": {},
+            "source_request_boundary": {},
         }
     try:
         payload = json.loads(intake_json.read_text(encoding="utf-8"))
@@ -99,12 +100,17 @@ def _intake_status(intake_json: Path) -> dict[str, Any]:
             "error_count": None,
             "warning_count": None,
             "issue_code_counts": {},
+            "source_request_boundary": {},
         }
+    source_request_boundary = payload.get("source_request_boundary")
     return {
         "status": str(payload.get("status") or ""),
         "error_count": payload.get("error_count"),
         "warning_count": payload.get("warning_count"),
         "issue_code_counts": _issue_code_counts(payload),
+        "source_request_boundary": (
+            dict(source_request_boundary) if isinstance(source_request_boundary, dict) else {}
+        ),
     }
 
 
@@ -361,6 +367,7 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- reference_request_validation_errors: `{summary['reference_request_validation_error_count']}`",
         "- reference_request_validation_issue_codes: "
         f"`{_format_case_action_counts(summary['reference_request_validation_issue_code_counts'])}`",
+        f"- source_request_boundary: `{_format_case_action_counts(summary.get('source_request_boundary') or {})}`",
         f"- reference_intake_status: `{summary['reference_intake_status']}`",
         f"- reference_intake_warnings: `{summary['reference_intake_warning_count']}`",
         f"- reference_intake_issue_codes: `{_format_case_action_counts(summary['reference_intake_issue_code_counts'])}`",
@@ -463,6 +470,7 @@ def _write_run_summary(
         "reference_request_validation_error_count": request_validation["error_count"],
         "reference_request_validation_warning_count": request_validation["warning_count"],
         "reference_request_validation_issue_code_counts": request_validation["issue_code_counts"],
+        "source_request_boundary": request_validation["source_request_boundary"],
         "reference_intake_json": _existing(input_dir / "reference_intake.json"),
         "reference_intake_markdown": _existing(input_dir / "reference_intake.md"),
         "reference_intake_status": intake["status"],
@@ -523,6 +531,7 @@ def _write_run_summary(
         "case_action_counts": payload["case_action_counts"],
         "case_action_domain_counts": payload["case_action_domain_counts"],
         "reference_request_validation_issue_code_counts": payload["reference_request_validation_issue_code_counts"],
+        "source_request_boundary": payload.get("source_request_boundary") or {},
         "reference_intake_issue_code_counts": payload["reference_intake_issue_code_counts"],
         "count": len(artifacts),
         "artifacts": artifacts,
