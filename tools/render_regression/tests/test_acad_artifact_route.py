@@ -342,6 +342,55 @@ def test_cli_require_action_fails_closed_on_unexpected_top_level_action(tmp_path
     assert "action artifact:" in stderr
 
 
+def test_cli_require_action_artifact_passes_for_matching_suffix(tmp_path):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "missing_references",
+        "status": "blocked",
+        "case_count": 1,
+        "artifacts": [
+            {"kind": "missing_references_markdown", "path": str(input_dir / "missing_references.md")},
+        ],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--require-action",
+        "provide-returned-autocad-pngs",
+        "--require-action-domain",
+        "input",
+        "--require-action-artifact",
+        "missing_references.md",
+    ]) == 0
+
+
+def test_cli_require_action_artifact_fails_closed_on_unexpected_artifact(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "missing_references",
+        "status": "blocked",
+        "case_count": 1,
+        "artifacts": [
+            {"kind": "missing_references_markdown", "path": str(input_dir / "missing_references.md")},
+        ],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--require-action-artifact",
+        "reference_intake.md",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "required action artifact 'reference_intake.md'" in stderr
+    assert "missing_references.md" in stderr
+    assert "provide-returned-autocad-pngs" in stderr
+
+
 def test_cli_require_action_domain_passes_for_expected_domain(tmp_path):
     compare_dir = tmp_path / "compare"
     compare_dir.mkdir()

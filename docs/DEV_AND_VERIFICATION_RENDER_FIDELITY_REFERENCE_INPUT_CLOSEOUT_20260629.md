@@ -2047,6 +2047,44 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Route Action Artifact Gate
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let unattended checks assert that the top-level route action points at the
+  expected human-readable handoff artifact.
+- Prevent a green route code/domain check from hiding a missing or wrong action
+  artifact path.
+
+Changes:
+
+- `acad_artifact_route.py` now accepts `--require-action-artifact <path-suffix>`.
+- The check compares against `recommended_next_action.artifact` with
+  slash-normalized suffix matching so absolute CI paths remain stable.
+- Failure output prints the actual action artifact and action code.
+- README documents the combined `--require-action`, `--require-action-domain`,
+  and `--require-action-artifact` guard for missing AutoCAD reference PNGs.
+
+Boundary:
+
+- Route-gate assertion only.
+- No route priority change.
+- No renderer change.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- No private drawing or AutoCAD PNG committed.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up CLI Action Domain Logs
 
 Status: implemented in this branch.

@@ -485,6 +485,14 @@ def _recommended_action_artifact(payload: dict[str, Any]) -> str:
     return str((payload.get("recommended_next_action") or {}).get("artifact") or "")
 
 
+def _artifact_matches(actual: str, expected: str) -> bool:
+    actual_norm = actual.replace("\\", "/")
+    expected_norm = expected.replace("\\", "/").lstrip("/")
+    if not expected_norm:
+        return not actual_norm
+    return actual_norm == expected_norm or actual_norm.endswith(f"/{expected_norm}")
+
+
 def _recommended_action_domain(payload: dict[str, Any]) -> str:
     return _route_action(payload)["domain"]
 
@@ -546,6 +554,11 @@ def main(argv: list[str] | None = None) -> int:
                         help="exit 2 unless the top-level recommended_next_action.code matches this value")
     parser.add_argument("--require-action-domain", default="",
                         help="exit 2 unless the top-level recommended_next_action.domain matches this value")
+    parser.add_argument("--require-action-artifact", default="",
+                        help=(
+                            "exit 2 unless the top-level recommended_next_action.artifact "
+                            "matches or ends with this path"
+                        ))
     parser.add_argument("--require-source-boundary", action="append", default=[],
                         help="exit 2 unless every routed source artifact boundary has key=value; may repeat")
     args = parser.parse_args(argv)
@@ -598,6 +611,16 @@ def main(argv: list[str] | None = None) -> int:
             )
             if artifact:
                 print(f"acad_artifact_route: action artifact: {artifact}", file=sys.stderr)
+            return 2
+    if args.require_action_artifact:
+        actual = _recommended_action_artifact(payload)
+        if not _artifact_matches(actual, args.require_action_artifact):
+            action = _recommended_action_code(payload)
+            print(
+                f"acad_artifact_route: required action artifact {args.require_action_artifact!r} "
+                f"but got {actual!r} for action {action!r}",
+                file=sys.stderr,
+            )
             return 2
     if source_boundary_expectations:
         failures = _check_source_boundary_requirements(payload, source_boundary_expectations)
