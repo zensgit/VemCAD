@@ -194,6 +194,45 @@ def _route_batch_summary(routes: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+_ACTION_PRIORITY = {
+    "fix-request-package": 0,
+    "provide-returned-autocad-pngs": 1,
+    "inspect-returned-reference-warnings": 2,
+    "inspect-renderer-candidate": 3,
+    "recapture-autocad-or-provide-window": 4,
+    "inspect-compare-input-block": 5,
+    "inspect-input-block": 5,
+    "inspect-compare-failure": 5,
+    "inspect-run-summary": 6,
+    "inspect-artifact-index": 6,
+    "inspect-compare-summary": 6,
+    "review-x3-pass": 7,
+    "continue-to-request-run": 8,
+}
+
+
+def _recommended_batch_action(routes: list[dict[str, Any]]) -> dict[str, str]:
+    if not routes:
+        return _action(
+            "inspect-artifact-index",
+            "Inspect artifact indexes before choosing the next action.",
+        )
+    ranked: list[tuple[int, int, dict[str, str]]] = []
+    for index, route in enumerate(routes):
+        action = _route_action(route)
+        code = action["code"] or "inspect-artifact-index"
+        priority = _ACTION_PRIORITY.get(code, 6)
+        ranked.append((priority, index, action))
+    priority, index, action = min(ranked, key=lambda item: (item[0], item[1]))
+    artifact = action.get("artifact") or str(routes[index].get("artifact_index") or "")
+    message = action.get("message") or "Inspect route artifacts before choosing the next action."
+    return {
+        "code": action.get("code") or "inspect-artifact-index",
+        "message": message,
+        "artifact": artifact,
+    }
+
+
 def route_artifact_indexes(paths: list[Path]) -> dict[str, Any]:
     if not paths:
         raise ValueError("at least one artifact index is required")
@@ -202,6 +241,7 @@ def route_artifact_indexes(paths: list[Path]) -> dict[str, Any]:
         "schema": BATCH_SCHEMA,
         "count": len(routes),
         **_route_batch_summary(routes),
+        "recommended_next_action": _recommended_batch_action(routes),
         "routes": routes,
     }
 
@@ -226,12 +266,15 @@ def _write_text(route: dict[str, Any]) -> str:
 
 
 def _write_batch_text(payload: dict[str, Any]) -> str:
+    action = payload.get("recommended_next_action") or {}
     chunks = [
         "\n".join([
             f"route_count: {payload.get('count', 0)}",
             "kind_counts: " + _format_counts(payload.get("kind_counts") or {}),
             "status_counts: " + _format_counts(payload.get("status_counts") or {}),
             "recommended_action_counts: " + _format_counts(payload.get("recommended_action_counts") or {}),
+            f"recommended_next_action: {action.get('code', '')}",
+            f"message: {action.get('message', '')}",
         ])
     ]
     for index, route in enumerate(payload.get("routes") or [], start=1):
@@ -283,6 +326,7 @@ def _write_markdown(payload: dict[str, Any]) -> str:
         "",
     ]
     if payload.get("schema") == BATCH_SCHEMA:
+        action = _route_action(payload)
         lines.extend([
             "## Summary",
             "",
@@ -291,8 +335,17 @@ def _write_markdown(payload: dict[str, Any]) -> str:
             f"- status_counts: `{_format_counts(payload.get('status_counts') or {})}`",
             "- recommended_action_counts: "
             f"`{_format_counts(payload.get('recommended_action_counts') or {})}`",
+            f"- recommended_next_action: `{action['code']}`",
+            f"- message: {action['message']}",
             "",
         ])
+        if action["artifact"]:
+            lines.extend([
+                "## Recommended Action Artifact",
+                "",
+                f"- action_artifact: `{action['artifact']}`",
+                "",
+            ])
         for index, route in enumerate(payload.get("routes") or [], start=1):
             lines.append(_write_markdown_route(route, heading=f"Route {index}"))
             lines.append("")
