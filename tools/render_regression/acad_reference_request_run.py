@@ -36,6 +36,33 @@ def _existing(path: Path) -> str:
     return str(path) if path.is_file() else ""
 
 
+def _md_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip().replace("\r\n", " ").replace("\n", " ").replace("\r", " ").replace("|", "\\|")
+
+
+def _md_table_cell(value: Any) -> str:
+    text = _md_text(value)
+    if not text:
+        return "-"
+    return text.replace("`", "\\`")
+
+
+def _md_code_cell(value: Any) -> str:
+    text = _md_text(value) or "-"
+    longest_backticks = 0
+    current = 0
+    for char in text:
+        if char == "`":
+            current += 1
+            longest_backticks = max(longest_backticks, current)
+        else:
+            current = 0
+    delimiter = "`" * (longest_backticks + 1)
+    return f"{delimiter}{text}{delimiter}"
+
+
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -520,9 +547,9 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
     ):
         value = summary.get(key) or ""
         if value:
-            lines.append(f"- {label}: `{value}`")
+            lines.append(f"- {label}: {_md_code_cell(value)}")
     if next_action.get("artifact"):
-        lines.append(f"- recommended next action artifact: `{next_action['artifact']}`")
+        lines.append(f"- recommended next action artifact: {_md_code_cell(next_action['artifact'])}")
     case_actions = summary.get("case_actions") or []
     if case_actions:
         lines.extend([
@@ -536,10 +563,10 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
             triage = action.get("triage_bucket") or action.get("issue_count") or "-"
             artifact = action.get("artifact") or ""
             lines.append(
-                f"| `{action.get('id', '')}` | {action.get('drawing_id', '')} | "
-                f"`{action.get('code', '')}` | `{action.get('domain', '')}` | "
-                f"`{action.get('source', '')}` | "
-                f"`{triage}` | `{artifact}` |"
+                f"| {_md_code_cell(action.get('id', ''))} | {_md_table_cell(action.get('drawing_id', ''))} | "
+                f"{_md_code_cell(action.get('code', ''))} | {_md_code_cell(action.get('domain', ''))} | "
+                f"{_md_code_cell(action.get('source', ''))} | "
+                f"{_md_code_cell(triage)} | {_md_code_cell(artifact)} |"
             )
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 

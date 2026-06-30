@@ -213,6 +213,9 @@ capture-window issues without opening `reference_intake.json`.
 The request-validation, missing-reference, and intake Markdown tables escape
 operator-supplied cells (`|`, newlines, and code-span edge cases), so drawing
 IDs and output filenames cannot silently corrupt the table shape.
+The one-command request-run Markdown summary applies the same escaping to its
+case-action table and artifact links, keeping the top-level unattended-run
+handoff safe for unusual drawing IDs or output paths.
 The batch, compare, and request-run CLIs also print the recommended action
 domain next to the action code, so CI logs can show the route class without
 opening JSON artifacts.
