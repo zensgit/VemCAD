@@ -4065,3 +4065,40 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
+
+## Follow-Up Request-Run Compare Summary README
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep the operator-facing render-regression README aligned with the
+  request-run compare distribution summary fields.
+- Avoid making operators discover `route_compare_case_count`,
+  `route_triage_bucket_counts`, `route_viewspace_status_counts`, and
+  `route_x3_band_counts` only by reading JSON output or the closeout ledger.
+
+Changes:
+
+- `tools/render_regression/README.md` now states that request-run summaries
+  surface route compare case counts, compared counts, triage bucket counts,
+  viewspace status counts, and X3 band counts when compare artifacts are
+  present.
+
+Boundary:
+
+- Documentation only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```

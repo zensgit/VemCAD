@@ -180,7 +180,12 @@ work before a separate route report is generated. The run summary also surfaces
 route-level `route_count`, `route_kind_counts`, `route_status_counts`,
 `route_recommended_action_counts`, and
 `route_recommended_action_domain_counts`, so operators can inspect the routed
-artifact topology without opening `route_summary.json`. It also writes
+artifact topology without opening `route_summary.json`. When compare artifacts
+are present, the same run summary also surfaces `route_compare_case_count`,
+`route_compared_count`, `route_triage_bucket_counts`,
+`route_viewspace_status_counts`, and `route_x3_band_counts`, so operators can
+see whether the compare portion is matched, recapture-required, or an X3
+failure distribution without drilling into the nested route summary. It also writes
 `case_actions.tsv` for spreadsheet-friendly per-case sorting/filtering by action
 code, domain, source, triage bucket, view-space status, and X3 band.
 When returned AutoCAD PNGs are still missing, `acad_reference_batch.py` writes
