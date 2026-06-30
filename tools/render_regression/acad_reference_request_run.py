@@ -109,6 +109,8 @@ def _run_artifact_index_payload(
         "schema": RUN_ARTIFACT_INDEX_SCHEMA,
         "boundary": _artifact_index_boundary(summary),
         "status": summary["status"],
+        "final_exit_code": summary["final_exit_code"],
+        "fail_on_input_review": summary["fail_on_input_review"],
         "recommended_next_action": summary["recommended_next_action"],
         "case_actions": summary["case_actions"],
         "case_action_counts": summary["case_action_counts"],
@@ -368,6 +370,21 @@ def _write_case_actions_tsv(path: Path, case_actions: list[dict[str, Any]]) -> N
             )
 
 
+def _final_exit_code(
+    summary: dict[str, Any],
+    base_exit_code: int,
+    *,
+    fail_on_input_review: bool,
+) -> int:
+    if (
+        fail_on_input_review
+        and base_exit_code == 0
+        and summary.get("recommended_next_action", {}).get("domain") == "input-review"
+    ):
+        return 2
+    return base_exit_code
+
+
 def _put_case_action(
     actions: dict[str, dict[str, Any]],
     case_id: str,
@@ -520,6 +537,8 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- status: `{summary['status']}`",
         f"- batch_exit_code: `{summary['batch_exit_code']}`",
         f"- compare_exit_code: `{summary['compare_exit_code']}`",
+        f"- final_exit_code: `{summary['final_exit_code']}`",
+        f"- fail_on_input_review: `{summary['fail_on_input_review']}`",
         f"- reference_request_validation_status: `{summary['reference_request_validation_status']}`",
         f"- reference_request_validation_errors: `{summary['reference_request_validation_error_count']}`",
         f"- reference_request_validation_warnings: `{summary['reference_request_validation_warning_count']}`",
@@ -636,6 +655,7 @@ def _write_run_summary(
     compare_dir: Path,
     batch_rc: int,
     compare_rc: int | None,
+    fail_on_input_review: bool = False,
 ) -> dict[str, Any]:
     compare_summary_json = compare_dir / "summary.json"
     compare_status = _compare_status(compare_summary_json)
@@ -685,6 +705,13 @@ def _write_run_summary(
         },
     }
     payload["recommended_next_action"] = _recommended_next_action(payload)
+    base_exit_code = batch_rc if batch_rc != 0 else int(compare_rc if compare_rc is not None else 1)
+    payload["fail_on_input_review"] = bool(fail_on_input_review)
+    payload["final_exit_code"] = _final_exit_code(
+        payload,
+        base_exit_code,
+        fail_on_input_review=fail_on_input_review,
+    )
     payload["case_actions"] = _case_actions(payload)
     payload["case_action_counts"] = _case_action_counts(payload["case_actions"])
     payload["case_action_domain_counts"] = _case_action_domain_counts(payload["case_actions"])
@@ -758,6 +785,8 @@ def _write_run_summary(
 
 def _print_run_summary(summary: dict[str, Any], out_dir: Path) -> None:
     print(f"AutoCAD reference request run: {summary['status']}")
+    print(f"  final exit code: {summary['final_exit_code']}")
+    print(f"  fail on input review: {bool(summary.get('fail_on_input_review'))}")
     print(f"  recommended next action: {summary['recommended_next_action']['code']}")
     print(f"  recommended next action domain: {summary['recommended_next_action']['domain']}")
     if summary["recommended_next_action"].get("artifact"):
@@ -805,21 +834,6 @@ def _print_run_summary(summary: dict[str, Any], out_dir: Path) -> None:
     print(f"  run summary: {out_dir / 'run_summary.md'}")
 
 
-def _final_exit_code(
-    summary: dict[str, Any],
-    compare_rc: int,
-    *,
-    fail_on_input_review: bool,
-) -> int:
-    if (
-        fail_on_input_review
-        and compare_rc == 0
-        and summary.get("recommended_next_action", {}).get("domain") == "input-review"
-    ):
-        return 2
-    return compare_rc
-
-
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="acad_reference_request_run",
@@ -863,6 +877,7 @@ def main(argv: list[str] | None = None) -> int:
             compare_dir=compare_dir,
             batch_rc=batch_rc,
             compare_rc=None,
+            fail_on_input_review=args.fail_on_input_review,
         )
         _print_run_summary(summary, args.out_dir)
         return batch_rc
@@ -878,13 +893,10 @@ def main(argv: list[str] | None = None) -> int:
         compare_dir=compare_dir,
         batch_rc=batch_rc,
         compare_rc=compare_rc,
-    )
-    _print_run_summary(summary, args.out_dir)
-    return _final_exit_code(
-        summary,
-        compare_rc,
         fail_on_input_review=args.fail_on_input_review,
     )
+    _print_run_summary(summary, args.out_dir)
+    return int(summary["final_exit_code"])
 
 
 if __name__ == "__main__":

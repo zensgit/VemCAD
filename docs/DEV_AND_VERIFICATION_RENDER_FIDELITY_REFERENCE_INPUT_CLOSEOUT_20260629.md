@@ -1246,6 +1246,51 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 11 passed
 ```
 
+## Follow-Up Request-Run Final Exit Provenance
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make the `--fail-on-input-review` result explainable from uploaded artifacts,
+  not only from the shell exit status.
+- Avoid confusing unattended runs where `status=pass` and
+  `recommended_next_action.domain=input-review` are correct, but the process
+  exits `2` because the opt-in fail flag was enabled.
+
+Changes:
+
+- `run_summary.json`, the run-level `artifact_index.json`, and
+  `run_summary.md` now include:
+  - `fail_on_input_review`;
+  - `final_exit_code`.
+- `acad_reference_request_run.py` stdout prints both fields.
+- Regression coverage asserts:
+  - normal pass runs record `final_exit_code=0` and
+    `fail_on_input_review=false`;
+  - default input-review runs keep `final_exit_code=0`;
+  - `--fail-on-input-review` input-review runs record `final_exit_code=2`.
+- `tools/render_regression/README.md` documents that the uploaded summary
+  artifacts explain the opt-in failure mode.
+
+Boundary:
+
+- Run provenance/reporting only.
+- No renderer change.
+- No compare metric change.
+- No route priority change.
+- No default behavior change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 11 passed
+```
+
 ## Follow-Up Per-Case Action Artifact Resolution
 
 Status: implemented in this branch.

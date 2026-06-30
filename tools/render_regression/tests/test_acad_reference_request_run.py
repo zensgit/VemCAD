@@ -165,6 +165,8 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert summary["run_artifact_index"].endswith("artifact_index.json")
     assert summary["batch_exit_code"] == 0
     assert summary["compare_exit_code"] == 0
+    assert summary["final_exit_code"] == 0
+    assert summary["fail_on_input_review"] is False
     assert summary["boundary"]["autocad_equivalence_claim"] is False
     assert summary["source_request_boundary"] == REQUEST_BOUNDARY
     assert summary["reference_request_validation_status"] == "pass"
@@ -203,6 +205,8 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert summary["route_viewspace_status_counts"] == {"match": 1}
     assert summary["route_x3_band_counts"] == {"pass": 1}
     assert artifact_index["status"] == "pass"
+    assert artifact_index["final_exit_code"] == 0
+    assert artifact_index["fail_on_input_review"] is False
     assert artifact_index["boundary"] == {
         "renders_dxf": False,
         "compares_renders": True,
@@ -248,6 +252,8 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert routed_run["route_viewspace_status_counts"] == {"match": 1}
     assert routed_run["route_x3_band_counts"] == {"pass": 1}
     assert "recommended next action: review-x3-pass" in stdout
+    assert "final exit code: 0" in stdout
+    assert "fail on input review: False" in stdout
     assert "recommended next action domain: pass-review" in stdout
     assert "reference request validation issue codes: none" in stdout
     assert "case action domain counts: pass-review=1" in stdout
@@ -259,6 +265,8 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert f"route summary  : {out / 'route_summary.md'}" in stdout
     assert compare_summary["status"] == "pass"
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
+    assert "final_exit_code: `0`" in summary_md
+    assert "fail_on_input_review: `False`" in summary_md
     assert "recommended_next_action: `review-x3-pass`" in summary_md
     assert "recommended_next_action_domain: `pass-review`" in summary_md
     assert "reference_request_validation_warnings: `0`" in summary_md
@@ -667,10 +675,15 @@ def test_reference_request_run_can_fail_closed_on_input_review_warnings(tmp_path
     default_summary = json.loads((default_out / "run_summary.json").read_text(encoding="utf-8"))
     assert default_summary["status"] == "pass"
     assert default_summary["compare_exit_code"] == 0
+    assert default_summary["final_exit_code"] == 0
+    assert default_summary["fail_on_input_review"] is False
     assert default_summary["reference_intake_status"] == "review"
     assert default_summary["reference_intake_issue_code_counts"] == {"long_edge_below_requested": 1}
     assert default_summary["recommended_next_action"]["code"] == "inspect-returned-reference-warnings"
     assert default_summary["recommended_next_action"]["domain"] == "input-review"
+    default_artifact_index = _run_artifact_index(default_out)
+    assert default_artifact_index["final_exit_code"] == 0
+    assert default_artifact_index["fail_on_input_review"] is False
 
     fail_out = tmp_path / "fail-run"
     assert runner.main([
@@ -685,10 +698,18 @@ def test_reference_request_run_can_fail_closed_on_input_review_warnings(tmp_path
     fail_summary = json.loads((fail_out / "run_summary.json").read_text(encoding="utf-8"))
     assert fail_summary["status"] == "pass"
     assert fail_summary["compare_exit_code"] == 0
+    assert fail_summary["final_exit_code"] == 2
+    assert fail_summary["fail_on_input_review"] is True
     assert fail_summary["reference_intake_status"] == "review"
     assert fail_summary["reference_intake_issue_code_counts"] == {"long_edge_below_requested": 1}
     assert fail_summary["recommended_next_action"]["domain"] == "input-review"
     assert fail_summary["case_action_domain_counts"] == {"input-review": 1}
+    fail_artifact_index = _run_artifact_index(fail_out)
+    assert fail_artifact_index["final_exit_code"] == 2
+    assert fail_artifact_index["fail_on_input_review"] is True
+    fail_summary_md = (fail_out / "run_summary.md").read_text(encoding="utf-8")
+    assert "final_exit_code: `2`" in fail_summary_md
+    assert "fail_on_input_review: `True`" in fail_summary_md
 
 
 def test_reference_request_run_routes_intake_blocked_to_fix_returned_input(tmp_path, capsys):

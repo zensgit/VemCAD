@@ -182,7 +182,9 @@ artifact index keep returned-reference intake warnings visible even when the
 matched-view compare itself passes. By default those warnings remain a review
 lane rather than a hard failure; pass `--fail-on-input-review` when an
 unattended job should exit `2` if the run's recommended action is in the
-`input-review` domain.
+`input-review` domain. The run summary records `fail_on_input_review` and
+`final_exit_code`, so uploaded artifacts explain this opt-in failure even when
+the semantic run status remains `pass`.
 The run summary and run-level
 artifact index also surface route-level `route_count`, `route_kind_counts`,
 `route_status_counts`,
