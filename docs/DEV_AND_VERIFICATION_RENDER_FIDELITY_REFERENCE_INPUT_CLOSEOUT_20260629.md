@@ -1417,6 +1417,58 @@ python3 -m pytest tools/render_regression/tests -q
 # 114 passed
 ```
 
+## Follow-Up Multi-Route Top-Level Recommendation
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make recursive/multi-index route reports directly actionable from their top
+  summary.
+- Avoid requiring CI or an unattended operator to derive one safe next action
+  from `recommended_action_counts`.
+- Preserve the existing input-first discipline: request-package or returned-PNG
+  repairs are routed before renderer-candidate work.
+
+Changes:
+
+- Multi-route `acad_artifact_route.py` payloads now include
+  `recommended_next_action`.
+- Multi-route `--text` and Markdown reports print that top-level action in the
+  summary section.
+- The selected action points at the source route artifact when the child route
+  does not already name a more specific artifact.
+- Single-route behavior is unchanged.
+
+Priority:
+
+1. `fix-request-package`
+2. `provide-returned-autocad-pngs`
+3. `inspect-returned-reference-warnings`
+4. `inspect-renderer-candidate`
+5. `recapture-autocad-or-provide-window`
+6. inspect/failure actions
+7. `review-x3-pass`
+8. `continue-to-request-run`
+
+Boundary:
+
+- Route aggregation only.
+- No routing-rule change for individual artifact indexes.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# 12 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 114 passed
+```
+
 Private compatibility smoke:
 
 ```bash

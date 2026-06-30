@@ -105,6 +105,8 @@ def test_routes_multiple_directories_as_batch(tmp_path):
         "continue-to-request-run": 1,
         "recapture-autocad-or-provide-window": 1,
     }
+    assert payload["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
+    assert payload["recommended_next_action"]["artifact"].endswith("compare/artifact_index.json")
     assert [item["kind"] for item in payload["routes"]] == ["batch", "compare"]
     assert payload["routes"][0]["recommended_next_action"]["code"] == "continue-to-request-run"
     assert payload["routes"][1]["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
@@ -143,6 +145,7 @@ def test_cli_multiple_directories_text(tmp_path, capsys):
         "recommended_action_counts: continue-to-request-run=1, "
         "recapture-autocad-or-provide-window=1"
     ) in output
+    assert "recommended_next_action: recapture-autocad-or-provide-window" in output
     assert "route: 1" in output
     assert "route: 2" in output
     assert "recommended_next_action: continue-to-request-run" in output
@@ -225,10 +228,12 @@ def test_cli_writes_json_and_markdown_reports(tmp_path):
         "continue-to-request-run": 1,
         "recapture-autocad-or-provide-window": 1,
     }
+    assert payload["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
     assert "# AutoCAD Artifact Route Report" in markdown
     assert "does not compare renders" in markdown
     assert "- route_count: `2`" in markdown
     assert "recommended_action_counts" in markdown
+    assert "- recommended_next_action: `recapture-autocad-or-provide-window`" in markdown
     assert "recapture-autocad-or-provide-window=1" in markdown
 
 
@@ -256,6 +261,39 @@ def test_routes_compare_renderer_candidate_before_recapture(tmp_path):
     assert payload["kind"] == "compare"
     assert payload["recommended_next_action"]["code"] == "inspect-renderer-candidate"
     assert payload["triage_bucket_counts"]["renderer-candidate"] == 1
+
+
+def test_batch_route_prioritizes_input_repairs_before_renderer_candidates(tmp_path):
+    validation_dir = tmp_path / "validation"
+    compare_dir = tmp_path / "compare"
+    validation_dir.mkdir()
+    compare_dir.mkdir()
+    _write(validation_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "request_validation",
+        "status": "blocked",
+        "case_count": 1,
+        "artifacts": [],
+    })
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "compare_failed",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"renderer-candidate": 1},
+        "viewspace_status_counts": {"match": 1},
+        "x3_band_counts": {"fail": 1},
+        "artifacts": [],
+    })
+
+    payload = route.route_artifact_indexes([validation_dir, compare_dir])
+
+    assert payload["recommended_action_counts"] == {
+        "fix-request-package": 1,
+        "inspect-renderer-candidate": 1,
+    }
+    assert payload["recommended_next_action"]["code"] == "fix-request-package"
+    assert payload["recommended_next_action"]["artifact"].endswith("validation/artifact_index.json")
 
 
 def test_rejects_unknown_schema(tmp_path):
