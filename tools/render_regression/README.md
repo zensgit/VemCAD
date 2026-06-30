@@ -234,6 +234,11 @@ needs to assert the routed status distribution itself, such as requiring
 `viewspace_mismatch` in a recapture test or forbidding any nested `blocked`
 artifact in a supposedly ready batch.
 
+Use `--require-kind <kind>` / `--forbid-kind <kind>` when a workflow needs to
+assert the routed artifact topology itself. This catches incomplete recursive
+inputs, such as a run that accidentally uploads only the input batch artifacts
+and never includes the compare artifact index.
+
 When a workflow also needs to assert that the chosen action points at the
 expected handoff artifact, use `--require-action-artifact <path-suffix>`.
 Suffix matching keeps the guard stable across absolute CI paths:
