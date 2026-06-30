@@ -176,6 +176,24 @@ def route_artifact_index(path: Path) -> dict[str, Any]:
     }
 
 
+def _count_values(values: list[str]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for value in values:
+        key = value or "<missing>"
+        counts[key] = counts.get(key, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _route_batch_summary(routes: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "kind_counts": _count_values([str(route.get("kind") or "") for route in routes]),
+        "status_counts": _count_values([str(route.get("status") or "") for route in routes]),
+        "recommended_action_counts": _count_values([
+            str((route.get("recommended_next_action") or {}).get("code") or "") for route in routes
+        ]),
+    }
+
+
 def route_artifact_indexes(paths: list[Path]) -> dict[str, Any]:
     if not paths:
         raise ValueError("at least one artifact index is required")
@@ -183,8 +201,13 @@ def route_artifact_indexes(paths: list[Path]) -> dict[str, Any]:
     return {
         "schema": BATCH_SCHEMA,
         "count": len(routes),
+        **_route_batch_summary(routes),
         "routes": routes,
     }
+
+
+def _format_counts(counts: dict[str, Any]) -> str:
+    return ", ".join(f"{key}={value}" for key, value in sorted(counts.items()))
 
 
 def _write_text(route: dict[str, Any]) -> str:
@@ -196,16 +219,21 @@ def _write_text(route: dict[str, Any]) -> str:
         f"message: {action.get('message', '')}",
     ]
     if route.get("case_action_counts"):
-        counts = ", ".join(f"{key}={value}" for key, value in sorted(route["case_action_counts"].items()))
-        lines.append(f"case_action_counts: {counts}")
+        lines.append(f"case_action_counts: {_format_counts(route['case_action_counts'])}")
     if route.get("triage_bucket_counts"):
-        counts = ", ".join(f"{key}={value}" for key, value in sorted(route["triage_bucket_counts"].items()))
-        lines.append(f"triage_bucket_counts: {counts}")
+        lines.append(f"triage_bucket_counts: {_format_counts(route['triage_bucket_counts'])}")
     return "\n".join(lines)
 
 
 def _write_batch_text(payload: dict[str, Any]) -> str:
-    chunks = []
+    chunks = [
+        "\n".join([
+            f"route_count: {payload.get('count', 0)}",
+            "kind_counts: " + _format_counts(payload.get("kind_counts") or {}),
+            "status_counts: " + _format_counts(payload.get("status_counts") or {}),
+            "recommended_action_counts: " + _format_counts(payload.get("recommended_action_counts") or {}),
+        ])
+    ]
     for index, route in enumerate(payload.get("routes") or [], start=1):
         chunks.append("\n".join([
             f"route: {index}",

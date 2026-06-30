@@ -845,6 +845,54 @@ python3 tools/render_regression/acad_artifact_route.py \
 # recommended_next_action: continue-to-request-run
 ```
 
+## Follow-Up Artifact Route Batch Summary
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make multi-route and recursive artifact routing useful in CI logs without
+  reading every route section first.
+- Surface the distribution of route kinds, statuses, and recommended actions at
+  the top of the route payload.
+
+Changes:
+
+- Multi-route JSON now includes:
+  - `kind_counts`
+  - `status_counts`
+  - `recommended_action_counts`
+- Multi-route `--text` now starts with `route_count` and the three aggregate
+  count lines before the per-route sections.
+- Single-route JSON/text output remains unchanged.
+
+Boundary:
+
+- Read-only reporting ergonomics only.
+- No routing-rule change.
+- No renderer change.
+- No AutoCAD PNG equivalence claim.
+- `viewspace_mismatch` remains an input/recapture action unless a matched-view
+  route explicitly reports a renderer candidate.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# 10 passed
+```
+
+Private compatibility smoke:
+
+```bash
+python3 tools/render_regression/acad_artifact_route.py \
+  /private/tmp/vemcad-artifact-route-recursive-smoke-20260629 --recursive --text
+# route_count: 3
+# kind_counts: batch=1, compare=1, request_run=1
+# status_counts: pass=1, viewspace_mismatch=2
+# recommended_action_counts: continue-to-request-run=1, recapture-autocad-or-provide-window=2
+```
+
 Private compatibility smoke:
 
 ```bash
