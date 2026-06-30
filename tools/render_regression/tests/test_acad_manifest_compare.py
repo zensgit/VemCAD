@@ -106,7 +106,7 @@ def test_dry_run_validates_manifest_without_candidate_png(tmp_path):
     assert summary["boundary"]["renders_dxf"] is False
 
 
-def test_manifest_harness_runs_compare_and_records_match(tmp_path):
+def test_manifest_harness_runs_compare_and_records_match(tmp_path, capsys):
     acad = _png(tmp_path / "acad.png", box=[20, 15, 740, 555])
     ours = _png(tmp_path / "ours.png", box=[20, 15, 740, 555])
     dxf = _dxf(tmp_path / "B11.dxf")
@@ -124,6 +124,7 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path):
         "--candidate-cases", str(candidates),
         "--out-dir", str(out),
     ])
+    stdout = capsys.readouterr().out
 
     assert rc == 0
     summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
@@ -177,6 +178,8 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path):
     assert route_summary["recommended_next_action"]["code"] == "review-x3-pass"
     assert "AutoCAD Artifact Route Report" in route_summary_md
     assert "claim AutoCAD equivalence" in route_summary_md
+    assert "route summary" in stdout
+    assert "recommended next action: review-x3-pass" in stdout
     assert not (out / "reference_request.json").exists()
     assert not (out / "reference_request.md").exists()
 
@@ -208,7 +211,7 @@ def test_manifest_harness_surfaces_text_provenance_notes(tmp_path):
     assert "text_provenance_summary" in {item["kind"] for item in artifact_index["artifacts"]}
 
 
-def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tmp_path):
+def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tmp_path, capsys):
     acad = _png(tmp_path / "acad.png", size=(800, 600), box=[220, 165, 580, 435])
     ours = _png(tmp_path / "ours.png", size=(760, 570), box=[20, 15, 740, 555])
     dxf = _dxf(tmp_path / "B11.dxf")
@@ -221,6 +224,7 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
         "--candidate-cases", str(candidates),
         "--out-dir", str(out),
     ])
+    stdout = capsys.readouterr().out
 
     assert rc == 2
     summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
@@ -249,6 +253,8 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     route_summary_md = (out / "route_summary.md").read_text(encoding="utf-8")
     assert route_summary["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
     assert "recapture-autocad-or-provide-window" in route_summary_md
+    assert "route summary" in stdout
+    assert "recommended next action: recapture-autocad-or-provide-window" in stdout
     request = json.loads((out / "reference_request.json").read_text(encoding="utf-8"))
     assert request["schema"] == "vemcad.acad_reference_request/v1"
     assert request["reason"] == "recapture-required"
@@ -279,7 +285,7 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     }
 
 
-def test_manifest_harness_stops_on_blocked_manifest(tmp_path):
+def test_manifest_harness_stops_on_blocked_manifest(tmp_path, capsys):
     acad = _png(tmp_path / "acad.png", box=[20, 15, 740, 555])
     dxf = _dxf(tmp_path / "B11.dxf")
     manifest = _manifest(
@@ -291,6 +297,7 @@ def test_manifest_harness_stops_on_blocked_manifest(tmp_path):
     out = tmp_path / "out"
 
     rc = harness.main(["--manifest", str(manifest), "--out-dir", str(out), "--dry-run"])
+    stdout = capsys.readouterr().out
 
     assert rc == 2
     summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
@@ -308,6 +315,8 @@ def test_manifest_harness_stops_on_blocked_manifest(tmp_path):
     }
     route_summary = json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
     assert route_summary["recommended_next_action"]["code"] == "inspect-compare-input-block"
+    assert "route summary" in stdout
+    assert "recommended next action: inspect-compare-input-block" in stdout
 
 
 def test_triage_rows_prioritize_matched_fail_then_recapture_then_pass():

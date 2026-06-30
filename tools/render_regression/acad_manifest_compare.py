@@ -122,6 +122,12 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def _print_route_summary(out_dir: Path, route_payload: dict[str, Any]) -> None:
+    action = route_payload.get("recommended_next_action") or {}
+    print(f"  route summary  : {out_dir / 'route_summary.md'}")
+    print(f"  recommended next action: {action.get('code', '')}")
+
+
 def _write_tsv(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
@@ -828,6 +834,7 @@ def main(argv: list[str] | None = None) -> int:
         f"AutoCAD manifest compare: {report['status']} "
         f"({report['compared_count']}/{report['case_count']} compared, {len(report['issues'])} issues)"
     )
+    _print_route_summary(args.out_dir, route_payload)
     for issue in report["issues"]:
         print(f"  {issue['severity']} {issue['case_id']} {issue['code']}: {issue['message']}")
     return rc
