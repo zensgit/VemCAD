@@ -438,6 +438,8 @@ def _write_text(route: dict[str, Any]) -> str:
         lines.append(f"stage: {route.get('stage')}")
     if route.get("case_count") is not None:
         lines.append(f"case_count: {route.get('case_count')}")
+    if route.get("compared_count") is not None:
+        lines.append(f"compared_count: {route.get('compared_count')}")
     if route.get("error_count") is not None:
         lines.append(f"errors: {route.get('error_count')}")
     if route.get("warning_count") is not None:
@@ -490,6 +492,10 @@ def _write_text(route: dict[str, Any]) -> str:
         )
     if route.get("triage_bucket_counts"):
         lines.append(f"triage_bucket_counts: {_format_counts(route['triage_bucket_counts'])}")
+    if route.get("viewspace_status_counts"):
+        lines.append(f"viewspace_status_counts: {_format_counts(route['viewspace_status_counts'])}")
+    if route.get("x3_band_counts"):
+        lines.append(f"x3_band_counts: {_format_counts(route['x3_band_counts'])}")
     return "\n".join(lines)
 
 
@@ -554,6 +560,8 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         lines.append(f"- stage: `{route.get('stage')}`")
     if route.get("case_count") is not None:
         lines.append(f"- case_count: `{route.get('case_count')}`")
+    if route.get("compared_count") is not None:
+        lines.append(f"- compared_count: `{route.get('compared_count')}`")
     if route.get("error_count") is not None:
         lines.append(f"- errors: `{route.get('error_count')}`")
     if route.get("warning_count") is not None:
@@ -607,6 +615,10 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         )
     if route.get("triage_bucket_counts"):
         lines.append(f"- triage_bucket_counts: `{_format_counts(route['triage_bucket_counts'])}`")
+    if route.get("viewspace_status_counts"):
+        lines.append(f"- viewspace_status_counts: `{_format_counts(route['viewspace_status_counts'])}`")
+    if route.get("x3_band_counts"):
+        lines.append(f"- x3_band_counts: `{_format_counts(route['x3_band_counts'])}`")
     return "\n".join(lines)
 
 

@@ -1715,11 +1715,25 @@ def test_routes_compare_renderer_candidate_before_recapture(tmp_path):
     })
 
     payload = route.route_artifact_index(index)
+    text = route._write_text(payload)
+    markdown = route.route_markdown(payload)
 
     assert payload["kind"] == "compare"
+    assert payload["case_count"] == 2
+    assert payload["compared_count"] == 2
     assert payload["recommended_next_action"]["code"] == "inspect-renderer-candidate"
     assert payload["recommended_next_action"]["domain"] == "renderer-candidate"
     assert payload["triage_bucket_counts"]["renderer-candidate"] == 1
+    assert payload["viewspace_status_counts"] == {"match": 1, "mismatch": 1}
+    assert payload["x3_band_counts"] == {"fail": 1, "fallback": 1}
+    assert "case_count: 2" in text
+    assert "compared_count: 2" in text
+    assert "viewspace_status_counts: match=1, mismatch=1" in text
+    assert "x3_band_counts: fail=1, fallback=1" in text
+    assert "- case_count: `2`" in markdown
+    assert "- compared_count: `2`" in markdown
+    assert "- viewspace_status_counts: `match=1, mismatch=1`" in markdown
+    assert "- x3_band_counts: `fail=1, fallback=1`" in markdown
 
 
 def test_batch_route_prioritizes_input_repairs_before_renderer_candidates(tmp_path):

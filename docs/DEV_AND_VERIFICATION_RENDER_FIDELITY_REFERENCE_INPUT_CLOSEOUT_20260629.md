@@ -3851,3 +3851,43 @@ python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
 python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
+
+## Follow-Up Compare Route Count Visibility
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Surface compare-route `compared_count`, `viewspace_status_counts`, and
+  `x3_band_counts` in route text and Markdown.
+- Let operators see whether a routed compare artifact is dominated by matched
+  renderer-candidate cases, recapture-required mismatches, or X3 band failures
+  without opening `artifact_index.json`.
+
+Changes:
+
+- Route text now prints `compared_count` when a compare artifact exposes it.
+- Route text and Markdown now print `viewspace_status_counts` and
+  `x3_band_counts`.
+- Regression coverage proves a mixed compare route surfaces:
+  - `compared_count=2`;
+  - `viewspace_status_counts=match=1, mismatch=1`;
+  - `x3_band_counts=fail=1, fallback=1`.
+
+Boundary:
+
+- Route-report visibility only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
