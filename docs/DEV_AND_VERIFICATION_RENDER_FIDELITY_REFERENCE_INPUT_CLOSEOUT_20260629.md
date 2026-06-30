@@ -1500,6 +1500,45 @@ python3 -m pytest tools/render_regression/tests -q
 # 101 passed
 ```
 
+## Follow-Up Request Validation Expected Size Evidence
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make the request-validation report display the expected AutoCAD PNG size that
+  it already validates.
+- Let operators see the capture-size contract in
+  `reference_request_validation.json/md` before returned AutoCAD PNGs exist,
+  without reopening the original request package.
+
+Changes:
+
+- `acad_reference_batch.py` now writes per-case
+  `requested_expected_size` as compact `WIDTHxHEIGHT` text in request
+  validation rows.
+- `reference_request_validation.md` adds an `Expected size` table column.
+- `tools/render_regression/README.md` documents the operator-facing behavior.
+
+Boundary:
+
+- Request-validation evidence only.
+- No request validation semantics change.
+- No renderer change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Request Capture Contract Validation
 
 Status: implemented in this branch.
