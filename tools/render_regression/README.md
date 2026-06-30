@@ -250,6 +250,8 @@ Batch artifact indexes and route reports also surface
 `reference_intake_issue_code_counts` when those preflight reports exist. This
 lets CI jobs that stop at the input stage show the exact request/intake issue
 codes without opening nested JSON artifacts.
+When routing multiple artifact indexes at once, the top-level route summary
+aggregates those same issue-code counts across all nested routes.
 
 To assert source artifact boundaries as part of the same route step, repeat
 `--require-source-boundary key=value`. For example, this guarantees every
