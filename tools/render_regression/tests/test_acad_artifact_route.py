@@ -1984,6 +1984,37 @@ def test_routes_compare_renderer_candidate_before_recapture(tmp_path):
     assert "- x3_band_counts: `fail=1, fallback=1`" in markdown
 
 
+def test_routes_compare_recapture_points_to_reference_request(tmp_path):
+    request_md = tmp_path / "reference_request.md"
+    request_md.write_text("# request\n", encoding="utf-8")
+    index = _write(tmp_path / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {
+            "recapture-required": 1,
+        },
+        "viewspace_status_counts": {"mismatch": 1},
+        "x3_band_counts": {"fallback": 1},
+        "artifacts": [
+            {"kind": "reference_request_markdown", "path": "reference_request.md"},
+        ],
+    })
+
+    payload = route.route_artifact_index(index)
+    text = route._write_text(payload)
+    markdown = route.route_markdown(payload)
+
+    assert payload["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
+    assert payload["recommended_next_action"]["artifact"] == "reference_request.md"
+    assert payload["action_artifact_resolved"] == str(request_md.resolve())
+    assert payload["action_artifact_exists"] is True
+    assert "action_artifact: reference_request.md" in text
+    assert "- action_artifact: `reference_request.md`" in markdown
+    assert "- action_artifact_exists: `True`" in markdown
+
+
 def test_batch_route_prioritizes_input_repairs_before_renderer_candidates(tmp_path):
     validation_dir = tmp_path / "validation"
     compare_dir = tmp_path / "compare"

@@ -1065,6 +1065,50 @@ python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
 # passed
 ```
 
+## Follow-Up Recapture Route Action Artifact
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make `acad_artifact_route.py` point the recapture recommendation at the
+  generated operator handoff file instead of only saying that a recapture is
+  required.
+- Keep recursive route summaries useful for unattended runs: the top-level
+  `recommended_next_action.artifact` can now resolve to `reference_request.md`
+  when compare output has generated one.
+
+Changes:
+
+- Compare routes with `triage_bucket_counts.recapture-required > 0` now set
+  `recommended_next_action.artifact` to the `reference_request_markdown`
+  artifact path when present.
+- Route JSON/text/Markdown already resolve and print action artifacts; this
+  change makes the recapture lane use that existing mechanism.
+- End-to-end compare regression now asserts `route_summary.json` points at
+  `reference_request.md` and reports `action_artifact_exists=true`.
+- Route-only regression now asserts an isolated compare `artifact_index.json`
+  with a `reference_request_markdown` artifact routes to that file.
+- `tools/render_regression/README.md` documents the recapture action artifact
+  behavior.
+
+Boundary:
+
+- Operator routing/reporting only.
+- No renderer change.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- No private drawing or AutoCAD PNG committed.
+- No generated request JSON schema/content change.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_manifest_compare.py \
+  tools/render_regression/tests/test_acad_artifact_route.py -q
+# 72 passed
+```
+
 ## Follow-Up Legacy Batch Compare Optional Report Cleanup
 
 Status: implemented in this branch.

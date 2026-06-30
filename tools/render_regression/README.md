@@ -228,6 +228,9 @@ AutoCAD export is needed and what size contract it should satisfy.
 Route Markdown reports also use safe code spans for action artifacts and count
 summaries, so unusual artifact paths remain readable in the top-level route
 handoff.
+When a compare route recommends `recapture-autocad-or-provide-window`, the
+route action artifact points directly at the generated `reference_request.md`
+when that request exists.
 The batch, compare, and request-run CLIs also print the recommended action
 domain next to the action code, so CI logs can show the route class without
 opening JSON artifacts.
