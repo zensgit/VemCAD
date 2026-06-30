@@ -1760,6 +1760,8 @@ def test_batch_route_prioritizes_input_repairs_before_renderer_candidates(tmp_pa
     })
 
     payload = route.route_artifact_indexes([validation_dir, compare_dir])
+    text = route._write_batch_text(payload)
+    markdown = route.route_markdown(payload)
 
     assert payload["recommended_action_counts"] == {
         "fix-request-package": 1,
@@ -1772,6 +1774,21 @@ def test_batch_route_prioritizes_input_repairs_before_renderer_candidates(tmp_pa
     assert payload["recommended_next_action"]["code"] == "fix-request-package"
     assert payload["recommended_next_action"]["domain"] == "input"
     assert payload["recommended_next_action"]["artifact"].endswith("validation/artifact_index.json")
+    assert payload["compare_case_count"] == 1
+    assert payload["compared_count"] == 1
+    assert payload["triage_bucket_counts"] == {"renderer-candidate": 1}
+    assert payload["viewspace_status_counts"] == {"match": 1}
+    assert payload["x3_band_counts"] == {"fail": 1}
+    assert "compare_case_count: 1" in text
+    assert "compared_count: 1" in text
+    assert "triage_bucket_counts: renderer-candidate=1" in text
+    assert "viewspace_status_counts: match=1" in text
+    assert "x3_band_counts: fail=1" in text
+    assert "- compare_case_count: `1`" in markdown
+    assert "- compared_count: `1`" in markdown
+    assert "- triage_bucket_counts: `renderer-candidate=1`" in markdown
+    assert "- viewspace_status_counts: `match=1`" in markdown
+    assert "- x3_band_counts: `fail=1`" in markdown
 
 
 def test_rejects_unknown_schema(tmp_path):
