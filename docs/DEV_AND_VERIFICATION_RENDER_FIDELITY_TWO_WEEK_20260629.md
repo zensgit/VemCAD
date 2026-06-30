@@ -951,3 +951,21 @@ Boundary:
 The continuation slices #192-#195 are summarized in:
 
 - `docs/DEV_AND_VERIFICATION_RENDER_FIDELITY_REFERENCE_INPUT_CLOSEOUT_20260629.md`
+
+## Continuation Evidence-Hardening Closeout
+
+The follow-up evidence-hardening slices after the reference-input closeout are
+also recorded in:
+
+- `docs/DEV_AND_VERIFICATION_RENDER_FIDELITY_REFERENCE_INPUT_CLOSEOUT_20260629.md`
+
+Current additional closure:
+
+- standalone compare and request-run paths both emit route reports;
+- artifact indexes route batch/request/compare outputs without changing X3;
+- request-package validation now catches diagnostic capture methods and
+  unmatched view contracts before AutoCAD PNG fulfilment.
+
+Boundary remains unchanged: no renderer tuning, no GUI AutoCAD automation, and
+no AutoCAD-equivalence claim without fresh matched-view AutoCAD PNGs or an
+explicit world window.

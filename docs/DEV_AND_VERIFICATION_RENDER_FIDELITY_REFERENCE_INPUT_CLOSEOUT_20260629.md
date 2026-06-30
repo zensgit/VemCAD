@@ -1258,6 +1258,50 @@ python3 -m pytest tools/render_regression/tests -q
 # 101 passed
 ```
 
+## Follow-Up Request Capture Contract Validation
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Move capture-contract errors from the later manifest gate to the earlier
+  request-package validation gate.
+- Stop an operator from spending time exporting/returning PNGs from a request
+  that already declares a diagnostic capture method or unmatched view contract.
+
+Changes:
+
+- `acad_reference_batch.py --validate-request` now validates:
+  - `requested_capture_method` against the same gate/diagnostic method sets as
+    `acad_reference_manifest.py`;
+  - `requested_view_contract` against the same matched-view contract set.
+- Invalid requests fail closed with:
+  - `diagnostic_requested_capture_method`;
+  - `unknown_requested_capture_method`;
+  - `unmatched_requested_view_contract`.
+- `reference_request_validation.json/md` now records the normalized requested
+  capture method and view contract per case, so the validation report explains
+  exactly which declared contract blocked the request.
+
+Boundary:
+
+- Request-package validation only.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- Missing fields remain backward compatible: absent values normalize to the
+  existing defaults `plot-export` and `model-extents`.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 14 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 114 passed
+```
+
 Private compatibility smoke:
 
 ```bash

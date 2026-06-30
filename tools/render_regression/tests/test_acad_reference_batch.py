@@ -169,6 +169,8 @@ def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(t
                 "candidate_png_size_bytes": ours.stat().st_size + 1,
                 "recommended_output_name": "../G11.png",
                 "requested_expected_size": {"width": 0, "height": "bad"},
+                "requested_capture_method": "screenshot",
+                "requested_view_contract": "paper-layout",
             },
             {
                 "id": "G12",
@@ -202,6 +204,8 @@ def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(t
         "candidate_png_sha256_mismatch",
         "candidate_png_size_mismatch",
         "invalid_requested_expected_size",
+        "diagnostic_requested_capture_method",
+        "unmatched_requested_view_contract",
         "duplicate_recommended_output_name",
         "source_dxf_missing",
         "candidate_missing",
@@ -292,6 +296,51 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
         "--out-dir", str(dry_run),
         "--dry-run",
     ]) == 0
+
+
+def test_batch_generator_validation_blocks_unmatched_capture_contract_before_capture(tmp_path):
+    source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
+    ours = Path(_png(tmp_path / "ours" / "G11.png", (760, 570)))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "source_dxf_sha256": _sha256(source),
+            "source_dxf_size_bytes": source.stat().st_size,
+            "candidate_png_sha256": _sha256(ours),
+            "candidate_png_size_bytes": ours.stat().st_size,
+            "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_capture_method": "viewport-capture",
+            "requested_view_contract": "paper-layout",
+            "requested_expected_size": {"width": 1600, "height": 1131},
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--validate-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--out-dir", str(out),
+    ]) == 2
+
+    validation = json.loads((out / "reference_request_validation.json").read_text(encoding="utf-8"))
+    assert validation["status"] == "blocked"
+    issue_codes = {issue["code"] for issue in validation["issues"]}
+    assert issue_codes == {
+        "diagnostic_requested_capture_method",
+        "unmatched_requested_view_contract",
+    }
+    row = validation["cases"][0]
+    assert row["requested_capture_method"] == "viewport-capture"
+    assert row["requested_view_contract"] == "paper-layout"
+    validation_md = (out / "reference_request_validation.md").read_text(encoding="utf-8")
+    assert "`viewport-capture`" in validation_md
+    assert "`paper-layout`" in validation_md
 
 
 def test_batch_generator_blocks_request_when_source_dxf_provenance_drifts(tmp_path):
