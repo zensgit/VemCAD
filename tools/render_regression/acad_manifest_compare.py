@@ -535,6 +535,17 @@ def _write_reference_request(
     candidate_arg = candidate_cases or "<candidate_cases.json>"
     lines.extend([
         "",
+        "## Before Capture Or Fulfilment",
+        "",
+        "Validate the request package before spending time in AutoCAD:",
+        "",
+        "```bash",
+        "python3 tools/render_regression/acad_reference_batch.py \\",
+        f"  --validate-request {json_path} \\",
+        f"  --candidate-cases {candidate_arg} \\",
+        "  --out-dir <request-validation-dir>",
+        "```",
+        "",
         "## After The PNGs Are Returned",
         "",
         "Place the returned AutoCAD PNGs in one directory using the requested filenames, then run:",
