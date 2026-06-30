@@ -169,6 +169,10 @@ def _route_run(payload: dict[str, Any]) -> dict[str, Any]:
         "status": str(payload.get("status") or ""),
         "case_action_counts": payload.get("case_action_counts") or {},
         "case_action_domain_counts": payload.get("case_action_domain_counts") or {},
+        "reference_request_validation_issue_code_counts": (
+            payload.get("reference_request_validation_issue_code_counts") or {}
+        ),
+        "reference_intake_issue_code_counts": payload.get("reference_intake_issue_code_counts") or {},
         "case_actions": payload.get("case_actions") or [],
         "recommended_next_action": _normalize_recommended_action(
             payload.get("recommended_next_action"),
@@ -399,6 +403,16 @@ def _write_text(route: dict[str, Any]) -> str:
         lines.append(f"case_action_counts: {_format_counts(route['case_action_counts'])}")
     if route.get("case_action_domain_counts"):
         lines.append(f"case_action_domain_counts: {_format_counts(route['case_action_domain_counts'])}")
+    if route.get("reference_request_validation_issue_code_counts"):
+        lines.append(
+            "reference_request_validation_issue_code_counts: "
+            + _format_counts(route["reference_request_validation_issue_code_counts"])
+        )
+    if route.get("reference_intake_issue_code_counts"):
+        lines.append(
+            "reference_intake_issue_code_counts: "
+            + _format_counts(route["reference_intake_issue_code_counts"])
+        )
     if route.get("triage_bucket_counts"):
         lines.append(f"triage_bucket_counts: {_format_counts(route['triage_bucket_counts'])}")
     return "\n".join(lines)
@@ -470,6 +484,16 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         lines.append(f"- case_action_counts: `{_format_counts(route['case_action_counts'])}`")
     if route.get("case_action_domain_counts"):
         lines.append(f"- case_action_domain_counts: `{_format_counts(route['case_action_domain_counts'])}`")
+    if route.get("reference_request_validation_issue_code_counts"):
+        lines.append(
+            "- reference_request_validation_issue_code_counts: "
+            f"`{_format_counts(route['reference_request_validation_issue_code_counts'])}`"
+        )
+    if route.get("reference_intake_issue_code_counts"):
+        lines.append(
+            "- reference_intake_issue_code_counts: "
+            f"`{_format_counts(route['reference_intake_issue_code_counts'])}`"
+        )
     if route.get("triage_bucket_counts"):
         lines.append(f"- triage_bucket_counts: `{_format_counts(route['triage_bucket_counts'])}`")
     return "\n".join(lines)
