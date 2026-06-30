@@ -1,4 +1,5 @@
 import json
+import hashlib
 import sys
 from pathlib import Path
 
@@ -22,6 +23,10 @@ def _png(path: Path, size=(760, 570), box=None) -> str:
 def _dxf(path: Path) -> str:
     path.write_text("0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n", encoding="utf-8")
     return str(path)
+
+
+def _sha256(path: str) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
 def _manifest(
@@ -226,6 +231,10 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert request["cases"][0]["requested_view_contract"] == "model-extents"
     assert request["cases"][0]["recommended_output_name"] == "G11_autocad_model_extents.png"
     assert request["cases"][0]["requested_expected_size"] == {"width": 800, "height": 600}
+    assert request["cases"][0]["source_dxf_sha256"] == _sha256(dxf)
+    assert request["cases"][0]["source_dxf_size_bytes"] == Path(dxf).stat().st_size
+    assert request["cases"][0]["candidate_png_sha256"] == _sha256(ours)
+    assert request["cases"][0]["candidate_png_size_bytes"] == Path(ours).stat().st_size
     request_md = (out / "reference_request.md").read_text(encoding="utf-8")
     assert "AutoCAD Reference Recapture Request" in request_md
     assert "G11_autocad_model_extents.png" in request_md

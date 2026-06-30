@@ -1,4 +1,5 @@
 import json
+import hashlib
 import sys
 from pathlib import Path
 
@@ -20,6 +21,10 @@ def _dxf(path: Path) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("0\nSECTION\n2\nENTITIES\n0\nENDSEC\n0\nEOF\n", encoding="utf-8")
     return str(path)
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def test_batch_generator_writes_manifest_and_candidates(tmp_path):
@@ -134,6 +139,9 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
     assert intake["status"] == "pass"
     assert intake["warning_count"] == 0
     assert intake["boundary"]["autocad_equivalence_claim"] is False
+    assert intake["cases"][0]["inspection"]["sha256"] == _sha256(
+        tmp_path / "returned" / "G11_autocad_model_extents.png"
+    )
     intake_md = (out / "reference_intake.md").read_text(encoding="utf-8")
     assert "AutoCAD Reference Intake Preflight" in intake_md
     assert "G11_autocad_model_extents.png" in intake_md
@@ -151,6 +159,63 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
         "--out-dir", str(dry_run),
         "--dry-run",
     ]) == 0
+
+
+def test_batch_generator_blocks_request_when_source_dxf_provenance_drifts(tmp_path):
+    _dxf(tmp_path / "dxf" / "G11.dxf")
+    _png(tmp_path / "ours" / "G11.png", (760, 570))
+    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1600, 1131))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "source_dxf_sha256": "0" * 64,
+            "recommended_output_name": "G11_autocad_model_extents.png",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--out-dir", str(out),
+    ]) == 2
+
+    assert not (out / "acad_manifest.json").exists()
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert "reference_intake_json" in {item["kind"] for item in artifact_index["artifacts"]}
+
+
+def test_batch_generator_blocks_request_when_candidate_png_provenance_drifts(tmp_path):
+    _dxf(tmp_path / "dxf" / "G11.dxf")
+    _png(tmp_path / "ours" / "G11.png", (760, 570))
+    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1600, 1131))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "candidate_png_sha256": "f" * 64,
+            "recommended_output_name": "G11_autocad_model_extents.png",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+
+    assert batch.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--out-dir", str(tmp_path / "out"),
+    ]) == 2
 
 
 def test_batch_generator_blocks_returned_png_size_mismatch_when_request_declares_size(tmp_path):
