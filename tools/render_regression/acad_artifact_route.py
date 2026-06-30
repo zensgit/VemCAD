@@ -168,6 +168,7 @@ def _route_run(payload: dict[str, Any]) -> dict[str, Any]:
         "kind": "request_run",
         "status": str(payload.get("status") or ""),
         "case_action_counts": payload.get("case_action_counts") or {},
+        "case_action_domain_counts": payload.get("case_action_domain_counts") or {},
         "case_actions": payload.get("case_actions") or [],
         "recommended_next_action": _normalize_recommended_action(
             payload.get("recommended_next_action"),
@@ -352,6 +353,8 @@ def _write_text(route: dict[str, Any]) -> str:
         )
     if route.get("case_action_counts"):
         lines.append(f"case_action_counts: {_format_counts(route['case_action_counts'])}")
+    if route.get("case_action_domain_counts"):
+        lines.append(f"case_action_domain_counts: {_format_counts(route['case_action_domain_counts'])}")
     if route.get("triage_bucket_counts"):
         lines.append(f"triage_bucket_counts: {_format_counts(route['triage_bucket_counts'])}")
     return "\n".join(lines)
@@ -412,6 +415,8 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         lines.append(f"- action_artifact: `{action['artifact']}`")
     if route.get("case_action_counts"):
         lines.append(f"- case_action_counts: `{_format_counts(route['case_action_counts'])}`")
+    if route.get("case_action_domain_counts"):
+        lines.append(f"- case_action_domain_counts: `{_format_counts(route['case_action_domain_counts'])}`")
     if route.get("triage_bucket_counts"):
         lines.append(f"- triage_bucket_counts: `{_format_counts(route['triage_bucket_counts'])}`")
     return "\n".join(lines)
@@ -527,6 +532,17 @@ def _recommended_action_domain(payload: dict[str, Any]) -> str:
     return _route_action(payload)["domain"]
 
 
+def _action_domain_counts(payload: dict[str, Any]) -> dict[str, int]:
+    counts = payload.get("recommended_action_domain_counts")
+    if isinstance(counts, dict):
+        return {str(key): int(value) for key, value in counts.items() if str(key)}
+    counts = payload.get("case_action_domain_counts")
+    if isinstance(counts, dict):
+        return {str(key): int(value) for key, value in counts.items() if str(key)}
+    domain = _recommended_action_domain(payload)
+    return {domain: 1} if domain else {}
+
+
 def _parse_boundary_expectation(raw: str) -> tuple[str, Any]:
     if "=" not in raw:
         raise ValueError(f"boundary expectation must be key=value: {raw}")
@@ -584,6 +600,11 @@ def main(argv: list[str] | None = None) -> int:
                         help="exit 2 unless the top-level recommended_next_action.code matches this value")
     parser.add_argument("--require-action-domain", default="",
                         help="exit 2 unless the top-level recommended_next_action.domain matches this value")
+    parser.add_argument("--forbid-action-domain", action="append", default=[],
+                        help=(
+                            "exit 2 if any routed action domain count includes this domain; "
+                            "may repeat"
+                        ))
     parser.add_argument("--require-action-artifact", default="",
                         help=(
                             "exit 2 unless the top-level recommended_next_action.artifact "
@@ -646,6 +667,21 @@ def main(argv: list[str] | None = None) -> int:
             )
             if artifact:
                 print(f"acad_artifact_route: action artifact: {artifact}", file=sys.stderr)
+            return 2
+    if args.forbid_action_domain:
+        counts = _action_domain_counts(payload)
+        forbidden = [domain for domain in args.forbid_action_domain if counts.get(domain, 0)]
+        if forbidden:
+            print(
+                "acad_artifact_route: forbidden action domain present: "
+                + ", ".join(f"{domain}={counts.get(domain, 0)}" for domain in forbidden),
+                file=sys.stderr,
+            )
+            print(
+                "acad_artifact_route: action domain counts: "
+                + _format_counts(counts),
+                file=sys.stderr,
+            )
             return 2
     if args.require_action_artifact:
         actual = _recommended_action_artifact(payload)
