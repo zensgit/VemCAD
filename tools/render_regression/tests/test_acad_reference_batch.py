@@ -155,6 +155,9 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
     assert batch.main([
         "--validate-request", str(request),
         "--candidate-cases", str(candidates),
+        "--require-request-boundary", "autocad_equivalence_claim=false",
+        "--require-request-boundary", "requires_returned_autocad_png=true",
+        "--require-request-boundary", "requires_viewspace_match=true",
         "--out-dir", str(out),
     ]) == 0
     stdout = capsys.readouterr().out
@@ -214,6 +217,49 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
     assert "route summary" in stdout
     assert "recommended next action: continue-to-request-run" in stdout
     assert "recommended next action domain: continue" in stdout
+
+
+def test_batch_generator_can_require_reference_request_boundary(tmp_path):
+    source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
+    ours = Path(_png(tmp_path / "ours" / "G11.png", (760, 570)))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "boundary": {
+            "autocad_equivalence_claim": True,
+        },
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "source_dxf_sha256": _sha256(source),
+            "candidate_png_sha256": _sha256(ours),
+            "recommended_output_name": "G11_autocad_model_extents.png",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--validate-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--require-request-boundary", "autocad_equivalence_claim=false",
+        "--require-request-boundary", "requires_returned_autocad_png=true",
+        "--out-dir", str(out),
+    ]) == 2
+
+    validation = json.loads((out / "reference_request_validation.json").read_text(encoding="utf-8"))
+    assert validation["status"] == "blocked"
+    assert validation["issue_code_counts"] == {
+        "missing_request_boundary": 1,
+        "request_boundary_mismatch": 1,
+    }
+    issue_codes = {issue["code"] for issue in validation["issues"]}
+    assert {"missing_request_boundary", "request_boundary_mismatch"} <= issue_codes
+    validation_md = (out / "reference_request_validation.md").read_text(encoding="utf-8")
+    assert "missing_request_boundary=1" in validation_md
+    assert "request_boundary_mismatch=1" in validation_md
 
 
 def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(tmp_path):

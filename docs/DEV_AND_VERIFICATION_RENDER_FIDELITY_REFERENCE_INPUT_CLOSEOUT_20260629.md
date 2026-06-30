@@ -1020,6 +1020,45 @@ python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
 # passed
 ```
 
+## Follow-Up Request Validation Boundary Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Move the request-boundary fail-closed check earlier, before time is spent
+  capturing AutoCAD PNGs.
+- Keep old request packages readable by default, while allowing generated
+  handoff commands to require the boundary explicitly.
+- Make the validation report show clear `missing_request_boundary` /
+  `request_boundary_mismatch` issue codes when the source request package no
+  longer carries the no-equivalence / returned-PNG / matched-view contract.
+
+Changes:
+
+- `acad_reference_batch.py --validate-request` and `--from-request` now accept
+  repeatable `--require-request-boundary key=value`.
+- Generated `reference_request.md` adds the request-boundary guard to the
+  "Before Capture Or Fulfilment" validation command.
+- `tools/render_regression/README.md` documents the pre-capture validation
+  command with the same guard.
+
+Boundary:
+
+- Input-package validation guard only.
+- No renderer change.
+- No X3 scoring change.
+- No compare behavior change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py tools/render_regression/tests/test_acad_manifest_compare.py -q
+# passed
+```
+
 ## Follow-Up Source Report Issue Code Counts
 
 Status: implemented in this branch.
