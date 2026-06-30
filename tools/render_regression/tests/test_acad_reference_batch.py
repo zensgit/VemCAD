@@ -209,7 +209,8 @@ def test_batch_generator_validates_reference_request_package_before_fulfilment(t
     assert validation_tsv[0] == (
         "id\tdrawing_id\trecommended_output_name\trequested_capture_method\t"
         "requested_view_contract\trequested_expected_size\tsource_dxf\tsource_dxf_sha256\t"
-        "source_dxf_size_bytes\tcandidate_png\tcandidate_png_sha256\tcandidate_png_size_bytes\tissue_codes"
+        "source_dxf_size_bytes\tcurrent_acad_png\tcurrent_acad_png_sha256\t"
+        "current_acad_png_size_bytes\tcandidate_png\tcandidate_png_sha256\tcandidate_png_size_bytes\tissue_codes"
     )
     assert validation_tsv[1].startswith("G11\tG11/B11\tG11_autocad_model_extents.png\t")
     assert f"\t{_sha256(source)}\t{source.stat().st_size}\t" in validation_tsv[1]
@@ -276,7 +277,7 @@ def test_batch_generator_escapes_reference_request_validation_markdown_table_cel
     assert "G11\\|bearing cap" in row
     assert "`G11\\|acad_model_extents.png`" in row
     assert "G11\\|ours.png" in row
-    assert _unescaped_pipe_count(row) == 12
+    assert _unescaped_pipe_count(row) == 14
 
 
 def test_batch_generator_can_require_reference_request_boundary(tmp_path):
@@ -413,6 +414,53 @@ def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(t
         "reference_request_validation_markdown",
         "reference_request_validation_tsv",
     } <= {item["kind"] for item in artifact_index["artifacts"]}
+
+
+def test_batch_generator_validates_current_acad_png_provenance_when_available(tmp_path):
+    source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
+    ours = Path(_png(tmp_path / "ours" / "G11.png", (760, 570)))
+    current = Path(_png(tmp_path / "acad" / "G11_bad_current.png", (800, 600), box=[220, 165, 580, 435]))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "source_dxf_sha256": _sha256(source),
+            "current_acad_png": "acad/G11_bad_current.png",
+            "current_acad_png_sha256": "0" * 64,
+            "current_acad_png_size_bytes": current.stat().st_size + 1,
+            "candidate_png_sha256": _sha256(ours),
+            "candidate_png_size_bytes": ours.stat().st_size,
+            "recommended_output_name": "G11_autocad_model_extents.png",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--validate-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--out-dir", str(out),
+    ]) == 2
+
+    validation = json.loads((out / "reference_request_validation.json").read_text(encoding="utf-8"))
+    assert validation["issue_code_counts"] == {
+        "current_acad_png_sha256_mismatch": 1,
+        "current_acad_png_size_mismatch": 1,
+    }
+    row = validation["cases"][0]
+    assert row["current_acad_png"].endswith("acad/G11_bad_current.png")
+    assert row["current_acad_png_provenance"]["sha256"] == _sha256(current)
+    assert row["current_acad_png_provenance"]["size_bytes"] == current.stat().st_size
+    validation_md = (out / "reference_request_validation.md").read_text(encoding="utf-8")
+    assert "current_acad_png_sha256_mismatch" in validation_md
+    assert f"sha256={_sha256(current)} size={current.stat().st_size}" in validation_md
+    validation_tsv = (out / "reference_request_validation.tsv").read_text(encoding="utf-8")
+    assert "current_acad_png_sha256_mismatch" in validation_tsv
+    assert _sha256(current) in validation_tsv
 
 
 def test_batch_generator_fulfills_reference_request(tmp_path):
