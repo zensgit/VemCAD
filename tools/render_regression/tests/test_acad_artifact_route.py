@@ -753,6 +753,60 @@ def test_cli_forbid_action_domain_fails_on_request_run_case_domain_counts(tmp_pa
     assert "action domain counts: input=1, renderer-candidate=1" in stderr
 
 
+def test_cli_forbid_action_passes_when_action_absent(tmp_path):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "missing_references",
+        "status": "blocked",
+        "case_count": 1,
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--require-action-domain",
+        "input",
+        "--forbid-action",
+        "inspect-renderer-candidate",
+    ]) == 0
+
+
+def test_cli_forbid_action_fails_on_request_run_case_action_counts(tmp_path, capsys):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    _write(run_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_request_run_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "recommended_next_action": {
+            "code": "recapture-autocad-or-provide-window",
+            "message": "recapture",
+            "domain": "input",
+        },
+        "case_action_counts": {
+            "recapture-autocad-or-provide-window": 1,
+            "review-x3-pass": 1,
+        },
+        "case_action_domain_counts": {
+            "input": 1,
+            "pass-review": 1,
+        },
+        "case_actions": [],
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(run_dir),
+        "--forbid-action",
+        "recapture-autocad-or-provide-window",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "forbidden action present: recapture-autocad-or-provide-window=1" in stderr
+    assert "action counts: recapture-autocad-or-provide-window=1, review-x3-pass=1" in stderr
+
+
 def test_cli_require_action_count_passes_for_batch(tmp_path):
     input_dir = tmp_path / "input"
     compare_dir = tmp_path / "compare"

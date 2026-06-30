@@ -821,6 +821,11 @@ def main(argv: list[str] | None = None) -> int:
                             "exit 2 if any routed action domain count includes this domain; "
                             "may repeat"
                         ))
+    parser.add_argument("--forbid-action", action="append", default=[],
+                        help=(
+                            "exit 2 if routed action counts include this code; "
+                            "may repeat"
+                        ))
     parser.add_argument("--require-action-count", action="append", default=[],
                         help=(
                             "exit 2 unless routed action counts contain code=count; "
@@ -932,6 +937,21 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(
                 "acad_artifact_route: action domain counts: "
+                + _format_counts(counts),
+                file=sys.stderr,
+            )
+            return 2
+    if args.forbid_action:
+        counts = _action_counts(payload)
+        forbidden = [action for action in args.forbid_action if counts.get(action, 0)]
+        if forbidden:
+            print(
+                "acad_artifact_route: forbidden action present: "
+                + ", ".join(f"{action}={counts.get(action, 0)}" for action in forbidden),
+                file=sys.stderr,
+            )
+            print(
+                "acad_artifact_route: action counts: "
                 + _format_counts(counts),
                 file=sys.stderr,
             )

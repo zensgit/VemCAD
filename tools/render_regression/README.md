@@ -261,6 +261,18 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --forbid-action-domain renderer-candidate
 ```
 
+Use `--forbid-action <code>` when a workflow should allow an action domain but
+fail closed on a specific action code. For example, an input-domain gate can
+still reject stale matched-view work that routes to
+`recapture-autocad-or-provide-window`:
+
+```bash
+python3 tools/render_regression/acad_artifact_route.py <run-dir> \
+  --recursive \
+  --require-action-domain input \
+  --forbid-action recapture-autocad-or-provide-window
+```
+
 Use `--require-action-count <code=count>` when a workflow needs to assert the
 exact routed action distribution. For multi-route payloads this checks
 `recommended_action_counts`; for request-run payloads it checks

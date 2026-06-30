@@ -3254,6 +3254,45 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Route Forbidden Action Gate
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let unattended route checks fail closed on one specific routed action code,
+  even when that action shares an otherwise allowed domain.
+- Prevent a coarse `--require-action-domain input` guard from accepting a run
+  that still contains `recapture-autocad-or-provide-window` when a workflow is
+  deliberately expecting a different input action.
+
+Changes:
+
+- `acad_artifact_route.py` now accepts repeatable `--forbid-action <code>`.
+- Multi-route payloads are checked against `recommended_action_counts`.
+- Request-run payloads are checked against `case_action_counts`.
+- Single-route payloads fall back to the top-level recommended action code.
+- Failure output prints both the forbidden action counts and the full routed
+  action-count summary.
+
+Boundary:
+
+- Route-gate assertion only.
+- No route priority change.
+- No renderer change.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- No private drawing or AutoCAD PNG committed.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up CLI Action Domain Logs
 
 Status: implemented in this branch.
