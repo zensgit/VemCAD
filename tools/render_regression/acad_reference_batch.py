@@ -114,6 +114,78 @@ def _inspect_reference_png(path: Path) -> tuple[dict[str, Any], list[dict[str, s
     return inspection, issues
 
 
+def _ink_profile(path: Path) -> dict[str, Any]:
+    with Image.open(path) as image:
+        rgb = image.convert("RGB")
+        width, height = rgb.size
+        min_x = width
+        min_y = height
+        max_x = -1
+        max_y = -1
+        for y in range(height):
+            for x, pixel in enumerate(rgb.crop((0, y, width, y + 1)).getdata()):
+                if not _near_white(pixel):
+                    min_x = min(min_x, x)
+                    min_y = min(min_y, y)
+                    max_x = max(max_x, x)
+                    max_y = max(max_y, y)
+        if max_x < min_x or max_y < min_y:
+            return {
+                "status": "blank",
+                "image_width": width,
+                "image_height": height,
+            }
+        bbox_w = max_x - min_x + 1
+        bbox_h = max_y - min_y + 1
+        return {
+            "status": "available",
+            "image_width": width,
+            "image_height": height,
+            "bbox": [min_x, min_y, max_x, max_y],
+            "bbox_width": bbox_w,
+            "bbox_height": bbox_h,
+            "bbox_aspect": round(bbox_w / bbox_h, 6) if bbox_h else None,
+            "fill_x": round(bbox_w / width, 6) if width else None,
+            "fill_y": round(bbox_h / height, 6) if height else None,
+        }
+
+
+def _identity_advisory(returned_png: Path, candidate_png: Path | None) -> tuple[dict[str, Any], list[dict[str, str]]]:
+    if candidate_png is None:
+        return {"status": "unavailable", "reason": "candidate_missing"}, []
+    try:
+        returned = _ink_profile(returned_png)
+        candidate = _ink_profile(candidate_png)
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}, []
+    advisory: dict[str, Any] = {
+        "status": "available",
+        "diagnostic_only": True,
+        "candidate_png": str(candidate_png),
+        "returned_ink": returned,
+        "candidate_ink": candidate,
+    }
+    issues: list[dict[str, str]] = []
+    returned_aspect = returned.get("bbox_aspect")
+    candidate_aspect = candidate.get("bbox_aspect")
+    if isinstance(returned_aspect, (int, float)) and isinstance(candidate_aspect, (int, float)):
+        aspect_delta = abs(float(returned_aspect) - float(candidate_aspect)) / max(
+            float(returned_aspect),
+            float(candidate_aspect),
+        )
+        advisory["ink_bbox_aspect_delta"] = round(aspect_delta, 6)
+        if aspect_delta > 0.25:
+            issues.append({
+                "severity": "warning",
+                "code": "ink_bbox_aspect_divergence",
+                "message": (
+                    f"returned/candidate ink bbox aspect differs by {aspect_delta:.3f}; "
+                    "check for wrong drawing or capture-window mismatch"
+                ),
+            })
+    return advisory, issues
+
+
 def _resolve(base: Path, value: Any) -> str:
     raw = _str(value)
     if not raw:
@@ -419,10 +491,12 @@ def _write_reference_intake_report(
     out_dir: Path,
     request_json: Path,
     *,
+    candidate_cases: Path,
     reference_dir: Path,
     case_ids: set[str] | None = None,
 ) -> dict[str, Any]:
     request_cases = _filter_request_cases(_load_request_cases(request_json), case_ids)
+    candidates = _load_candidate_map(candidate_cases)
     rows: list[dict[str, Any]] = []
     error_count = 0
     warning_count = 0
@@ -440,6 +514,15 @@ def _write_reference_intake_report(
                 "code": "reference_png_unreadable",
                 "message": str(exc),
             }]
+        candidate = candidates.get(case_id)
+        candidate_png = None
+        if candidate is not None:
+            candidate_raw = _str(candidate.get("ours"))
+            if candidate_raw:
+                candidate_png = Path(_resolve(candidate_cases.parent, candidate_raw))
+        advisory, advisory_issues = _identity_advisory(expected_path, candidate_png)
+        inspection["identity_advisory"] = advisory
+        row_issues.extend(advisory_issues)
         for issue in row_issues:
             if issue["severity"] == "error":
                 error_count += 1
@@ -529,6 +612,7 @@ def build_files_from_request(
     intake = _write_reference_intake_report(
         out_dir,
         request_json,
+        candidate_cases=candidate_cases,
         reference_dir=reference_dir,
         case_ids=case_ids,
     )
