@@ -1559,6 +1559,44 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Route Required-Action Gate
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let CI or unattended scripts assert that a route payload reached the expected
+  next action.
+- Fail closed when an artifact tree routes somewhere unexpected, without making
+  downstream scripts parse JSON manually.
+
+Changes:
+
+- `acad_artifact_route.py` now accepts:
+  `--require-action <recommended_next_action.code>`.
+- The option works for both single artifact indexes and multi-route/recursive
+  payloads because it checks the top-level `recommended_next_action`.
+- On mismatch the command exits `2` and prints the actual action plus the
+  action artifact when available.
+
+Boundary:
+
+- Route assertion only.
+- No routing-rule change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 Private compatibility smoke:
 
 ```bash

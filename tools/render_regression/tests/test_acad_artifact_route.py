@@ -247,6 +247,63 @@ def test_cli_writes_json_and_markdown_reports(tmp_path):
     assert "recapture-autocad-or-provide-window=1" in markdown
 
 
+def test_cli_require_action_passes_for_matching_top_level_action(tmp_path):
+    compare_dir = tmp_path / "compare"
+    compare_dir.mkdir()
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"recapture-required": 1},
+        "viewspace_status_counts": {"mismatch": 1},
+        "x3_band_counts": {"fallback": 1},
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(compare_dir),
+        "--require-action",
+        "recapture-autocad-or-provide-window",
+    ]) == 0
+
+
+def test_cli_require_action_fails_closed_on_unexpected_top_level_action(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    compare_dir = tmp_path / "compare"
+    input_dir.mkdir()
+    compare_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "pass",
+        "case_count": 1,
+        "artifacts": [],
+    })
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"recapture-required": 1},
+        "viewspace_status_counts": {"mismatch": 1},
+        "x3_band_counts": {"fallback": 1},
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        str(compare_dir),
+        "--require-action",
+        "review-x3-pass",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "required action 'review-x3-pass'" in stderr
+    assert "got 'recapture-autocad-or-provide-window'" in stderr
+    assert "action artifact:" in stderr
+
+
 def test_recursive_rejects_directory_without_artifact_indexes(tmp_path):
     assert route.main([str(tmp_path), "--recursive"]) == 2
 

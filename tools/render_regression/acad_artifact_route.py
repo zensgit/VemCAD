@@ -397,6 +397,14 @@ def write_route_report_files(
         _write_output_file(out_md, route_markdown(payload))
 
 
+def _recommended_action_code(payload: dict[str, Any]) -> str:
+    return str((payload.get("recommended_next_action") or {}).get("code") or "")
+
+
+def _recommended_action_artifact(payload: dict[str, Any]) -> str:
+    return str((payload.get("recommended_next_action") or {}).get("artifact") or "")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="acad_artifact_route",
@@ -408,6 +416,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--text", action="store_true", help="print a human-readable summary instead of JSON")
     parser.add_argument("--out-json", type=Path, help="also write the route payload JSON to this file")
     parser.add_argument("--out-md", type=Path, help="also write a Markdown route report to this file")
+    parser.add_argument("--require-action", default="",
+                        help="exit 2 unless the top-level recommended_next_action.code matches this value")
     args = parser.parse_args(argv)
 
     try:
@@ -427,6 +437,18 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(json.dumps(payload, ensure_ascii=False, indent=2))
     write_route_report_files(payload, out_json=args.out_json, out_md=args.out_md)
+    if args.require_action:
+        actual = _recommended_action_code(payload)
+        if actual != args.require_action:
+            artifact = _recommended_action_artifact(payload)
+            print(
+                f"acad_artifact_route: required action {args.require_action!r} "
+                f"but got {actual!r}",
+                file=sys.stderr,
+            )
+            if artifact:
+                print(f"acad_artifact_route: action artifact: {artifact}", file=sys.stderr)
+            return 2
     return 0
 
 
