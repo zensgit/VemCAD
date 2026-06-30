@@ -5347,3 +5347,45 @@ python3 -m pytest \
 python3 -m pytest tools/render_regression/tests -q
 # 189 passed
 ```
+
+## Follow-Up Recapture Route Action Artifact Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make generated `reference_request.md` handoff commands fail closed when the
+  routed `recommended_next_action.artifact` does not resolve to an existing
+  file.
+- Avoid a green boundary/action route check that points operators at a missing
+  handoff artifact.
+- Reuse the existing `acad_artifact_route.py --require-action-artifact-exists`
+  guard instead of adding new route semantics.
+
+Changes:
+
+- `acad_manifest_compare.py` now adds `--require-action-artifact-exists` to
+  the generated post-return `acad_artifact_route.py <next-run-dir> --recursive`
+  command in `reference_request.md`.
+- The generated handoff test asserts the guard appears exactly once in the
+  route-inspection command block.
+
+Boundary:
+
+- Generated operator handoff hardening only.
+- No route priority change.
+- No default exit-code behavior change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 8 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 189 passed
+```
