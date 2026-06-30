@@ -4574,3 +4574,48 @@ Verification:
 python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
 # passed
 ```
+
+## Follow-Up Recapture Request Markdown Status Columns
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make generated `reference_request.md` handoffs explain not only which files
+  to recapture, but why they are in the recapture lane and what size contract
+  the returned PNG should satisfy.
+- Surface existing per-case request evidence without requiring operators to
+  open `reference_request.json`.
+
+Changes:
+
+- `acad_manifest_compare.py` now adds `Current view`, `Current X3`, and
+  `Expected size` columns to generated `reference_request.md`.
+- The values are sourced from existing request case fields:
+  `current_viewspace_status`, `current_x3_band`, and
+  `requested_expected_size`.
+- A local `_expected_size_text()` helper formats `requested_expected_size` as
+  compact `WIDTHxHEIGHT` text for Markdown.
+- Regression coverage asserts the normal `viewspace_mismatch` request
+  Markdown includes `mismatch`, `fallback`, and `800x600`.
+- The Markdown escaping regression was updated for the wider recapture request
+  table.
+- `tools/render_regression/README.md` now documents the visible recapture
+  status/size columns.
+
+Boundary:
+
+- Operator evidence surfacing only.
+- `reference_request.json` schema/content is unchanged.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# passed
+```
