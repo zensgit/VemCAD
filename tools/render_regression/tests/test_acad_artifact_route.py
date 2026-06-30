@@ -76,6 +76,23 @@ def test_routes_batch_missing_references(tmp_path):
     assert "- reference_intake_issue_code_counts: `returned_reference_blank=2`" in markdown
 
 
+def test_route_markdown_escapes_code_span_values(tmp_path):
+    index = _write(tmp_path / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "missing_references",
+        "status": "blocked",
+        "case_count": 1,
+        "artifacts": [
+            {"kind": "missing_references_markdown", "path": "missing|refs`2026`.md"},
+        ],
+    })
+
+    payload = route.route_artifact_index(index)
+    markdown = route.route_markdown(payload)
+
+    assert "- action_artifact: ``missing\\|refs`2026`.md``" in markdown
+
+
 def test_routes_directory_containing_artifact_index(tmp_path):
     _write(tmp_path / "artifact_index.json", {
         "schema": "vemcad.acad_reference_batch_artifact_index/v1",

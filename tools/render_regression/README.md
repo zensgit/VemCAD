@@ -219,6 +219,9 @@ handoff safe for unusual drawing IDs or output paths.
 The manifest-compare summary and generated recapture request tables use the
 same safe Markdown table/code-cell formatting for case IDs, drawing IDs, and
 requested output names.
+Route Markdown reports also use safe code spans for action artifacts and count
+summaries, so unusual artifact paths remain readable in the top-level route
+handoff.
 The batch, compare, and request-run CLIs also print the recommended action
 domain next to the action code, so CI logs can show the route class without
 opening JSON artifacts.
