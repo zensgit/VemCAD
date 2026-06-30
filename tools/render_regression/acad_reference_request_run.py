@@ -37,6 +37,28 @@ def _compare_status(compare_summary: Path) -> str:
     return str(payload.get("status") or "")
 
 
+def _intake_status(intake_json: Path) -> dict[str, Any]:
+    if not intake_json.is_file():
+        return {
+            "status": "",
+            "error_count": None,
+            "warning_count": None,
+        }
+    try:
+        payload = json.loads(intake_json.read_text(encoding="utf-8"))
+    except Exception:
+        return {
+            "status": "unreadable",
+            "error_count": None,
+            "warning_count": None,
+        }
+    return {
+        "status": str(payload.get("status") or ""),
+        "error_count": payload.get("error_count"),
+        "warning_count": payload.get("warning_count"),
+    }
+
+
 def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
     lines = [
         "# AutoCAD Reference Request Run",
@@ -44,6 +66,8 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- status: `{summary['status']}`",
         f"- batch_exit_code: `{summary['batch_exit_code']}`",
         f"- compare_exit_code: `{summary['compare_exit_code']}`",
+        f"- reference_intake_status: `{summary['reference_intake_status']}`",
+        f"- reference_intake_warnings: `{summary['reference_intake_warning_count']}`",
         "",
         "## Boundary",
         "",
@@ -80,6 +104,7 @@ def _write_run_summary(
 ) -> dict[str, Any]:
     compare_summary_json = compare_dir / "summary.json"
     compare_status = _compare_status(compare_summary_json)
+    intake = _intake_status(input_dir / "reference_intake.json")
     if batch_rc != 0:
         status = "input_blocked"
     else:
@@ -94,6 +119,9 @@ def _write_run_summary(
         "input_artifact_index": _existing(input_dir / "artifact_index.json"),
         "reference_intake_json": _existing(input_dir / "reference_intake.json"),
         "reference_intake_markdown": _existing(input_dir / "reference_intake.md"),
+        "reference_intake_status": intake["status"],
+        "reference_intake_error_count": intake["error_count"],
+        "reference_intake_warning_count": intake["warning_count"],
         "missing_references_json": _existing(input_dir / "missing_references.json"),
         "missing_references_markdown": _existing(input_dir / "missing_references.md"),
         "compare_summary_json": _existing(compare_summary_json),

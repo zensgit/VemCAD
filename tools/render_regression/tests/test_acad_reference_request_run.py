@@ -9,9 +9,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import acad_reference_request_run as runner  # noqa: E402
 
 
-def _png(path: Path, size=(760, 570), box=None) -> str:
+def _png(path: Path, size=(760, 570), box=None, color=(255, 255, 255)) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
-    image = Image.new("RGB", size, (255, 255, 255))
+    image = Image.new("RGB", size, color)
     if box is not None:
         draw = ImageDraw.Draw(image)
         draw.rectangle(box, outline=(0, 0, 0), width=3)
@@ -52,8 +52,12 @@ def _candidates(path: Path, *, case_id="G11") -> Path:
 
 def test_reference_request_run_fulfills_and_compares_match(tmp_path):
     _dxf(tmp_path / "dxf" / "B11.dxf")
-    _png(tmp_path / "ours" / "G11.png", box=[20, 15, 740, 555])
-    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", box=[20, 15, 740, 555])
+    _png(tmp_path / "ours" / "G11.png", size=(1600, 1131), box=[40, 30, 1560, 1100])
+    _png(
+        tmp_path / "returned" / "G11_autocad_model_extents.png",
+        size=(1600, 1131),
+        box=[40, 30, 1560, 1100],
+    )
     request = _request(tmp_path / "reference_request.json")
     candidates = _candidates(tmp_path / "candidate_cases.json")
     out = tmp_path / "run"
@@ -73,6 +77,8 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path):
     assert summary["batch_exit_code"] == 0
     assert summary["compare_exit_code"] == 0
     assert summary["boundary"]["autocad_equivalence_claim"] is False
+    assert summary["reference_intake_status"] == "pass"
+    assert summary["reference_intake_warning_count"] == 0
     assert summary["reference_intake_markdown"].endswith("reference_intake.md")
     assert summary["compare_summary_markdown"].endswith("summary.md")
     assert compare_summary["status"] == "pass"
@@ -103,6 +109,36 @@ def test_reference_request_run_preserves_viewspace_mismatch_exit(tmp_path):
     assert compare_summary["status"] == "viewspace_mismatch"
 
 
+def test_reference_request_run_surfaces_intake_review_warnings(tmp_path):
+    _dxf(tmp_path / "dxf" / "B11.dxf")
+    _png(tmp_path / "ours" / "G11.png", size=(760, 570), box=[20, 15, 740, 555])
+    _png(
+        tmp_path / "returned" / "G11_autocad_model_extents.png",
+        size=(900, 600),
+        box=[220, 165, 580, 435],
+        color=(12, 12, 12),
+    )
+    request = _request(tmp_path / "reference_request.json")
+    candidates = _candidates(tmp_path / "candidate_cases.json")
+    out = tmp_path / "run"
+
+    assert runner.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--case-id", "G11",
+        "--out-dir", str(out),
+    ]) == 2
+
+    summary = json.loads((out / "run_summary.json").read_text(encoding="utf-8"))
+    assert summary["status"] == "viewspace_mismatch"
+    assert summary["reference_intake_status"] == "review"
+    assert summary["reference_intake_warning_count"] == 2
+    summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
+    assert "reference_intake_status: `review`" in summary_md
+    assert "reference_intake_warnings: `2`" in summary_md
+
+
 def test_reference_request_run_stops_on_missing_reference(tmp_path):
     _dxf(tmp_path / "dxf" / "B11.dxf")
     _png(tmp_path / "ours" / "G11.png", box=[20, 15, 740, 555])
@@ -123,5 +159,7 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path):
     assert summary["batch_exit_code"] == 2
     assert summary["compare_exit_code"] is None
     assert summary["missing_references_markdown"].endswith("missing_references.md")
+    assert summary["reference_intake_status"] == ""
+    assert summary["reference_intake_warning_count"] is None
     assert summary["compare_summary_markdown"] == ""
     assert not (out / "compare" / "summary.json").exists()

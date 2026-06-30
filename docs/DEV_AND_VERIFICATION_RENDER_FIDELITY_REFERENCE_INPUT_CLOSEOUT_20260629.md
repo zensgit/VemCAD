@@ -270,3 +270,41 @@ Boundary:
 - No private drawing or AutoCAD PNG committed.
 - Does not attempt to infer whether the returned PNG depicts the same drawing;
   the matched-view X3 gate remains the only fidelity gate.
+
+## Follow-Up Run Summary Hardening
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make the one-command runner's top-level summary show returned-reference
+  intake quality without requiring the operator to open `input/reference_intake`.
+
+Changes:
+
+- `acad_reference_request_run.py` now copies these fields from
+  `input/reference_intake.json` into `run_summary.json`:
+  - `reference_intake_status`
+  - `reference_intake_error_count`
+  - `reference_intake_warning_count`
+- `run_summary.md` prints the intake status and warning count in the result
+  block.
+- Missing-reference blocked runs, which never produce `reference_intake`, keep
+  those fields empty/null.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 4 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 97 passed
+```
+
+Boundary:
+
+- Summary/reporting only.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- Does not change X3 semantics or AutoCAD-equivalence wording.
