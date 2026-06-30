@@ -106,6 +106,54 @@ def test_dry_run_validates_manifest_without_candidate_png(tmp_path):
     assert summary["boundary"]["renders_dxf"] is False
 
 
+def test_manifest_harness_clears_stale_compare_artifacts_on_dry_run_rerun(tmp_path):
+    acad = _png(tmp_path / "acad.png", box=[20, 15, 740, 555])
+    ours = _png(tmp_path / "ours.png", box=[20, 15, 740, 555])
+    dxf = _dxf(tmp_path / "B11.dxf")
+    manifest = _manifest(tmp_path / "manifest.json", acad=acad, dxf=dxf)
+    candidates = _candidates(tmp_path / "candidates.json", ours)
+    out = tmp_path / "out"
+
+    assert harness.main([
+        "--manifest", str(manifest),
+        "--candidate-cases", str(candidates),
+        "--out-dir", str(out),
+    ]) == 0
+    assert (out / "summary.tsv").is_file()
+    assert (out / "contact_sheet.png").is_file()
+    assert any((out / "overlays").glob("*"))
+    assert any((out / "viewspace").glob("*"))
+
+    assert harness.main(["--manifest", str(manifest), "--out-dir", str(out), "--dry-run"]) == 0
+
+    summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert summary["status"] == "ready"
+    assert summary["dry_run"] is True
+    assert summary["compared_count"] == 0
+    artifact_kinds = {item["kind"] for item in artifact_index["artifacts"]}
+    assert artifact_kinds == {
+        "summary_json",
+        "summary_markdown",
+        "route_summary_json",
+        "route_summary_markdown",
+        "autocad_reference",
+    }
+    assert artifact_index["boundary"]["compares_renders"] is False
+    assert artifact_index["compared_count"] == 0
+    assert "summary_tsv" not in artifact_kinds
+    assert "contact_sheet" not in artifact_kinds
+    assert "vemcad_candidate" not in artifact_kinds
+    assert "x3_overlay" not in artifact_kinds
+    assert "viewspace_report" not in artifact_kinds
+    assert not (out / "summary.tsv").exists()
+    assert not (out / "contact_sheet.png").exists()
+    assert not (out / "overlays").exists()
+    assert not (out / "viewspace").exists()
+    assert not (out / "reference_request.json").exists()
+    assert not (out / "reference_request.md").exists()
+
+
 def test_manifest_harness_runs_compare_and_records_match(tmp_path, capsys):
     acad = _png(tmp_path / "acad.png", box=[20, 15, 740, 555])
     ours = _png(tmp_path / "ours.png", box=[20, 15, 740, 555])

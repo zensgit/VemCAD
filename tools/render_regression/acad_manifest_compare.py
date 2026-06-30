@@ -14,6 +14,7 @@ import contextlib
 import hashlib
 import io
 import json
+import shutil
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -141,6 +142,27 @@ def _manifest_issue_dict(issue: dict[str, Any]) -> dict[str, str]:
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _clear_compare_outputs(out_dir: Path) -> None:
+    for name in (
+        "summary.json",
+        "summary.md",
+        "summary.tsv",
+        "artifact_index.json",
+        "route_summary.json",
+        "route_summary.md",
+        "contact_sheet.png",
+        "reference_request.json",
+        "reference_request.md",
+    ):
+        path = out_dir / name
+        if path.is_file():
+            path.unlink()
+    for name in ("overlays", "viewspace", "semantic", "text"):
+        path = out_dir / name
+        if path.is_dir():
+            shutil.rmtree(path)
 
 
 def _print_route_summary(out_dir: Path, route_payload: dict[str, Any]) -> None:
@@ -843,6 +865,7 @@ def main(argv: list[str] | None = None) -> int:
                         help="validate the AutoCAD manifest only; do not require candidates or compare")
     args = parser.parse_args(argv)
 
+    _clear_compare_outputs(args.out_dir)
     args.out_dir.mkdir(parents=True, exist_ok=True)
     rc, report = build_report(
         args.manifest,
