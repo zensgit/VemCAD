@@ -188,6 +188,7 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path, capsys):
     assert "claim AutoCAD equivalence" in route_summary_md
     assert "route summary" in stdout
     assert "recommended next action: review-x3-pass" in stdout
+    assert "recommended next action domain: pass-review" in stdout
     assert not (out / "reference_request.json").exists()
     assert not (out / "reference_request.md").exists()
 
@@ -263,6 +264,7 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert "recapture-autocad-or-provide-window" in route_summary_md
     assert "route summary" in stdout
     assert "recommended next action: recapture-autocad-or-provide-window" in stdout
+    assert "recommended next action domain: input" in stdout
     request = json.loads((out / "reference_request.json").read_text(encoding="utf-8"))
     assert request["schema"] == "vemcad.acad_reference_request/v1"
     assert request["reason"] == "recapture-required"
@@ -327,6 +329,7 @@ def test_manifest_harness_stops_on_blocked_manifest(tmp_path, capsys):
     assert route_summary["recommended_next_action"]["code"] == "inspect-compare-input-block"
     assert "route summary" in stdout
     assert "recommended next action: inspect-compare-input-block" in stdout
+    assert "recommended next action domain: input" in stdout
 
 
 def test_triage_rows_prioritize_matched_fail_then_recapture_then_pass():

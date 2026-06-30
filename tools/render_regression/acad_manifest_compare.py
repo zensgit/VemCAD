@@ -138,6 +138,7 @@ def _print_route_summary(out_dir: Path, route_payload: dict[str, Any]) -> None:
     action = route_payload.get("recommended_next_action") or {}
     print(f"  route summary  : {out_dir / 'route_summary.md'}")
     print(f"  recommended next action: {action.get('code', '')}")
+    print(f"  recommended next action domain: {action.get('domain', '')}")
 
 
 def _write_tsv(path: Path, rows: list[dict[str, Any]]) -> None:
