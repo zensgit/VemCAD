@@ -841,6 +841,22 @@ def _issue_code_counts(payload: dict[str, Any]) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
+def _count_map(payload: dict[str, Any], key: str) -> dict[str, int]:
+    values = payload.get(key)
+    if not isinstance(values, dict):
+        return {}
+    counts: dict[str, int] = {}
+    for name, count in values.items():
+        name_text = str(name)
+        if not name_text:
+            continue
+        try:
+            counts[name_text] = int(count)
+        except Exception:
+            continue
+    return dict(sorted(counts.items()))
+
+
 def _parse_boundary_expectation(raw: str) -> tuple[str, Any]:
     if "=" not in raw:
         raise ValueError(f"boundary expectation must be key=value: {raw}")
@@ -872,6 +888,27 @@ def _parse_count_expectation(raw: str) -> tuple[str, int]:
     if count < 0:
         raise ValueError(f"count expectation value must be non-negative: {raw}")
     return key, count
+
+
+def _check_count_guards(
+    *,
+    label: str,
+    counts: dict[str, int],
+    required: list[tuple[str, int]],
+    forbidden: list[str],
+) -> list[str]:
+    failures: list[str] = []
+    for key, expected in required:
+        actual = counts.get(key, 0)
+        if actual != expected:
+            failures.append(f"required {label} count mismatch: {key}={expected} (got {actual})")
+    forbidden_present = [key for key in forbidden if counts.get(key, 0)]
+    if forbidden_present:
+        failures.append(
+            f"forbidden {label} present: "
+            + ", ".join(f"{key}={counts.get(key, 0)}" for key in forbidden_present)
+        )
+    return failures
 
 
 def _source_boundary_routes(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -999,6 +1036,36 @@ def main(argv: list[str] | None = None) -> int:
                             "exit 2 if the routed request/intake issue-code counts "
                             "include this code; may repeat"
                         ))
+    parser.add_argument("--require-triage-bucket", action="append", default=[],
+                        help=(
+                            "exit 2 unless routed compare triage_bucket_counts "
+                            "contain bucket=count; may repeat"
+                        ))
+    parser.add_argument("--forbid-triage-bucket", action="append", default=[],
+                        help=(
+                            "exit 2 if routed compare triage_bucket_counts "
+                            "include this bucket; may repeat"
+                        ))
+    parser.add_argument("--require-viewspace-status", action="append", default=[],
+                        help=(
+                            "exit 2 unless routed compare viewspace_status_counts "
+                            "contain status=count; may repeat"
+                        ))
+    parser.add_argument("--forbid-viewspace-status", action="append", default=[],
+                        help=(
+                            "exit 2 if routed compare viewspace_status_counts "
+                            "include this status; may repeat"
+                        ))
+    parser.add_argument("--require-x3-band", action="append", default=[],
+                        help=(
+                            "exit 2 unless routed compare x3_band_counts "
+                            "contain band=count; may repeat"
+                        ))
+    parser.add_argument("--forbid-x3-band", action="append", default=[],
+                        help=(
+                            "exit 2 if routed compare x3_band_counts "
+                            "include this band; may repeat"
+                        ))
     args = parser.parse_args(argv)
 
     try:
@@ -1022,6 +1089,15 @@ def main(argv: list[str] | None = None) -> int:
         ]
         action_domain_count_expectations = [
             _parse_count_expectation(item) for item in args.require_action_domain_count
+        ]
+        triage_bucket_expectations = [
+            _parse_count_expectation(item) for item in args.require_triage_bucket
+        ]
+        viewspace_status_expectations = [
+            _parse_count_expectation(item) for item in args.require_viewspace_status
+        ]
+        x3_band_expectations = [
+            _parse_count_expectation(item) for item in args.require_x3_band
         ]
     except Exception as exc:
         print(f"acad_artifact_route: {exc}", file=sys.stderr)
@@ -1222,6 +1298,43 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 "acad_artifact_route: issue code counts: "
                 + _format_counts(counts),
+                file=sys.stderr,
+            )
+            return 2
+    compare_count_guards = [
+        (
+            "triage bucket",
+            _count_map(payload, "triage_bucket_counts"),
+            triage_bucket_expectations,
+            args.forbid_triage_bucket,
+        ),
+        (
+            "viewspace status",
+            _count_map(payload, "viewspace_status_counts"),
+            viewspace_status_expectations,
+            args.forbid_viewspace_status,
+        ),
+        (
+            "x3 band",
+            _count_map(payload, "x3_band_counts"),
+            x3_band_expectations,
+            args.forbid_x3_band,
+        ),
+    ]
+    for label, counts, required, forbidden in compare_count_guards:
+        if not required and not forbidden:
+            continue
+        failures = _check_count_guards(
+            label=label,
+            counts=counts,
+            required=required,
+            forbidden=forbidden,
+        )
+        if failures:
+            for failure in failures:
+                print(f"acad_artifact_route: {failure}", file=sys.stderr)
+            print(
+                f"acad_artifact_route: {label} counts: " + _format_counts(counts),
                 file=sys.stderr,
             )
             return 2

@@ -1140,6 +1140,82 @@ def test_cli_require_action_domain_count_fails_closed_for_mismatch(tmp_path, cap
     assert "action domain counts: input=2, pass-review=1" in stderr
 
 
+def test_cli_require_compare_counts_passes_for_batch(tmp_path):
+    input_dir = tmp_path / "input"
+    compare_dir = tmp_path / "compare"
+    input_dir.mkdir()
+    compare_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "pass",
+        "case_count": 1,
+        "artifacts": [],
+    })
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "compare_failed",
+        "case_count": 2,
+        "compared_count": 2,
+        "triage_bucket_counts": {"renderer-candidate": 1, "recapture-required": 1},
+        "viewspace_status_counts": {"match": 1, "mismatch": 1},
+        "x3_band_counts": {"fail": 1, "fallback": 1},
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        str(compare_dir),
+        "--require-triage-bucket",
+        "renderer-candidate=1",
+        "--require-triage-bucket",
+        "recapture-required=1",
+        "--require-viewspace-status",
+        "match=1",
+        "--require-viewspace-status",
+        "mismatch=1",
+        "--require-x3-band",
+        "fail=1",
+        "--require-x3-band",
+        "fallback=1",
+    ]) == 0
+
+
+def test_cli_forbid_viewspace_status_fails_on_hidden_mismatch(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    compare_dir = tmp_path / "compare"
+    input_dir.mkdir()
+    compare_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "request_validation",
+        "status": "blocked",
+        "case_count": 1,
+        "artifacts": [],
+    })
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"recapture-required": 1},
+        "viewspace_status_counts": {"mismatch": 1},
+        "x3_band_counts": {"fallback": 1},
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        str(compare_dir),
+        "--forbid-viewspace-status",
+        "mismatch",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "forbidden viewspace status present: mismatch=1" in stderr
+    assert "viewspace status counts: mismatch=1" in stderr
+
+
 def test_cli_require_status_passes_when_present(tmp_path):
     input_dir = tmp_path / "input"
     compare_dir = tmp_path / "compare"

@@ -3935,3 +3935,49 @@ python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
 python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
+
+## Follow-Up Compare Distribution Route Guards
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let unattended route checks fail closed on compare distribution drift, not
+  only on top-level action/status/kind.
+- Cover mixed route summaries where input repair correctly remains the top
+  priority but the compare portion still contains `viewspace_mismatch`,
+  `renderer-candidate`, or X3 band failures.
+
+Changes:
+
+- `acad_artifact_route.py` adds compare-distribution guards:
+  - `--require-triage-bucket bucket=count`;
+  - `--forbid-triage-bucket bucket`;
+  - `--require-viewspace-status status=count`;
+  - `--forbid-viewspace-status status`;
+  - `--require-x3-band band=count`;
+  - `--forbid-x3-band band`.
+- The guards work for single compare routes and recursive/multi-route summaries
+  because the previous slice aggregates compare counts at the top level.
+- Regression coverage proves:
+  - exact compare distributions can be required on a mixed batch;
+  - a hidden `viewspace_status_counts.mismatch` fails closed even when an input
+    repair route is the top-level recommendation.
+
+Boundary:
+
+- Route assertion only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
