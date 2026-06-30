@@ -5473,3 +5473,44 @@ python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
 python3 -m pytest tools/render_regression/tests -q
 # 189 passed
 ```
+
+## Follow-Up Recapture Input-Review Fail Flag
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep generated `reference_request.md` post-return handoff commands aligned
+  with the README's unattended wrapper example.
+- Fail closed when returned-reference intake warnings would otherwise leave a
+  `pass` comparison with a recommended action in the `input-review` domain.
+- Preserve the lower-level wrapper default: `acad_reference_request_run.py`
+  remains review-lane by default unless `--fail-on-input-review` is passed.
+
+Changes:
+
+- `acad_manifest_compare.py` now adds `--fail-on-input-review` to the
+  generated post-return `acad_reference_request_run.py` command in
+  `reference_request.md`.
+- The generated handoff test asserts the fail flag appears exactly once beside
+  the request-boundary and route-topology guards.
+
+Boundary:
+
+- Generated operator handoff hardening only.
+- No wrapper default behavior change.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 8 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 189 passed
+```
