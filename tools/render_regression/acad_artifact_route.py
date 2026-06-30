@@ -648,6 +648,27 @@ def _action_domain_counts(payload: dict[str, Any]) -> dict[str, int]:
     return {domain: 1} if domain else {}
 
 
+def _issue_code_counts(payload: dict[str, Any]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for key in (
+        "reference_request_validation_issue_code_counts",
+        "reference_intake_issue_code_counts",
+    ):
+        values = payload.get(key)
+        if not isinstance(values, dict):
+            continue
+        for code, count in values.items():
+            code_text = str(code)
+            if not code_text:
+                continue
+            try:
+                count_int = int(count)
+            except Exception:
+                continue
+            counts[code_text] = counts.get(code_text, 0) + count_int
+    return dict(sorted(counts.items()))
+
+
 def _parse_boundary_expectation(raw: str) -> tuple[str, Any]:
     if "=" not in raw:
         raise ValueError(f"boundary expectation must be key=value: {raw}")
@@ -722,6 +743,16 @@ def main(argv: list[str] | None = None) -> int:
                         ))
     parser.add_argument("--require-source-boundary", action="append", default=[],
                         help="exit 2 unless every routed source artifact boundary has key=value; may repeat")
+    parser.add_argument("--require-issue-code", action="append", default=[],
+                        help=(
+                            "exit 2 unless the routed request/intake issue-code counts "
+                            "include this code; may repeat"
+                        ))
+    parser.add_argument("--forbid-issue-code", action="append", default=[],
+                        help=(
+                            "exit 2 if the routed request/intake issue-code counts "
+                            "include this code; may repeat"
+                        ))
     args = parser.parse_args(argv)
 
     try:
@@ -784,6 +815,34 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(
                 "acad_artifact_route: action domain counts: "
+                + _format_counts(counts),
+                file=sys.stderr,
+            )
+            return 2
+    if args.require_issue_code or args.forbid_issue_code:
+        counts = _issue_code_counts(payload)
+        missing = [code for code in args.require_issue_code if not counts.get(code, 0)]
+        if missing:
+            print(
+                "acad_artifact_route: required issue code missing: "
+                + ", ".join(missing),
+                file=sys.stderr,
+            )
+            print(
+                "acad_artifact_route: issue code counts: "
+                + _format_counts(counts),
+                file=sys.stderr,
+            )
+            return 2
+        forbidden_codes = [code for code in args.forbid_issue_code if counts.get(code, 0)]
+        if forbidden_codes:
+            print(
+                "acad_artifact_route: forbidden issue code present: "
+                + ", ".join(f"{code}={counts.get(code, 0)}" for code in forbidden_codes),
+                file=sys.stderr,
+            )
+            print(
+                "acad_artifact_route: issue code counts: "
                 + _format_counts(counts),
                 file=sys.stderr,
             )

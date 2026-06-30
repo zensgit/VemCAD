@@ -727,6 +727,103 @@ def test_cli_forbid_action_domain_fails_on_request_run_case_domain_counts(tmp_pa
     assert "action domain counts: input=1, renderer-candidate=1" in stderr
 
 
+def test_cli_require_issue_code_passes_when_present(tmp_path):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "review",
+        "case_count": 1,
+        "reference_request_validation_issue_code_counts": {
+            "source_dxf_sha256_mismatch": 1,
+        },
+        "reference_intake_issue_code_counts": {
+            "corner_background_not_white": 2,
+        },
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--require-issue-code",
+        "source_dxf_sha256_mismatch",
+        "--require-issue-code",
+        "corner_background_not_white",
+    ]) == 0
+
+
+def test_cli_require_issue_code_fails_closed_when_missing(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "review",
+        "case_count": 1,
+        "reference_intake_issue_code_counts": {
+            "corner_background_not_white": 2,
+        },
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--require-issue-code",
+        "returned_reference_blank",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "required issue code missing: returned_reference_blank" in stderr
+    assert "issue code counts: corner_background_not_white=2" in stderr
+
+
+def test_cli_forbid_issue_code_passes_when_absent(tmp_path):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "review",
+        "case_count": 1,
+        "reference_intake_issue_code_counts": {
+            "corner_background_not_white": 2,
+        },
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--forbid-issue-code",
+        "returned_reference_blank",
+    ]) == 0
+
+
+def test_cli_forbid_issue_code_fails_closed_when_present(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "review",
+        "case_count": 1,
+        "reference_intake_issue_code_counts": {
+            "corner_background_not_white": 2,
+        },
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--forbid-issue-code",
+        "corner_background_not_white",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "forbidden issue code present: corner_background_not_white=2" in stderr
+    assert "issue code counts: corner_background_not_white=2" in stderr
+
+
 def test_cli_require_source_boundary_passes_when_all_routes_match(tmp_path):
     input_dir = tmp_path / "input"
     compare_dir = tmp_path / "compare"

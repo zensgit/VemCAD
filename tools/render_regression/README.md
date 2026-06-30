@@ -256,6 +256,11 @@ codes without opening nested JSON artifacts.
 When routing multiple artifact indexes at once, the top-level route summary
 aggregates those same issue-code counts across all nested routes.
 
+Use `--require-issue-code <code>` or `--forbid-issue-code <code>` when a CI
+route step must fail closed on specific request/intake issue classes. These
+guards inspect only routed request/intake issue-code counts; they do not parse
+action codes or triage buckets.
+
 To assert source artifact boundaries as part of the same route step, repeat
 `--require-source-boundary key=value`. For example, this guarantees every
 routed source artifact explicitly says it is not an AutoCAD-equivalence claim:
