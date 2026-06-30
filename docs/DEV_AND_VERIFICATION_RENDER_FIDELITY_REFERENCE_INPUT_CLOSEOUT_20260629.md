@@ -1895,6 +1895,45 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Request-Run Missing References TSV
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Surface the spreadsheet-friendly missing-reference handoff artifact from the
+  higher-level request-run wrapper.
+- Keep operators from having to inspect the nested input directory or scrape
+  Markdown to find `missing_references.tsv`.
+
+Changes:
+
+- `acad_reference_request_run.py` now records `missing_references_tsv` in
+  `run_summary.json`.
+- `run_summary.md` lists the TSV under artifacts when the wrapper is
+  input-blocked.
+- The wrapper-level artifact index includes `missing_references_tsv`.
+- The existing recommended next action still points to the Markdown report,
+  because that remains the human-readable handoff.
+
+Boundary:
+
+- Artifact surfacing only.
+- No route priority change.
+- No renderer change.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- No private drawing or AutoCAD PNG committed.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up CLI Action Domain Logs
 
 Status: implemented in this branch.
