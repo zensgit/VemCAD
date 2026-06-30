@@ -246,6 +246,49 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Returned Reference Input Action
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Give returned-reference intake errors a specific operator action instead of
+  falling through to generic run-summary inspection.
+- Keep intake warnings (`review`) separate from intake errors (`blocked`): a
+  warning asks for review, while an error asks the operator to fix the returned
+  AutoCAD PNG input before matched-view comparison.
+
+Changes:
+
+- `acad_artifact_route.py` now maps batch `stage=reference_intake` /
+  `status=blocked` to `fix-returned-reference-input`.
+- `acad_reference_request_run.py` now maps `reference_intake_status=blocked`
+  to the same top-level action.
+- Per-case `case_actions[]` now use `fix-returned-reference-input` when an
+  intake row has an error; warning-only rows still use
+  `inspect-returned-reference-warnings`.
+- The new action is in the `input` domain; warning review remains
+  `input-review`.
+
+Boundary:
+
+- Operator routing/reporting only.
+- No renderer change.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- No private drawing or AutoCAD PNG committed.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_artifact_route.py \
+  tools/render_regression/tests/test_acad_reference_request_run.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Provenance Hardening
 
 Status: implemented in this branch.
@@ -3476,10 +3519,11 @@ Decision order:
 
 1. `fix-request-package` when request validation is blocked or unreadable.
 2. `provide-returned-autocad-pngs` when returned PNGs are missing.
-3. `inspect-returned-reference-warnings` when intake is `review`.
-4. `recapture-autocad-or-provide-window` on `viewspace_mismatch`.
-5. `review-x3-pass` on matched-view pass.
-6. `inspect-compare-failure` on compare failures.
+3. `fix-returned-reference-input` when intake is `blocked`.
+4. `inspect-returned-reference-warnings` when intake is `review`.
+5. `recapture-autocad-or-provide-window` on `viewspace_mismatch`.
+6. `review-x3-pass` on matched-view pass.
+7. `inspect-compare-failure` on compare failures.
 
 Boundary:
 

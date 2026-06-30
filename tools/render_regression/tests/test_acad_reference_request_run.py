@@ -47,19 +47,25 @@ def _dxf(path: Path) -> str:
     return str(path)
 
 
-def _request(path: Path, *, case_id="G11") -> Path:
+def _request(path: Path, *, case_id="G11", expected_size=None) -> Path:
+    case = {
+        "id": case_id,
+        "drawing_id": f"{case_id}/B11",
+        "source_dxf": "dxf/B11.dxf",
+        "recommended_output_name": f"{case_id}_autocad_model_extents.png",
+        "requested_capture_method": "plot-export",
+        "requested_view_contract": "model-extents",
+    }
+    if expected_size is not None:
+        case["requested_expected_size"] = {
+            "width": expected_size[0],
+            "height": expected_size[1],
+        }
     path.write_text(json.dumps({
         "schema": "vemcad.acad_reference_request/v1",
         "reason": "recapture-required",
         "boundary": dict(REQUEST_BOUNDARY),
-        "cases": [{
-            "id": case_id,
-            "drawing_id": f"{case_id}/B11",
-            "source_dxf": "dxf/B11.dxf",
-            "recommended_output_name": f"{case_id}_autocad_model_extents.png",
-            "requested_capture_method": "plot-export",
-            "requested_view_contract": "model-extents",
-        }],
+        "cases": [case],
     }), encoding="utf-8")
     return path
 
@@ -408,6 +414,46 @@ def test_reference_request_run_surfaces_intake_review_warnings(tmp_path):
     assert "reference_intake_warnings: `2`" in summary_md
     assert "reference_intake_issue_codes: `corner_background_not_white=1, long_edge_below_requested=1`" in summary_md
     assert "recommended_next_action: `inspect-returned-reference-warnings`" in summary_md
+
+
+def test_reference_request_run_routes_intake_blocked_to_fix_returned_input(tmp_path, capsys):
+    _dxf(tmp_path / "dxf" / "B11.dxf")
+    _png(tmp_path / "ours" / "G11.png", size=(760, 570), box=[20, 15, 740, 555])
+    _png(
+        tmp_path / "returned" / "G11_autocad_model_extents.png",
+        size=(1200, 900),
+        box=[20, 15, 1180, 880],
+    )
+    request = _request(tmp_path / "reference_request.json", expected_size=(1600, 1131))
+    candidates = _candidates(tmp_path / "candidate_cases.json")
+    out = tmp_path / "run"
+
+    assert runner.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--case-id", "G11",
+        "--out-dir", str(out),
+    ]) == 2
+    stdout = capsys.readouterr().out
+
+    summary = json.loads((out / "run_summary.json").read_text(encoding="utf-8"))
+    artifact_index = _run_artifact_index(out)
+    assert summary["status"] == "input_blocked"
+    assert summary["reference_request_validation_status"] == "pass"
+    assert summary["reference_intake_status"] == "blocked"
+    assert summary["reference_intake_issue_code_counts"]["returned_png_size_mismatch"] == 1
+    assert summary["recommended_next_action"]["code"] == "fix-returned-reference-input"
+    assert summary["recommended_next_action"]["domain"] == "input"
+    assert summary["recommended_next_action"]["artifact"].endswith("reference_intake.md")
+    assert summary["case_action_counts"] == {"fix-returned-reference-input": 1}
+    assert summary["case_action_domain_counts"] == {"input": 1}
+    assert summary["case_actions"][0]["code"] == "fix-returned-reference-input"
+    assert summary["case_actions"][0]["source"] == "reference_intake"
+    assert artifact_index["recommended_next_action"] == summary["recommended_next_action"]
+    assert artifact_index["case_actions"] == summary["case_actions"]
+    assert "recommended next action: fix-returned-reference-input" in stdout
+    assert "case action counts: fix-returned-reference-input=1" in stdout
 
 
 def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):

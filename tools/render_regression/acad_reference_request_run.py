@@ -163,6 +163,12 @@ def _recommended_next_action(summary: dict[str, Any]) -> dict[str, str]:
             "Place the returned AutoCAD PNGs using the requested filenames, then rerun the wrapper.",
             artifact=str(summary.get("missing_references_markdown") or ""),
         )
+    if intake_status == "blocked":
+        return _action(
+            "fix-returned-reference-input",
+            "Fix returned AutoCAD PNG input before matched-view comparison.",
+            artifact=str(summary.get("reference_intake_markdown") or ""),
+        )
     if intake_status == "review":
         return _action(
             "inspect-returned-reference-warnings",
@@ -331,12 +337,19 @@ def _case_actions(summary: dict[str, Any]) -> list[dict[str, Any]]:
     for row in intake.get("cases") or []:
         issues = [item for item in row.get("issues") or [] if item.get("severity") in {"error", "warning"}]
         if issues:
+            has_error = any(item.get("severity") == "error" for item in issues)
+            code = "fix-returned-reference-input" if has_error else "inspect-returned-reference-warnings"
+            message = (
+                "Fix returned AutoCAD PNG input before matched-view comparison."
+                if has_error
+                else "Inspect returned-reference intake warnings before trusting visual conclusions."
+            )
             _put_case_action(
                 actions,
                 str(row.get("id") or ""),
                 drawing_id=str(row.get("drawing_id") or ""),
-                code="inspect-returned-reference-warnings",
-                message="Inspect returned-reference intake warnings before trusting visual conclusions.",
+                code=code,
+                message=message,
                 source="reference_intake",
                 artifact=intake_artifact,
                 extra={"issue_count": len(issues)},
