@@ -235,8 +235,10 @@ The batch, compare, and request-run CLIs also print the recommended action
 domain next to the action code, so CI logs can show the route class without
 opening JSON artifacts.
 When a recommended action has a handoff artifact, those CLIs also print the
-artifact path; route-backed CLIs additionally print the resolved path and
-whether it exists.
+artifact path, the resolved path, and whether it exists. The one-command
+request-run wrapper also carries that resolution in `run_summary.json/md` and
+the run-level `artifact_index.json`, so uploaded run artifacts and CI logs both
+point directly at the handoff file.
 For one-command request runs, per-case `case_actions` rows use the same
 recapture handoff: a `recapture-autocad-or-provide-window` case points at
 `compare/reference_request.md` when generated, while matched/pass review cases

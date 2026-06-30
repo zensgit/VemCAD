@@ -1065,6 +1065,53 @@ python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
 # passed
 ```
 
+## Follow-Up Request-Run Action Artifact Resolution
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make the one-command `acad_reference_request_run.py` wrapper match the
+  batch/compare CLIs for handoff artifacts.
+- Let CI logs, `run_summary.json/md`, and the run-level `artifact_index.json`
+  point directly at the resolved recommended-action file and state whether it
+  exists.
+- Avoid the operator having to open `route_summary.json` just to resolve
+  `compare/reference_request.md` or `input/missing_references.md`.
+
+Changes:
+
+- `acad_reference_request_run.py` now copies route-derived action artifact
+  resolution into:
+  - `recommended_next_action_artifact_resolved`;
+  - `recommended_next_action_artifact_exists`.
+- Those fields are printed in stdout when a recommended action has a handoff
+  artifact.
+- `run_summary.md` prints the resolved artifact path and existence flag.
+- The run-level `artifact_index.json` carries the same fields for automation.
+- Regression coverage pins both important paths:
+  - `viewspace_mismatch` resolves to `compare/reference_request.md`;
+  - missing returned AutoCAD PNGs resolve to `input/missing_references.md`.
+- `tools/render_regression/README.md` documents that batch, compare, and
+  request-run CLIs all print the artifact path, resolved path, and existence.
+
+Boundary:
+
+- Evidence/reporting only.
+- No route priority change.
+- No renderer change.
+- No compare metric change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 10 passed
+```
+
 ## Follow-Up Recapture Route Action Artifact
 
 Status: implemented in this branch.
