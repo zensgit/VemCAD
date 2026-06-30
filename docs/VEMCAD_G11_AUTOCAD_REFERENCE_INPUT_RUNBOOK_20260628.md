@@ -314,6 +314,7 @@ To route any batch/run/compare artifact index through one command:
 
 ```bash
 python3 tools/render_regression/acad_artifact_route.py <artifact_index.json> --text
+python3 tools/render_regression/acad_artifact_route.py <artifact-directory> --text
 ```
 
 The route helper is read-only. It does not compare renders, does not change

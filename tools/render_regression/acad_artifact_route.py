@@ -23,6 +23,14 @@ def _read_json(path: Path) -> dict[str, Any]:
     return payload
 
 
+def _resolve_artifact_index(path: Path) -> Path:
+    if path.is_dir():
+        path = path / "artifact_index.json"
+    if not path.is_file():
+        raise ValueError(f"artifact index not found: {path}")
+    return path
+
+
 def _action(code: str, message: str, *, artifact: str = "") -> dict[str, str]:
     return {
         "code": code,
@@ -127,6 +135,7 @@ def _route_compare(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def route_artifact_index(path: Path) -> dict[str, Any]:
+    path = _resolve_artifact_index(path)
     payload = _read_json(path)
     schema = str(payload.get("schema") or "")
     if schema == "vemcad.acad_reference_batch_artifact_index/v1":
@@ -166,7 +175,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="acad_artifact_route",
         description="Read an AutoCAD reference artifact index and print the next safe action.")
-    parser.add_argument("artifact_index", type=Path)
+    parser.add_argument("artifact_index", type=Path,
+                        help="artifact_index.json, or a directory containing artifact_index.json")
     parser.add_argument("--text", action="store_true", help="print a human-readable summary instead of JSON")
     args = parser.parse_args(argv)
 

@@ -30,6 +30,22 @@ def test_routes_batch_missing_references(tmp_path):
     assert payload["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
 
 
+def test_routes_directory_containing_artifact_index(tmp_path):
+    _write(tmp_path / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "review",
+        "case_count": 1,
+        "artifacts": [],
+    })
+
+    payload = route.route_artifact_index(tmp_path)
+
+    assert payload["artifact_index"].endswith("artifact_index.json")
+    assert payload["kind"] == "batch"
+    assert payload["recommended_next_action"]["code"] == "inspect-returned-reference-warnings"
+
+
 def test_routes_run_case_actions(tmp_path):
     index = _write(tmp_path / "artifact_index.json", {
         "schema": "vemcad.acad_reference_request_run_artifact_index/v1",
@@ -82,3 +98,7 @@ def test_rejects_unknown_schema(tmp_path):
     index = _write(tmp_path / "artifact_index.json", {"schema": "unknown"})
 
     assert route.main([str(index)]) == 2
+
+
+def test_rejects_directory_without_artifact_index(tmp_path):
+    assert route.main([str(tmp_path)]) == 2
