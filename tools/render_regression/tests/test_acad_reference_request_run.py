@@ -143,7 +143,9 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert summary["route_summary_json"].endswith("route_summary.json")
     assert summary["route_summary_markdown"].endswith("route_summary.md")
     assert summary["recommended_next_action"]["code"] == "review-x3-pass"
+    assert summary["recommended_next_action"]["domain"] == "pass-review"
     assert summary["recommended_next_action"]["artifact"].endswith("summary.md")
+    assert summary["case_action_domain_counts"] == {"pass-review": 1}
     assert artifact_index["status"] == "pass"
     assert artifact_index["boundary"] == {
         "renders_dxf": False,
@@ -154,10 +156,16 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
         "autocad_equivalence_claim": False,
     }
     assert artifact_index["recommended_next_action"]["code"] == "review-x3-pass"
+    assert artifact_index["recommended_next_action"]["domain"] == "pass-review"
+    assert artifact_index["case_action_domain_counts"] == {"pass-review": 1}
     assert "recommended next action: review-x3-pass" in stdout
+    assert "recommended next action domain: pass-review" in stdout
+    assert "case action domain counts: pass-review=1" in stdout
     assert compare_summary["status"] == "pass"
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
     assert "recommended_next_action: `review-x3-pass`" in summary_md
+    assert "recommended_next_action_domain: `pass-review`" in summary_md
+    assert "case_action_domain_counts: `pass-review=1`" in summary_md
     assert "route summary markdown" in summary_md
     assert _run_artifact_kinds(out) >= {
         "run_summary_json",
@@ -178,6 +186,10 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert route_summary["recommended_action_counts"] == {
         "continue-to-request-run": 1,
         "review-x3-pass": 2,
+    }
+    assert route_summary["recommended_action_domain_counts"] == {
+        "continue": 1,
+        "pass-review": 2,
     }
     assert "AutoCAD Artifact Route Report" in route_summary_md
     assert "claim AutoCAD equivalence" in route_summary_md
@@ -206,18 +218,27 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     artifact_index = _run_artifact_index(out)
     assert summary["status"] == "viewspace_mismatch"
     assert summary["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
+    assert summary["recommended_next_action"]["domain"] == "input"
     assert summary["case_action_counts"] == {
         "recapture-autocad-or-provide-window": 1,
         "review-x3-pass": 1,
     }
+    assert summary["case_action_domain_counts"] == {
+        "input": 1,
+        "pass-review": 1,
+    }
     assert "case action counts: recapture-autocad-or-provide-window=1, review-x3-pass=1" in stdout
+    assert "case action domain counts: input=1, pass-review=1" in stdout
     assert artifact_index["case_actions"] == summary["case_actions"]
     assert artifact_index["case_action_counts"] == summary["case_action_counts"]
+    assert artifact_index["case_action_domain_counts"] == summary["case_action_domain_counts"]
     assert [item["id"] for item in summary["case_actions"]] == ["G12", "G11"]
     assert summary["case_actions"][0]["code"] == "recapture-autocad-or-provide-window"
+    assert summary["case_actions"][0]["domain"] == "input"
     assert summary["case_actions"][0]["source"] == "compare"
     assert summary["case_actions"][0]["triage_bucket"] == "recapture-required"
     assert summary["case_actions"][1]["code"] == "review-x3-pass"
+    assert summary["case_actions"][1]["domain"] == "pass-review"
     assert summary["case_actions"][1]["triage_bucket"] == "matched-pass"
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
     assert "## Case Actions" in summary_md
@@ -227,6 +248,10 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert route_summary["recommended_action_counts"] == {
         "continue-to-request-run": 1,
         "recapture-autocad-or-provide-window": 2,
+    }
+    assert route_summary["recommended_action_domain_counts"] == {
+        "continue": 1,
+        "input": 2,
     }
 
 
@@ -257,10 +282,13 @@ def test_reference_request_run_preserves_viewspace_mismatch_exit(tmp_path):
     assert summary["batch_exit_code"] == 0
     assert summary["compare_exit_code"] == 2
     assert summary["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
+    assert summary["recommended_next_action"]["domain"] == "input"
     assert "do not tune the renderer" in summary["recommended_next_action"]["message"]
+    assert summary["case_action_domain_counts"] == {"input": 1}
     assert compare_summary["status"] == "viewspace_mismatch"
     route_summary_md = (out / "route_summary.md").read_text(encoding="utf-8")
     assert "recapture-autocad-or-provide-window=2" in route_summary_md
+    assert "recommended_action_domain_counts: `continue=1, input=2`" in route_summary_md
 
 
 def test_reference_request_run_surfaces_intake_review_warnings(tmp_path):
@@ -290,7 +318,9 @@ def test_reference_request_run_surfaces_intake_review_warnings(tmp_path):
     assert summary["reference_intake_status"] == "review"
     assert summary["reference_intake_warning_count"] == 2
     assert summary["recommended_next_action"]["code"] == "inspect-returned-reference-warnings"
+    assert summary["recommended_next_action"]["domain"] == "input-review"
     assert summary["recommended_next_action"]["artifact"].endswith("reference_intake.md")
+    assert summary["case_action_domain_counts"] == {"input-review": 1}
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
     assert "reference_intake_status: `review`" in summary_md
     assert "reference_intake_warnings: `2`" in summary_md
@@ -324,15 +354,21 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
     assert summary["reference_intake_warning_count"] is None
     assert summary["compare_summary_markdown"] == ""
     assert summary["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
+    assert summary["recommended_next_action"]["domain"] == "input"
     assert summary["recommended_next_action"]["artifact"].endswith("missing_references.md")
+    assert summary["case_action_domain_counts"] == {"input": 1}
     assert artifact_index["status"] == "input_blocked"
     assert artifact_index["boundary"]["compares_renders"] is False
     assert artifact_index["boundary"]["autocad_equivalence_claim"] is False
     assert artifact_index["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
+    assert artifact_index["recommended_next_action"]["domain"] == "input"
     assert artifact_index["case_actions"] == summary["case_actions"]
     assert artifact_index["case_action_counts"] == summary["case_action_counts"]
+    assert artifact_index["case_action_domain_counts"] == summary["case_action_domain_counts"]
     assert "recommended next action: provide-returned-autocad-pngs" in stdout
+    assert "recommended next action domain: input" in stdout
     assert "case action counts: provide-returned-autocad-pngs=1" in stdout
+    assert "case action domain counts: input=1" in stdout
     assert not (out / "compare" / "summary.json").exists()
     assert _run_artifact_kinds(out) >= {
         "run_summary_json",
@@ -350,6 +386,7 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
     assert route_summary["recommended_action_counts"] == {
         "provide-returned-autocad-pngs": 2,
     }
+    assert route_summary["recommended_action_domain_counts"] == {"input": 2}
 
 
 def test_reference_request_run_surfaces_request_validation_block(tmp_path):
@@ -383,7 +420,9 @@ def test_reference_request_run_surfaces_request_validation_block(tmp_path):
     assert summary["reference_request_validation_error_count"] == 1
     assert summary["reference_request_validation_markdown"].endswith("reference_request_validation.md")
     assert summary["recommended_next_action"]["code"] == "fix-request-package"
+    assert summary["recommended_next_action"]["domain"] == "input"
     assert summary["recommended_next_action"]["artifact"].endswith("reference_request_validation.md")
+    assert summary["case_action_domain_counts"] == {"input": 1}
     assert summary["reference_intake_status"] == ""
     assert not (out / "compare" / "summary.json").exists()
     assert _run_artifact_kinds(out) >= {

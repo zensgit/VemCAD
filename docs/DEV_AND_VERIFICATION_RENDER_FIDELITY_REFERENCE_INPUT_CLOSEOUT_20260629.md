@@ -1781,6 +1781,46 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Request-Run Action Domains
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Carry the same machine-readable action domain metadata at the request-run
+  source, not only in the route wrapper.
+- Let `run_summary.json`, `run_summary.md`, and the run-level
+  `artifact_index.json` distinguish input/recapture gates from renderer work
+  without re-routing or parsing action-code strings.
+
+Changes:
+
+- `acad_reference_request_run.py` now includes `domain` on
+  `recommended_next_action`.
+- Each `case_actions[]` row now includes `domain`.
+- `run_summary.json` and `artifact_index.json` include
+  `case_action_domain_counts`.
+- `run_summary.md` and stdout print the recommended action domain and case
+  action domain counts.
+
+Boundary:
+
+- Run-summary/reporting metadata only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Recommended Next Action
 
 Status: implemented in this branch.
