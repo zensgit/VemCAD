@@ -332,6 +332,17 @@ def _format_case_action_counts(counts: dict[str, int]) -> str:
     return ", ".join(f"{key}={value}" for key, value in sorted(counts.items())) or "none"
 
 
+def _issue_code_labels(issues: list[dict[str, Any]]) -> list[str]:
+    labels: list[str] = []
+    for issue in issues:
+        code = str(issue.get("code") or "")
+        if not code:
+            continue
+        severity = str(issue.get("severity") or "")
+        labels.append(f"{severity}:{code}" if severity else code)
+    return sorted(labels)
+
+
 def _tsv(value: Any) -> str:
     return str(value or "").replace("\t", " ").replace("\r", " ").replace("\n", " ")
 
@@ -351,7 +362,7 @@ def _write_case_actions_tsv(path: Path, case_actions: list[dict[str, Any]]) -> N
     with path.open("w", encoding="utf-8") as handle:
         handle.write(
             "id\tdrawing_id\tcode\tdomain\tsource\ttriage_bucket\t"
-            "viewspace_status\tx3_band\tissue_count\trecommended_output_name\t"
+            "viewspace_status\tx3_band\tissue_count\tissue_codes\trecommended_output_name\t"
             "artifact\tartifact_resolved\tartifact_exists\n"
         )
         for action in case_actions:
@@ -365,6 +376,7 @@ def _write_case_actions_tsv(path: Path, case_actions: list[dict[str, Any]]) -> N
                 f"{_tsv(action.get('viewspace_status'))}\t"
                 f"{_tsv(action.get('x3_band'))}\t"
                 f"{_tsv(action.get('issue_count'))}\t"
+                f"{_tsv(action.get('issue_codes'))}\t"
                 f"{_tsv(action.get('recommended_output_name'))}\t"
                 f"{_tsv(action.get('artifact'))}\t"
                 f"{_tsv(action.get('artifact_resolved'))}\t"
@@ -454,7 +466,10 @@ def _case_actions(summary: dict[str, Any]) -> list[dict[str, Any]]:
                 message="Fix request-package provenance or structure before exporting or returning AutoCAD PNGs.",
                 source="request_validation",
                 artifact=validation_artifact,
-                extra={"issue_count": len(issues)},
+                extra={
+                    "issue_count": len(issues),
+                    "issue_codes": ", ".join(_issue_code_labels(issues)),
+                },
             )
 
     missing = _read_json(Path(str(summary.get("missing_references_json") or "")))
@@ -491,7 +506,10 @@ def _case_actions(summary: dict[str, Any]) -> list[dict[str, Any]]:
                 message=message,
                 source="reference_intake",
                 artifact=intake_artifact,
-                extra={"issue_count": len(issues)},
+                extra={
+                    "issue_count": len(issues),
+                    "issue_codes": ", ".join(_issue_code_labels(issues)),
+                },
             )
 
     compare_summary = _read_json(Path(str(summary.get("compare_summary_json") or "")))
@@ -642,17 +660,18 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
             "",
             "## Case Actions",
             "",
-            "| Case | Drawing | Action | Domain | Source | Triage | Artifact |",
-            "| --- | --- | --- | --- | --- | --- | --- |",
+            "| Case | Drawing | Action | Domain | Source | Triage | Issue codes | Artifact |",
+            "| --- | --- | --- | --- | --- | --- | --- | --- |",
         ])
         for action in case_actions:
             triage = action.get("triage_bucket") or action.get("issue_count") or "-"
+            issue_codes = action.get("issue_codes") or "-"
             artifact = action.get("artifact_resolved") or action.get("artifact") or ""
             lines.append(
                 f"| {_md_code_cell(action.get('id', ''))} | {_md_table_cell(action.get('drawing_id', ''))} | "
                 f"{_md_code_cell(action.get('code', ''))} | {_md_code_cell(action.get('domain', ''))} | "
                 f"{_md_code_cell(action.get('source', ''))} | "
-                f"{_md_code_cell(triage)} | {_md_code_cell(artifact)} |"
+                f"{_md_code_cell(triage)} | {_md_code_cell(issue_codes)} | {_md_code_cell(artifact)} |"
             )
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 

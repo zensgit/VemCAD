@@ -1244,6 +1244,9 @@ Verification:
 ```bash
 python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
 # 11 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 192 passed
 ```
 
 ## Follow-Up Request-Run Final Exit Provenance
@@ -5799,4 +5802,41 @@ Verification:
 ```bash
 python3 -m pytest tools/render_regression/tests -q
 # 192 passed
+```
+
+## Follow-Up Case Action Issue Codes
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make the one-command runner's per-case action table show the exact
+  request-validation or returned-reference-intake issue codes for each case.
+- Let unattended runs sort/filter `case_actions.tsv` by action and defect class
+  without opening nested JSON or Markdown artifacts.
+
+Changes:
+
+- `case_actions[]` rows for request-validation and returned-reference-intake
+  issues now include `issue_codes` such as
+  `error:returned_png_size_mismatch` or
+  `warning:long_edge_below_requested`.
+- `case_actions.tsv` now has an `issue_codes` column after `issue_count`.
+- `run_summary.md` Case Actions table now has an `Issue codes` column.
+- The README documents the new spreadsheet triage field.
+
+Boundary:
+
+- Operator evidence/reporting only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 11 passed
 ```

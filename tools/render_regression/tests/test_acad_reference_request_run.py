@@ -300,7 +300,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     case_actions_tsv = (out / "case_actions.tsv").read_text(encoding="utf-8").splitlines()
     assert case_actions_tsv[0] == (
         "id\tdrawing_id\tcode\tdomain\tsource\ttriage_bucket\t"
-        "viewspace_status\tx3_band\tissue_count\trecommended_output_name\t"
+        "viewspace_status\tx3_band\tissue_count\tissue_codes\trecommended_output_name\t"
         "artifact\tartifact_resolved\tartifact_exists"
     )
     row = case_actions_tsv[1].split("\t")
@@ -309,6 +309,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
         "matched-pass", "match", "pass",
     ]
     assert row[8:] == [
+        "",
         "",
         "",
         str(out / "compare" / "summary.md"),
@@ -395,7 +396,7 @@ def test_reference_request_run_escapes_markdown_case_action_cells(tmp_path):
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
     row = next(line for line in summary_md.splitlines() if line.startswith("| `G11` |"))
     assert "G11\\|bearing cap" in row
-    assert _unescaped_pipe_count(row) == 8
+    assert _unescaped_pipe_count(row) == 9
     assert "run\\|markdown" in summary_md
 
 
@@ -547,11 +548,13 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert (
         f"| `G12` | G12/B12 | `recapture-autocad-or-provide-window` | "
         f"`input` | `compare` | `recapture-required` | "
+        f"`-` | "
         f"`{(out / 'compare' / 'reference_request.md').resolve()}` |"
     ) in summary_md
     assert (
         f"| `G11` | G11/B11 | `review-x3-pass` | "
         f"`pass-review` | `compare` | `matched-pass` | "
+        f"`-` | "
         f"`{(out / 'compare' / 'summary.md').resolve()}` |"
     ) in summary_md
     case_actions_tsv = (out / "case_actions.tsv").read_text(encoding="utf-8").splitlines()
@@ -651,6 +654,10 @@ def test_reference_request_run_surfaces_intake_review_warnings(tmp_path):
     assert summary["recommended_next_action"]["domain"] == "input-review"
     assert summary["recommended_next_action"]["artifact"].endswith("reference_intake.md")
     assert summary["case_action_domain_counts"] == {"input-review": 1}
+    assert summary["case_actions"][0]["issue_count"] == 2
+    assert summary["case_actions"][0]["issue_codes"] == (
+        "warning:corner_background_not_white, warning:long_edge_below_requested"
+    )
     artifact_index = _run_artifact_index(out)
     assert artifact_index["reference_intake_issue_code_counts"] == summary["reference_intake_issue_code_counts"]
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
@@ -658,6 +665,7 @@ def test_reference_request_run_surfaces_intake_review_warnings(tmp_path):
     assert "reference_intake_warnings: `2`" in summary_md
     assert "reference_intake_issue_codes: `corner_background_not_white=1, long_edge_below_requested=1`" in summary_md
     assert "recommended_next_action: `inspect-returned-reference-warnings`" in summary_md
+    assert "`warning:corner_background_not_white, warning:long_edge_below_requested`" in summary_md
 
 
 def test_reference_request_run_can_fail_closed_on_input_review_warnings(tmp_path):
@@ -762,6 +770,10 @@ def test_reference_request_run_routes_intake_blocked_to_fix_returned_input(tmp_p
     assert summary["case_action_domain_counts"] == {"input": 1}
     assert summary["case_actions"][0]["code"] == "fix-returned-reference-input"
     assert summary["case_actions"][0]["source"] == "reference_intake"
+    assert summary["case_actions"][0]["issue_count"] == 2
+    assert summary["case_actions"][0]["issue_codes"] == (
+        "error:returned_png_size_mismatch, warning:long_edge_below_requested"
+    )
     assert artifact_index["recommended_next_action"] == summary["recommended_next_action"]
     assert artifact_index["case_actions"] == summary["case_actions"]
     assert "recommended next action: fix-returned-reference-input" in stdout
@@ -769,6 +781,7 @@ def test_reference_request_run_routes_intake_blocked_to_fix_returned_input(tmp_p
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
     assert "reference_intake_errors: `1`" in summary_md
     assert "case_action_counts: `fix-returned-reference-input=1`" in summary_md
+    assert "`error:returned_png_size_mismatch, warning:long_edge_below_requested`" in summary_md
 
 
 def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
@@ -942,6 +955,7 @@ def test_reference_request_run_surfaces_request_validation_block(tmp_path, capsy
     assert summary["recommended_next_action"]["domain"] == "input"
     assert summary["recommended_next_action"]["artifact"].endswith("reference_request_validation.md")
     assert summary["case_action_domain_counts"] == {"input": 1}
+    assert summary["case_actions"][0]["issue_codes"] == "error:source_dxf_sha256_mismatch"
     assert summary["reference_intake_status"] == ""
     artifact_index = _run_artifact_index(out)
     assert artifact_index["reference_request_validation_issue_code_counts"] == {
