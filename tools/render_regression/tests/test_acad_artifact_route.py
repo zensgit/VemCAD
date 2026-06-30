@@ -72,6 +72,13 @@ def test_routes_run_case_actions(tmp_path):
         },
         "case_action_counts": {"recapture-autocad-or-provide-window": 1},
         "case_action_domain_counts": {"input": 1},
+        "reference_request_validation_issue_code_counts": {
+            "source_dxf_sha256_mismatch": 1,
+        },
+        "reference_intake_issue_code_counts": {
+            "candidate_render_blank": 1,
+            "returned_reference_blank": 1,
+        },
         "case_actions": [{
             "id": "G11",
             "code": "recapture-autocad-or-provide-window",
@@ -81,14 +88,32 @@ def test_routes_run_case_actions(tmp_path):
 
     payload = route.route_artifact_index(index)
     text = route._write_text(payload)
+    markdown = route.route_markdown(payload)
 
     assert payload["kind"] == "request_run"
     assert payload["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
     assert payload["recommended_next_action"]["domain"] == "input"
     assert payload["case_action_counts"] == {"recapture-autocad-or-provide-window": 1}
     assert payload["case_action_domain_counts"] == {"input": 1}
+    assert payload["reference_request_validation_issue_code_counts"] == {
+        "source_dxf_sha256_mismatch": 1,
+    }
+    assert payload["reference_intake_issue_code_counts"] == {
+        "candidate_render_blank": 1,
+        "returned_reference_blank": 1,
+    }
     assert "case_action_counts: recapture-autocad-or-provide-window=1" in text
     assert "case_action_domain_counts: input=1" in text
+    assert "reference_request_validation_issue_code_counts: source_dxf_sha256_mismatch=1" in text
+    assert (
+        "reference_intake_issue_code_counts: candidate_render_blank=1, "
+        "returned_reference_blank=1"
+    ) in text
+    assert "- reference_request_validation_issue_code_counts: `source_dxf_sha256_mismatch=1`" in markdown
+    assert (
+        "- reference_intake_issue_code_counts: `candidate_render_blank=1, "
+        "returned_reference_blank=1`"
+    ) in markdown
 
 
 def test_routes_multiple_directories_as_batch(tmp_path):

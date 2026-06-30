@@ -577,6 +577,44 @@ python3 -m pytest tools/render_regression/tests -q
 # 101 passed
 ```
 
+## Follow-Up Route Issue Code Counts
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Preserve request-validation and returned-reference intake issue-code counts
+  when a run-level artifact index is routed through `acad_artifact_route.py`.
+- Let CI jobs that upload only route reports still show why a request run is in
+  input review.
+
+Changes:
+
+- Request-run route payloads now carry:
+  - `reference_request_validation_issue_code_counts`
+  - `reference_intake_issue_code_counts`
+- Text and Markdown route reports print these fields when present.
+- Tests cover JSON payload, text output, and Markdown output.
+
+Boundary:
+
+- Route-report evidence only.
+- No route priority change.
+- No input gate semantics change.
+- No renderer change.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- No private drawing or AutoCAD PNG committed.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Run Intake Issue Code Counts
 
 Status: implemented in this branch.
