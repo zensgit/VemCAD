@@ -221,7 +221,7 @@ request is input-blocked.
 The request validation report itself also records the requested expected size
 per row, so operators can verify the capture-size contract before any returned
 AutoCAD PNG exists.
-Both request validation and returned-reference intake reports print
+Request validation, returned-reference intake, and compare reports print
 `issue_code_counts` at the top, so operators can see the issue classes without
 scanning per-case tables. Returned-reference intake also prints the requested
 expected size next to the actual returned PNG size and blocks with
@@ -409,16 +409,17 @@ uploaded route reports can point directly at the handoff file without a second
 artifact-index lookup.
 Batch artifact indexes and route reports also surface
 `reference_request_validation_issue_code_counts` and
-`reference_intake_issue_code_counts` when those preflight reports exist. This
-lets CI jobs that stop at the input stage show the exact request/intake issue
-codes without opening nested JSON artifacts.
+`reference_intake_issue_code_counts` when those preflight reports exist, plus
+`compare_issue_code_counts` when compare manifests/candidate inputs are blocked.
+This lets CI jobs show the exact request/intake/compare issue codes without
+opening nested JSON artifacts.
 When routing multiple artifact indexes at once, the top-level route summary
 aggregates those same issue-code counts across all nested routes.
 
 Use `--require-issue-code <code>` or `--forbid-issue-code <code>` when a CI
-route step must fail closed on specific request/intake issue classes. These
-guards inspect only routed request/intake issue-code counts; they do not parse
-action codes or triage buckets.
+route step must fail closed on specific request/intake/compare issue classes.
+These guards inspect only routed issue-code counts; they do not parse action
+codes or triage buckets.
 
 Use compare-distribution guards when a workflow needs to assert the compare
 portion itself, even if a higher-priority input route controls the top-level

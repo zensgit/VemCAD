@@ -453,10 +453,13 @@ def test_manifest_harness_stops_on_blocked_manifest(tmp_path, capsys):
     summary = json.loads((out / "summary.json").read_text(encoding="utf-8"))
     assert summary["status"] == "blocked"
     assert summary["issues"][0]["code"] == "diagnostic_capture_method"
+    assert summary["issue_code_counts"] == {"diagnostic_capture_method": 1}
     summary_md = (out / "summary.md").read_text(encoding="utf-8")
     assert "status: `blocked`" in summary_md
+    assert "issue_code_counts: `diagnostic_capture_method=1`" in summary_md
     assert "`diagnostic_capture_method`" in summary_md
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert artifact_index["issue_code_counts"] == {"diagnostic_capture_method": 1}
     assert artifact_index["boundary"]["compares_renders"] is False
     assert artifact_index["boundary"]["autocad_equivalence_claim"] is False
     assert {item["kind"] for item in artifact_index["artifacts"]} == {

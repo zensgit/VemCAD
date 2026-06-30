@@ -1832,6 +1832,35 @@ def test_cli_require_issue_code_passes_when_present(tmp_path):
     ]) == 0
 
 
+def test_cli_issue_code_guards_include_compare_issues(tmp_path, capsys):
+    compare_dir = tmp_path / "compare"
+    compare_dir.mkdir()
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "blocked",
+        "case_count": 1,
+        "compared_count": 0,
+        "issue_code_counts": {"diagnostic_capture_method": 1},
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(compare_dir),
+        "--require-issue-code",
+        "diagnostic_capture_method",
+    ]) == 0
+
+    assert route.main([
+        str(compare_dir),
+        "--forbid-issue-code",
+        "diagnostic_capture_method",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "forbidden issue code present: diagnostic_capture_method=1" in stderr
+    assert "issue code counts: diagnostic_capture_method=1" in stderr
+
+
 def test_cli_require_issue_code_fails_closed_when_missing(tmp_path, capsys):
     input_dir = tmp_path / "input"
     input_dir.mkdir()
@@ -2090,6 +2119,7 @@ def test_routes_compare_renderer_candidate_before_recapture(tmp_path):
         },
         "viewspace_status_counts": {"match": 1, "mismatch": 1},
         "x3_band_counts": {"fail": 1, "fallback": 1},
+        "issue_code_counts": {"diagnostic_capture_method": 1},
         "artifacts": [],
     })
 
@@ -2105,12 +2135,15 @@ def test_routes_compare_renderer_candidate_before_recapture(tmp_path):
     assert payload["triage_bucket_counts"]["renderer-candidate"] == 1
     assert payload["viewspace_status_counts"] == {"match": 1, "mismatch": 1}
     assert payload["x3_band_counts"] == {"fail": 1, "fallback": 1}
+    assert payload["compare_issue_code_counts"] == {"diagnostic_capture_method": 1}
     assert "case_count: 2" in text
     assert "compared_count: 2" in text
+    assert "compare_issue_code_counts: diagnostic_capture_method=1" in text
     assert "viewspace_status_counts: match=1, mismatch=1" in text
     assert "x3_band_counts: fail=1, fallback=1" in text
     assert "- case_count: `2`" in markdown
     assert "- compared_count: `2`" in markdown
+    assert "- compare_issue_code_counts: `diagnostic_capture_method=1`" in markdown
     assert "- viewspace_status_counts: `match=1, mismatch=1`" in markdown
     assert "- x3_band_counts: `fail=1, fallback=1`" in markdown
 
@@ -2166,6 +2199,7 @@ def test_batch_route_prioritizes_input_repairs_before_renderer_candidates(tmp_pa
         "triage_bucket_counts": {"renderer-candidate": 1},
         "viewspace_status_counts": {"match": 1},
         "x3_band_counts": {"fail": 1},
+        "issue_code_counts": {"candidate_case_missing": 1},
         "artifacts": [],
     })
 
@@ -2189,13 +2223,16 @@ def test_batch_route_prioritizes_input_repairs_before_renderer_candidates(tmp_pa
     assert payload["triage_bucket_counts"] == {"renderer-candidate": 1}
     assert payload["viewspace_status_counts"] == {"match": 1}
     assert payload["x3_band_counts"] == {"fail": 1}
+    assert payload["compare_issue_code_counts"] == {"candidate_case_missing": 1}
     assert "compare_case_count: 1" in text
     assert "compared_count: 1" in text
+    assert "compare_issue_code_counts: candidate_case_missing=1" in text
     assert "triage_bucket_counts: renderer-candidate=1" in text
     assert "viewspace_status_counts: match=1" in text
     assert "x3_band_counts: fail=1" in text
     assert "- compare_case_count: `1`" in markdown
     assert "- compared_count: `1`" in markdown
+    assert "- compare_issue_code_counts: `candidate_case_missing=1`" in markdown
     assert "- triage_bucket_counts: `renderer-candidate=1`" in markdown
     assert "- viewspace_status_counts: `match=1`" in markdown
     assert "- x3_band_counts: `fail=1`" in markdown
