@@ -212,6 +212,28 @@ Generated requests may include source-DXF and candidate-PNG provenance
 checks those files before building the next manifest. A mismatch means the
 request/candidate inputs drifted and the run blocks before X3.
 
+Before asking for or fulfilling AutoCAD PNGs, validate the request package
+itself:
+
+```bash
+python3 tools/render_regression/acad_reference_batch.py \
+  --validate-request "$REQUEST_DIR/reference_request.json" \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --out-dir "$NEXT_DIR/request-validation"
+```
+
+The validation writes:
+
+- `$NEXT_DIR/request-validation/reference_request_validation.json`
+- `$NEXT_DIR/request-validation/reference_request_validation.md`
+- `$NEXT_DIR/request-validation/artifact_index.json`
+
+It checks request/candidate identity before any returned AutoCAD PNG exists:
+source DXF presence and declared hash/size, candidate PNG presence and declared
+hash/size, duplicate case/output names, plain-filename output names, and
+positive expected sizes. This is an input-package gate only; it does not compare
+renders and does not claim AutoCAD equivalence.
+
 ```bash
 python3 tools/render_regression/acad_manifest_compare.py \
   --manifest "$NEXT_DIR/input/acad_manifest.json" \

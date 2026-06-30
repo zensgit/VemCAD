@@ -94,6 +94,111 @@ def test_batch_generator_blocks_bad_cases_json(tmp_path):
     assert batch.main(["--cases", str(cases), "--out-dir", str(tmp_path / "out")]) == 2
 
 
+def test_batch_generator_validates_reference_request_package_before_fulfilment(tmp_path):
+    source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
+    ours = Path(_png(tmp_path / "ours" / "G11.png", (760, 570)))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "source_dxf_sha256": _sha256(source),
+            "source_dxf_size_bytes": source.stat().st_size,
+            "candidate_png_sha256": _sha256(ours),
+            "candidate_png_size_bytes": ours.stat().st_size,
+            "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_expected_size": {"width": 1600, "height": 1131},
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--validate-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--out-dir", str(out),
+    ]) == 0
+
+    validation = json.loads((out / "reference_request_validation.json").read_text(encoding="utf-8"))
+    assert validation["schema"] == "vemcad.acad_reference_request_validation/v1"
+    assert validation["status"] == "pass"
+    assert validation["error_count"] == 0
+    assert validation["boundary"]["requires_returned_autocad_png"] is False
+    assert validation["boundary"]["autocad_equivalence_claim"] is False
+    row = validation["cases"][0]
+    assert row["source_dxf_provenance"]["sha256"] == _sha256(source)
+    assert row["candidate_png_provenance"]["sha256"] == _sha256(ours)
+    validation_md = (out / "reference_request_validation.md").read_text(encoding="utf-8")
+    assert "AutoCAD Reference Request Validation" in validation_md
+    assert "G11_autocad_model_extents.png" in validation_md
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert {item["kind"] for item in artifact_index["artifacts"]} == {
+        "reference_request_validation_json",
+        "reference_request_validation_markdown",
+    }
+
+
+def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(tmp_path):
+    source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
+    ours = Path(_png(tmp_path / "ours" / "G11.png", (760, 570)))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [
+            {
+                "id": "G11",
+                "drawing_id": "G11/B11",
+                "source_dxf": "dxf/G11.dxf",
+                "source_dxf_sha256": "0" * 64,
+                "source_dxf_size_bytes": source.stat().st_size + 1,
+                "candidate_png_sha256": "f" * 64,
+                "candidate_png_size_bytes": ours.stat().st_size + 1,
+                "recommended_output_name": "../G11.png",
+                "requested_expected_size": {"width": 0, "height": "bad"},
+            },
+            {
+                "id": "G12",
+                "drawing_id": "G12/B12",
+                "source_dxf": "dxf/missing.dxf",
+                "recommended_output_name": "../G11.png",
+            },
+        ],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([
+        {"id": "G11", "ours": "ours/G11.png"},
+        {"id": "G11", "ours": "ours/G11-duplicate.png"},
+    ]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--validate-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--out-dir", str(out),
+    ]) == 2
+
+    validation = json.loads((out / "reference_request_validation.json").read_text(encoding="utf-8"))
+    assert validation["status"] == "blocked"
+    issue_codes = {issue["code"] for issue in validation["issues"]}
+    assert {
+        "duplicate_candidate_id",
+        "unsafe_recommended_output_name",
+        "source_dxf_sha256_mismatch",
+        "source_dxf_size_mismatch",
+        "candidate_png_sha256_mismatch",
+        "candidate_png_size_mismatch",
+        "invalid_requested_expected_size",
+        "duplicate_recommended_output_name",
+        "source_dxf_missing",
+        "candidate_missing",
+    } <= issue_codes
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert "reference_request_validation_markdown" in {item["kind"] for item in artifact_index["artifacts"]}
+
+
 def test_batch_generator_fulfills_reference_request(tmp_path):
     _dxf(tmp_path / "dxf" / "G11.dxf")
     _png(tmp_path / "ours" / "G11.png", (760, 570))
