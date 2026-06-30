@@ -5255,3 +5255,45 @@ python3 -m pytest \
 python3 -m pytest tools/render_regression/tests -q
 # 188 passed
 ```
+
+## Follow-Up Route Issue Code Count Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let CI/operator scripts pin exact issue-code distributions, not only issue
+  presence/absence.
+- Keep request-validation, returned-reference intake, and compare issue-code
+  guards consistent with the existing `code=count` style used by route
+  distribution guards.
+- Preserve the existing route priority and default exit behavior.
+
+Changes:
+
+- `acad_artifact_route.py` now accepts repeatable
+  `--require-issue-code-count <code=count>`.
+- The guard reads the same merged issue-code counts as
+  `--require-issue-code` and `--forbid-issue-code`, including compare
+  issue-code counts.
+- `tools/render_regression/README.md` documents the new guard.
+
+Boundary:
+
+- Opt-in route guard only.
+- No route priority change.
+- No default exit-code behavior change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# 70 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 189 passed
+```

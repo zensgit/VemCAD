@@ -1829,7 +1829,34 @@ def test_cli_require_issue_code_passes_when_present(tmp_path):
         "source_dxf_sha256_mismatch",
         "--require-issue-code",
         "corner_background_not_white",
+        "--require-issue-code-count",
+        "corner_background_not_white=2",
     ]) == 0
+
+
+def test_cli_require_issue_code_count_fails_closed_on_mismatch(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "review",
+        "case_count": 1,
+        "reference_intake_issue_code_counts": {
+            "corner_background_not_white": 2,
+        },
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--require-issue-code-count",
+        "corner_background_not_white=1",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "required issue code count mismatch: corner_background_not_white=1 (got 2)" in stderr
+    assert "issue code counts: corner_background_not_white=2" in stderr
 
 
 def test_cli_issue_code_guards_include_compare_issues(tmp_path, capsys):

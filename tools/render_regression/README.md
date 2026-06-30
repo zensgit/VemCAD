@@ -420,6 +420,8 @@ Use `--require-issue-code <code>` or `--forbid-issue-code <code>` when a CI
 route step must fail closed on specific request/intake/compare issue classes.
 These guards inspect only routed issue-code counts; they do not parse action
 codes or triage buckets.
+Use `--require-issue-code-count <code=count>` when the job must pin the exact
+number of a known issue class, for example `returned_png_size_mismatch=1`.
 
 Use compare-distribution guards when a workflow needs to assert the compare
 portion itself, even if a higher-priority input route controls the top-level
