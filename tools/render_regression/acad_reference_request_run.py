@@ -229,6 +229,8 @@ def _write_run_summary(
             artifacts.append(item)
     _write_json(out_dir / "artifact_index.json", {
         "schema": RUN_ARTIFACT_INDEX_SCHEMA,
+        "status": payload["status"],
+        "recommended_next_action": payload["recommended_next_action"],
         "count": len(artifacts),
         "artifacts": artifacts,
     })
@@ -270,6 +272,7 @@ def main(argv: list[str] | None = None) -> int:
             compare_rc=None,
         )
         print(f"AutoCAD reference request run: {summary['status']}")
+        print(f"  recommended next action: {summary['recommended_next_action']['code']}")
         print(f"  run summary: {args.out_dir / 'run_summary.md'}")
         return batch_rc
 
@@ -286,6 +289,7 @@ def main(argv: list[str] | None = None) -> int:
         compare_rc=compare_rc,
     )
     print(f"AutoCAD reference request run: {summary['status']}")
+    print(f"  recommended next action: {summary['recommended_next_action']['code']}")
     print(f"  run summary: {args.out_dir / 'run_summary.md'}")
     return compare_rc
 

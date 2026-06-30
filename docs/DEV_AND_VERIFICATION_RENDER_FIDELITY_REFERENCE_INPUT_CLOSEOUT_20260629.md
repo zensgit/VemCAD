@@ -512,6 +512,52 @@ python3 tools/render_regression/acad_reference_request_run.py \
 # recommended_next_action.code=recapture-autocad-or-provide-window
 ```
 
+## Follow-Up Recommended Action Surfacing
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make the recommended action visible from CI logs and the run-level artifact
+  index without opening `run_summary.json` first.
+- Keep artifact consumers and humans aligned on the same operator cue.
+
+Changes:
+
+- `acad_reference_request_run.py` prints
+  `recommended next action: <code>` after the run status.
+- `<run-dir>/artifact_index.json` now carries top-level `status` and
+  `recommended_next_action` fields in addition to the artifact list.
+
+Boundary:
+
+- Reporting/indexing only.
+- No recommendation-rule change.
+- No renderer change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 5 passed
+```
+
+Private compatibility smoke:
+
+```bash
+python3 tools/render_regression/acad_reference_request_run.py \
+  --from-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir /private/tmp/vemcad-provenance-compat-smoke-20260629/returned \
+  --case-id G11 \
+  --out-dir /private/tmp/vemcad-run-action-surface-smoke-20260629
+# AutoCAD reference request run: viewspace_mismatch
+# recommended next action: recapture-autocad-or-provide-window
+# artifact_index.status=viewspace_mismatch
+# artifact_index.recommended_next_action.code=recapture-autocad-or-provide-window
+```
+
 Private compatibility smoke:
 
 ```bash

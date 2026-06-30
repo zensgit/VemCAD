@@ -218,7 +218,9 @@ directory first.
 
 The wrapper also writes `recommended_next_action` into `run_summary.json` and
 prints it near the top of `run_summary.md`. Treat that as the first unattended
-review cue:
+review cue. The same action code is also printed to stdout and copied to the
+run-level `artifact_index.json`, so CI logs and artifact upload indexes can be
+routed without opening the summary first:
 
 | Recommended action | Meaning |
 | --- | --- |

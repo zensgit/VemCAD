@@ -9,9 +9,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import acad_reference_request_run as runner  # noqa: E402
 
 
-def _run_artifact_kinds(out: Path) -> set[str]:
+def _run_artifact_index(out: Path) -> dict:
     payload = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert payload["schema"] == "vemcad.acad_reference_request_run_artifact_index/v1"
+    return payload
+
+
+def _run_artifact_kinds(out: Path) -> set[str]:
+    payload = _run_artifact_index(out)
     return {item["kind"] for item in payload["artifacts"]}
 
 
@@ -56,7 +61,7 @@ def _candidates(path: Path, *, case_id="G11") -> Path:
     return path
 
 
-def test_reference_request_run_fulfills_and_compares_match(tmp_path):
+def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     _dxf(tmp_path / "dxf" / "B11.dxf")
     _png(tmp_path / "ours" / "G11.png", size=(1600, 1131), box=[40, 30, 1560, 1100])
     _png(
@@ -75,9 +80,11 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path):
         "--case-id", "G11",
         "--out-dir", str(out),
     ]) == 0
+    stdout = capsys.readouterr().out
 
     summary = json.loads((out / "run_summary.json").read_text(encoding="utf-8"))
     compare_summary = json.loads((out / "compare" / "summary.json").read_text(encoding="utf-8"))
+    artifact_index = _run_artifact_index(out)
     assert summary["schema"] == "vemcad.acad_reference_request_run/v1"
     assert summary["status"] == "pass"
     assert summary["run_artifact_index"].endswith("artifact_index.json")
@@ -93,6 +100,9 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path):
     assert summary["compare_summary_markdown"].endswith("summary.md")
     assert summary["recommended_next_action"]["code"] == "review-x3-pass"
     assert summary["recommended_next_action"]["artifact"].endswith("summary.md")
+    assert artifact_index["status"] == "pass"
+    assert artifact_index["recommended_next_action"]["code"] == "review-x3-pass"
+    assert "recommended next action: review-x3-pass" in stdout
     assert compare_summary["status"] == "pass"
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
     assert "recommended_next_action: `review-x3-pass`" in summary_md
@@ -175,7 +185,7 @@ def test_reference_request_run_surfaces_intake_review_warnings(tmp_path):
     assert "recommended_next_action: `inspect-returned-reference-warnings`" in summary_md
 
 
-def test_reference_request_run_stops_on_missing_reference(tmp_path):
+def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
     _dxf(tmp_path / "dxf" / "B11.dxf")
     _png(tmp_path / "ours" / "G11.png", box=[20, 15, 740, 555])
     request = _request(tmp_path / "reference_request.json")
@@ -189,8 +199,10 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path):
         "--case-id", "G11",
         "--out-dir", str(out),
     ]) == 2
+    stdout = capsys.readouterr().out
 
     summary = json.loads((out / "run_summary.json").read_text(encoding="utf-8"))
+    artifact_index = _run_artifact_index(out)
     assert summary["status"] == "input_blocked"
     assert summary["batch_exit_code"] == 2
     assert summary["compare_exit_code"] is None
@@ -201,6 +213,9 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path):
     assert summary["compare_summary_markdown"] == ""
     assert summary["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
     assert summary["recommended_next_action"]["artifact"].endswith("missing_references.md")
+    assert artifact_index["status"] == "input_blocked"
+    assert artifact_index["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
+    assert "recommended next action: provide-returned-autocad-pngs" in stdout
     assert not (out / "compare" / "summary.json").exists()
     assert _run_artifact_kinds(out) >= {
         "run_summary_json",
