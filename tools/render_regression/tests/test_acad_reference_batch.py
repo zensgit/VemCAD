@@ -36,6 +36,19 @@ def _route_summary(out: Path) -> dict:
     return json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
 
 
+def _unescaped_pipe_count(line: str) -> int:
+    count = 0
+    escaped = False
+    for char in line:
+        if char == "\\" and not escaped:
+            escaped = True
+            continue
+        if char == "|" and not escaped:
+            count += 1
+        escaped = False
+    return count
+
+
 def test_batch_generator_writes_manifest_and_candidates(tmp_path, capsys):
     _png(tmp_path / "acad" / "G01.png", (320, 240))
     _png(tmp_path / "ours" / "G01.png", (320, 240))
@@ -441,6 +454,40 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
     ]) == 0
 
 
+def test_batch_generator_escapes_reference_intake_markdown_table_cells(tmp_path):
+    source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
+    _png(tmp_path / "ours" / "G11.png", (760, 570), box=[20, 15, 740, 555])
+    _png(tmp_path / "returned" / "G11|acad_model_extents.png", (1600, 1131), box=[40, 30, 1560, 1100])
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11|bearing\ncap",
+            "source_dxf": "dxf/G11.dxf",
+            "source_dxf_sha256": _sha256(source),
+            "recommended_output_name": "G11|acad_model_extents.png",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--out-dir", str(out),
+    ]) == 0
+
+    intake_md = (out / "reference_intake.md").read_text(encoding="utf-8")
+    row = next(line for line in intake_md.splitlines() if line.startswith("| `G11` |"))
+    assert "G11\\|bearing cap" in row
+    assert "`G11\\|acad_model_extents.png`" in row
+    assert _unescaped_pipe_count(row) == 10
+
+
 def test_batch_generator_from_request_honors_boundary_guard_before_fulfilment(tmp_path):
     source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
     _png(tmp_path / "ours" / "G11.png", (760, 570), box=[20, 15, 740, 555])
@@ -733,6 +780,39 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path, capsys):
     assert "route summary" in stderr
     assert "recommended next action: provide-returned-autocad-pngs" in stderr
     assert "recommended next action domain: input" in stderr
+
+
+def test_batch_generator_escapes_missing_reference_markdown_table_cells(tmp_path):
+    source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
+    _png(tmp_path / "ours" / "G11.png", (760, 570))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11|bearing\ncap",
+            "source_dxf": "dxf/G11.dxf",
+            "source_dxf_sha256": _sha256(source),
+            "recommended_output_name": "G11|acad_model_extents.png",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--out-dir", str(out),
+    ]) == 2
+
+    missing_md = (out / "missing_references.md").read_text(encoding="utf-8")
+    row = next(line for line in missing_md.splitlines() if line.startswith("| `G11` |"))
+    assert "G11\\|bearing cap" in row
+    assert "`G11\\|acad_model_extents.png`" in row
+    assert _unescaped_pipe_count(row) == 9
 
 
 def test_batch_generator_clears_stale_missing_reports_on_successful_rerun(tmp_path):

@@ -40,6 +40,30 @@ def _tsv(value: Any) -> str:
     return _str(value).replace("\t", " ").replace("\r", " ").replace("\n", " ")
 
 
+def _md_table_cell(value: Any) -> str:
+    text = _str(value)
+    if not text:
+        return "-"
+    return text.replace("\r\n", " ").replace("\n", " ").replace("\r", " ").replace("|", "\\|").replace("`", "\\`")
+
+
+def _md_code_cell(value: Any) -> str:
+    text = _str(value)
+    if not text:
+        text = "-"
+    text = text.replace("\r\n", " ").replace("\n", " ").replace("\r", " ").replace("|", "\\|")
+    longest_backticks = 0
+    current = 0
+    for char in text:
+        if char == "`":
+            current += 1
+            longest_backticks = max(longest_backticks, current)
+        else:
+            current = 0
+    delimiter = "`" * (longest_backticks + 1)
+    return f"{delimiter}{text}{delimiter}"
+
+
 def _expected_size_text(expected_size: Any) -> str:
     if isinstance(expected_size, dict):
         width = expected_size.get("width")
@@ -1009,13 +1033,13 @@ def _write_missing_references_report(
     ]
     for item in missing:
         lines.append(
-            f"| `{item['id']}` | {_str(item.get('drawing_id'))} | "
-            f"`{item.get('source_dxf') or '-'}` | "
-            f"`{item['recommended_output_name']}` | "
-            f"`{item.get('requested_capture_method') or '-'}` | "
-            f"`{item.get('requested_view_contract') or '-'}` | "
-            f"`{item.get('requested_expected_size') or '-'}` | "
-            f"`{item['expected_path']}` |"
+            f"| {_md_code_cell(item['id'])} | {_md_table_cell(item.get('drawing_id'))} | "
+            f"{_md_code_cell(item.get('source_dxf'))} | "
+            f"{_md_code_cell(item['recommended_output_name'])} | "
+            f"{_md_code_cell(item.get('requested_capture_method'))} | "
+            f"{_md_code_cell(item.get('requested_view_contract'))} | "
+            f"{_md_code_cell(item.get('requested_expected_size'))} | "
+            f"{_md_code_cell(item['expected_path'])} |"
         )
     md_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
     return len(missing)
@@ -1295,12 +1319,12 @@ def _write_reference_intake_report(
             if inspection.get("width") and inspection.get("height") else "-"
         )
         lines.append(
-            f"| `{row['id']}` | {_str(row.get('drawing_id'))} | "
-            f"`{row['recommended_output_name']}` | {size} | "
-            f"{inspection.get('requested_expected_size', '-')} | "
-            f"{inspection.get('long_edge', '-')} | {inspection.get('corner_white_ratio', '-')} | "
-            f"{_identity_advisory_text(inspection.get('identity_advisory') or {})} | "
-            f"{issue_text} |"
+            f"| {_md_code_cell(row['id'])} | {_md_table_cell(row.get('drawing_id'))} | "
+            f"{_md_code_cell(row['recommended_output_name'])} | {_md_table_cell(size)} | "
+            f"{_md_table_cell(inspection.get('requested_expected_size', '-'))} | "
+            f"{_md_table_cell(inspection.get('long_edge', '-'))} | {_md_table_cell(inspection.get('corner_white_ratio', '-'))} | "
+            f"{_md_table_cell(_identity_advisory_text(inspection.get('identity_advisory') or {}))} | "
+            f"{_md_table_cell(issue_text)} |"
         )
     md_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
     return payload
