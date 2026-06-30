@@ -1972,6 +1972,45 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Route Action Artifacts
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let standalone route reports point directly at the human-readable artifact for
+  the recommended action.
+- Avoid a two-step "read route, then open artifact index, then find the report"
+  loop for missing-reference and request/intake input gates.
+
+Changes:
+
+- `acad_artifact_route.py` now pulls action artifacts from batch artifact
+  indexes when available:
+  - `fix-request-package` -> `reference_request_validation_markdown`;
+  - `provide-returned-autocad-pngs` -> `missing_references_markdown`;
+  - `inspect-returned-reference-warnings` -> `reference_intake_markdown`.
+- Text route output now includes `action_artifact` when the recommended action
+  has a target artifact.
+
+Boundary:
+
+- Read-only route surfacing only.
+- No route priority change.
+- No renderer change.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- No private drawing or AutoCAD PNG committed.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up CLI Action Domain Logs
 
 Status: implemented in this branch.

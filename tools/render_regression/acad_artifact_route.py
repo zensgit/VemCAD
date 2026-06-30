@@ -90,6 +90,13 @@ def _action(code: str, message: str, *, artifact: str = "", domain: str = "") ->
     }
 
 
+def _artifact_path(payload: dict[str, Any], kind: str) -> str:
+    for item in payload.get("artifacts") or []:
+        if isinstance(item, dict) and str(item.get("kind") or "") == kind:
+            return str(item.get("path") or "")
+    return ""
+
+
 def _route_action(route: dict[str, Any]) -> dict[str, str]:
     action = route.get("recommended_next_action") or {}
     if isinstance(action, dict):
@@ -118,11 +125,13 @@ def _route_batch(payload: dict[str, Any]) -> dict[str, Any]:
         action = _action(
             "fix-request-package",
             "Fix request-package provenance or structure before exporting or returning AutoCAD PNGs.",
+            artifact=_artifact_path(payload, "reference_request_validation_markdown"),
         )
     elif status == "blocked" and stage == "missing_references":
         action = _action(
             "provide-returned-autocad-pngs",
             "Place the returned AutoCAD PNGs using the requested filenames, then rerun the wrapper.",
+            artifact=_artifact_path(payload, "missing_references_markdown"),
         )
     elif status == "blocked":
         action = _action(
@@ -133,6 +142,7 @@ def _route_batch(payload: dict[str, Any]) -> dict[str, Any]:
         action = _action(
             "inspect-returned-reference-warnings",
             "Inspect returned-reference intake warnings before trusting visual conclusions.",
+            artifact=_artifact_path(payload, "reference_intake_markdown"),
         )
     elif status == "pass":
         action = _action(
@@ -325,6 +335,8 @@ def _write_text(route: dict[str, Any]) -> str:
         f"recommended_action_domain: {action.get('domain', '')}",
         f"message: {action.get('message', '')}",
     ]
+    if action.get("artifact"):
+        lines.append(f"action_artifact: {action.get('artifact', '')}")
     if source_boundary:
         lines.append(
             "source_artifact_boundary: "
@@ -354,6 +366,7 @@ def _write_batch_text(payload: dict[str, Any]) -> str:
             f"recommended_next_action: {action.get('code', '')}",
             f"recommended_action_domain: {action.get('domain', '')}",
             f"message: {action.get('message', '')}",
+            f"action_artifact: {action.get('artifact', '')}",
             f"autocad_equivalence_claim: {str(bool(boundary.get('autocad_equivalence_claim'))).lower()}",
         ])
     ]

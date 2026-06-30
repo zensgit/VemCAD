@@ -186,6 +186,8 @@ artifact index counts. A `viewspace_mismatch` case therefore remains an
   `fix-request-package`, `provide-returned-autocad-pngs`,
   `recapture-autocad-or-provide-window`, `inspect-renderer-candidate`, and
   `review-x3-pass`.
+- when the routed source artifact already contains a human-readable action
+  report, route reports also surface it as `action_artifact`.
 - every recommended action also carries `domain`, such as `input`,
   `renderer-candidate`, `pass-review`, or `continue`, so unattended jobs can
   distinguish "get better AutoCAD input" from "inspect renderer output" without
