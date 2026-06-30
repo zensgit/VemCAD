@@ -771,3 +771,80 @@ Boundary:
 - No renderer change.
 - No private drawing or AutoCAD PNG committed.
 - Does not change X3 semantics or AutoCAD-equivalence wording.
+
+### Slice 15 — One-Command Reference Request Runner
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Reduce manual command stitching when returned AutoCAD PNGs arrive.
+- Preserve the existing hard gates: input-prep must pass first, then X3 decides
+  whether the case is matched-view comparable.
+
+Deliverables:
+
+- `tools/render_regression/acad_reference_request_run.py`
+- `tools/render_regression/tests/test_acad_reference_request_run.py`
+- `docs/VEMCAD_G11_AUTOCAD_REFERENCE_INPUT_RUNBOOK_20260628.md`
+
+Behavior:
+
+- New wrapper command:
+
+```bash
+python3 tools/render_regression/acad_reference_request_run.py \
+  --from-request <reference_request.json> \
+  --candidate-cases <candidate_cases.json> \
+  --reference-dir <returned-png-dir> \
+  --case-id G11 \
+  --out-dir <run-dir>
+```
+
+- Writes:
+  - `<run-dir>/input/*` from `acad_reference_batch.py`;
+  - `<run-dir>/compare/*` from `acad_manifest_compare.py`;
+  - `<run-dir>/run_summary.json`;
+  - `<run-dir>/run_summary.md`.
+- Returns the existing compare exit code when input-prep passes, so
+  `viewspace_mismatch` remains exit code `2`.
+- Stops before compare and records `status=input_blocked` when input-prep
+  fails.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 3 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 92 passed
+```
+
+Private workflow smoke:
+
+```bash
+python3 tools/render_regression/acad_reference_request_run.py \
+  --from-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir /private/tmp/vemcad-reference-runner-smoke-20260629/returned \
+  --case-id G11 \
+  --out-dir /private/tmp/vemcad-reference-runner-smoke-20260629/run
+# AutoCAD reference request run: viewspace_mismatch
+# exit code: 2
+```
+
+Smoke result:
+
+- `run_summary.status=viewspace_mismatch`
+- `batch_exit_code=0`
+- `compare_exit_code=2`
+- `reference_intake.md` and `compare/summary.md` both linked from
+  `run_summary.json`.
+
+Boundary:
+
+- Orchestration only.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- Does not change X3 semantics or AutoCAD-equivalence wording.

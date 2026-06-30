@@ -178,6 +178,29 @@ python3 tools/render_regression/acad_reference_batch.py \
 
 Without `--case-id`, all requested PNGs must be present.
 
+For the common case, use the wrapper to fulfill the returned PNGs and run the
+matched-view comparison in one command:
+
+```bash
+python3 tools/render_regression/acad_reference_request_run.py \
+  --from-request "$REQUEST_DIR/reference_request.json" \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir "$RETURNED_DIR" \
+  --case-id G11 \
+  --out-dir "$NEXT_DIR"
+```
+
+The wrapper writes:
+
+- `$NEXT_DIR/input/` — generated manifest/candidates plus intake/index files;
+- `$NEXT_DIR/compare/` — X3 compare outputs;
+- `$NEXT_DIR/run_summary.json`;
+- `$NEXT_DIR/run_summary.md`.
+
+It returns the comparison exit code, so `viewspace_mismatch` still exits `2`.
+The wrapper is only an orchestration convenience; it does not render DXFs and
+does not replace the X3 gate.
+
 ```bash
 python3 tools/render_regression/acad_manifest_compare.py \
   --manifest "$NEXT_DIR/input/acad_manifest.json" \
