@@ -547,10 +547,10 @@ Verification:
 
 ```bash
 python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
-# passed
+# 62 passed
 
 python3 -m pytest tools/render_regression/tests -q
-# passed
+# 174 passed
 ```
 
 ## Follow-Up Route Count Guard
@@ -3776,6 +3776,50 @@ python3 -m pytest \
 
 python3 -m pytest tools/render_regression/tests -q
 # 172 passed
+```
+
+## Follow-Up Compare Count Route Guards
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let CI/operator route steps assert that a request-run actually compared the
+  expected number of cases.
+- Avoid relying only on bucket distributions when the first safety question is
+  simpler: did the compare route cover all expected returned references?
+
+Changes:
+
+- `acad_artifact_route.py` adds:
+  - `--require-compare-case-count <n>`;
+  - `--require-compared-count <n>`.
+- The guards read the correct field for:
+  - a single compare artifact index (`case_count` / `compared_count`);
+  - a single request-run artifact index (`route_compare_case_count` /
+    `route_compared_count`);
+  - recursive or multi-index route summaries (`compare_case_count` /
+    `compared_count`).
+- `tools/render_regression/README.md` documents the new guards beside the
+  existing triage/viewspace/X3 distribution guards.
+
+Boundary:
+
+- Route guard hardening only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
 ```
 
 ## Follow-Up Batch Route Error/Warning Count Visibility

@@ -903,6 +903,32 @@ def _route_count(payload: dict[str, Any]) -> int:
     return 1
 
 
+def _optional_int(payload: dict[str, Any], *keys: str) -> int | None:
+    for key in keys:
+        value = payload.get(key)
+        if value is None:
+            continue
+        try:
+            return int(value)
+        except Exception:
+            continue
+    return None
+
+
+def _compare_case_count(payload: dict[str, Any]) -> int | None:
+    if payload.get("schema") == BATCH_SCHEMA:
+        return _optional_int(payload, "compare_case_count")
+    if payload.get("kind") == "request_run":
+        return _optional_int(payload, "route_compare_case_count")
+    return _optional_int(payload, "case_count")
+
+
+def _compared_count(payload: dict[str, Any]) -> int | None:
+    if payload.get("kind") == "request_run":
+        return _optional_int(payload, "route_compared_count")
+    return _optional_int(payload, "compared_count")
+
+
 def _issue_code_counts(payload: dict[str, Any]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for key in (
@@ -1099,6 +1125,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="exit 2 if the routed kind counts include this kind; may repeat")
     parser.add_argument("--require-route-count", type=int,
                         help="exit 2 unless the routed artifact-index count exactly matches this value")
+    parser.add_argument("--require-compare-case-count", type=int,
+                        help="exit 2 unless the routed compare case count exactly matches this value")
+    parser.add_argument("--require-compared-count", type=int,
+                        help="exit 2 unless the routed compared count exactly matches this value")
     parser.add_argument("--require-action-artifact", default="",
                         help=(
                             "exit 2 unless the top-level recommended_next_action.artifact "
@@ -1361,6 +1391,24 @@ def main(argv: list[str] | None = None) -> int:
             print(
                 "acad_artifact_route: kind counts: "
                 + _format_counts(_kind_counts(payload)),
+                file=sys.stderr,
+            )
+            return 2
+    if args.require_compare_case_count is not None:
+        actual = _compare_case_count(payload)
+        if actual != args.require_compare_case_count:
+            print(
+                f"acad_artifact_route: required compare case count "
+                f"{args.require_compare_case_count} but got {actual}",
+                file=sys.stderr,
+            )
+            return 2
+    if args.require_compared_count is not None:
+        actual = _compared_count(payload)
+        if actual != args.require_compared_count:
+            print(
+                f"acad_artifact_route: required compared count "
+                f"{args.require_compared_count} but got {actual}",
                 file=sys.stderr,
             )
             return 2

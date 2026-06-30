@@ -1236,6 +1236,10 @@ def test_cli_require_compare_counts_passes_for_batch(tmp_path):
         "fail=1",
         "--require-x3-band",
         "fallback=1",
+        "--require-compare-case-count",
+        "2",
+        "--require-compared-count",
+        "2",
     ]) == 0
 
 
@@ -1269,7 +1273,67 @@ def test_cli_require_compare_counts_passes_for_request_run_route_fields(tmp_path
         "mismatch=1",
         "--require-x3-band",
         "fallback=1",
+        "--require-compare-case-count",
+        "2",
+        "--require-compared-count",
+        "2",
     ]) == 0
+
+
+def test_cli_require_compare_case_count_fails_closed_for_mismatch(tmp_path, capsys):
+    compare_dir = tmp_path / "compare"
+    compare_dir.mkdir()
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "pass",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"matched-pass": 1},
+        "viewspace_status_counts": {"match": 1},
+        "x3_band_counts": {"pass": 1},
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(compare_dir),
+        "--require-compare-case-count",
+        "2",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "required compare case count 2 but got 1" in stderr
+
+
+def test_cli_require_compared_count_fails_closed_for_request_run_mismatch(tmp_path, capsys):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    _write(run_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_request_run_artifact_index/v1",
+        "status": "pass",
+        "recommended_next_action": {
+            "code": "review-x3-pass",
+            "message": "pass",
+            "domain": "pass-review",
+        },
+        "case_action_counts": {"review-x3-pass": 1},
+        "case_action_domain_counts": {"pass-review": 1},
+        "route_compare_case_count": 1,
+        "route_compared_count": 1,
+        "route_triage_bucket_counts": {"matched-pass": 1},
+        "route_viewspace_status_counts": {"match": 1},
+        "route_x3_band_counts": {"pass": 1},
+        "case_actions": [],
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(run_dir),
+        "--require-compared-count",
+        "2",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "required compared count 2 but got 1" in stderr
 
 
 def test_cli_forbid_viewspace_status_fails_on_hidden_mismatch(tmp_path, capsys):
