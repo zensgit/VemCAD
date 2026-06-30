@@ -12,6 +12,14 @@ from typing import Any
 
 SCHEMA = "vemcad.acad_artifact_route/v1"
 BATCH_SCHEMA = "vemcad.acad_artifact_route_batch/v1"
+BOUNDARY = {
+    "read_only_routing": True,
+    "renders_dxf": False,
+    "compares_renders": False,
+    "changes_x3_scoring": False,
+    "changes_renderer": False,
+    "autocad_equivalence_claim": False,
+}
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -172,6 +180,7 @@ def route_artifact_index(path: Path) -> dict[str, Any]:
         "schema": SCHEMA,
         "artifact_index": str(path),
         "artifact_index_schema": schema,
+        "boundary": dict(BOUNDARY),
         **route,
     }
 
@@ -239,6 +248,7 @@ def route_artifact_indexes(paths: list[Path]) -> dict[str, Any]:
     routes = [route_artifact_index(path) for path in paths]
     return {
         "schema": BATCH_SCHEMA,
+        "boundary": dict(BOUNDARY),
         "count": len(routes),
         **_route_batch_summary(routes),
         "recommended_next_action": _recommended_batch_action(routes),
@@ -267,6 +277,7 @@ def _write_text(route: dict[str, Any]) -> str:
 
 def _write_batch_text(payload: dict[str, Any]) -> str:
     action = payload.get("recommended_next_action") or {}
+    boundary = payload.get("boundary") or {}
     chunks = [
         "\n".join([
             f"route_count: {payload.get('count', 0)}",
@@ -275,6 +286,7 @@ def _write_batch_text(payload: dict[str, Any]) -> str:
             "recommended_action_counts: " + _format_counts(payload.get("recommended_action_counts") or {}),
             f"recommended_next_action: {action.get('code', '')}",
             f"message: {action.get('message', '')}",
+            f"autocad_equivalence_claim: {str(bool(boundary.get('autocad_equivalence_claim'))).lower()}",
         ])
     ]
     for index, route in enumerate(payload.get("routes") or [], start=1):
@@ -299,6 +311,7 @@ def _route_action(route: dict[str, Any]) -> dict[str, str]:
 
 def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
     action = _route_action(route)
+    boundary = route.get("boundary") or {}
     lines = [
         f"## {heading}",
         "",
@@ -308,6 +321,11 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         f"- recommended_next_action: `{action['code']}`",
         f"- message: {action['message']}",
     ]
+    if boundary:
+        lines.extend([
+            f"- read_only_routing: `{bool(boundary.get('read_only_routing'))}`",
+            f"- autocad_equivalence_claim: `{bool(boundary.get('autocad_equivalence_claim'))}`",
+        ])
     if action["artifact"]:
         lines.append(f"- action_artifact: `{action['artifact']}`")
     if route.get("case_action_counts"):
@@ -327,6 +345,7 @@ def _write_markdown(payload: dict[str, Any]) -> str:
     ]
     if payload.get("schema") == BATCH_SCHEMA:
         action = _route_action(payload)
+        boundary = payload.get("boundary") or {}
         lines.extend([
             "## Summary",
             "",
@@ -337,6 +356,8 @@ def _write_markdown(payload: dict[str, Any]) -> str:
             f"`{_format_counts(payload.get('recommended_action_counts') or {})}`",
             f"- recommended_next_action: `{action['code']}`",
             f"- message: {action['message']}",
+            f"- read_only_routing: `{bool(boundary.get('read_only_routing'))}`",
+            f"- autocad_equivalence_claim: `{bool(boundary.get('autocad_equivalence_claim'))}`",
             "",
         ])
         if action["artifact"]:

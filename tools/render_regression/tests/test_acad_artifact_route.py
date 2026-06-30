@@ -25,6 +25,8 @@ def test_routes_batch_missing_references(tmp_path):
     payload = route.route_artifact_index(index)
 
     assert payload["schema"] == "vemcad.acad_artifact_route/v1"
+    assert payload["boundary"]["read_only_routing"] is True
+    assert payload["boundary"]["autocad_equivalence_claim"] is False
     assert payload["kind"] == "batch"
     assert payload["status"] == "blocked"
     assert payload["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
@@ -98,6 +100,9 @@ def test_routes_multiple_directories_as_batch(tmp_path):
     payload = route.route_artifact_indexes([input_dir, compare_dir])
 
     assert payload["schema"] == "vemcad.acad_artifact_route_batch/v1"
+    assert payload["boundary"]["read_only_routing"] is True
+    assert payload["boundary"]["compares_renders"] is False
+    assert payload["boundary"]["autocad_equivalence_claim"] is False
     assert payload["count"] == 2
     assert payload["kind_counts"] == {"batch": 1, "compare": 1}
     assert payload["status_counts"] == {"pass": 1, "viewspace_mismatch": 1}
@@ -146,6 +151,7 @@ def test_cli_multiple_directories_text(tmp_path, capsys):
         "recapture-autocad-or-provide-window=1"
     ) in output
     assert "recommended_next_action: recapture-autocad-or-provide-window" in output
+    assert "autocad_equivalence_claim: false" in output
     assert "route: 1" in output
     assert "route: 2" in output
     assert "recommended_next_action: continue-to-request-run" in output
@@ -224,6 +230,8 @@ def test_cli_writes_json_and_markdown_reports(tmp_path):
     markdown = out_md.read_text(encoding="utf-8")
 
     assert payload["schema"] == "vemcad.acad_artifact_route_batch/v1"
+    assert payload["boundary"]["changes_renderer"] is False
+    assert payload["boundary"]["changes_x3_scoring"] is False
     assert payload["recommended_action_counts"] == {
         "continue-to-request-run": 1,
         "recapture-autocad-or-provide-window": 1,
@@ -234,6 +242,8 @@ def test_cli_writes_json_and_markdown_reports(tmp_path):
     assert "- route_count: `2`" in markdown
     assert "recommended_action_counts" in markdown
     assert "- recommended_next_action: `recapture-autocad-or-provide-window`" in markdown
+    assert "- read_only_routing: `True`" in markdown
+    assert "- autocad_equivalence_claim: `False`" in markdown
     assert "recapture-autocad-or-provide-window=1" in markdown
 
 

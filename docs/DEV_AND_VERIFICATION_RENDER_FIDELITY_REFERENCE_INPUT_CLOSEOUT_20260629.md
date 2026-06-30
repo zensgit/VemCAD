@@ -1469,6 +1469,49 @@ python3 -m pytest tools/render_regression/tests -q
 # 114 passed
 ```
 
+## Follow-Up Machine-Readable Route Boundary
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Put the existing route-report boundary into JSON, not only Markdown prose.
+- Let CI/artifact consumers assert that an AutoCAD route report is read-only
+  routing guidance and not an AutoCAD-equivalence or renderer-change result.
+
+Changes:
+
+- Single-route and multi-route `acad_artifact_route.py` JSON payloads now
+  include:
+  - `read_only_routing: true`
+  - `renders_dxf: false`
+  - `compares_renders: false`
+  - `changes_x3_scoring: false`
+  - `changes_renderer: false`
+  - `autocad_equivalence_claim: false`
+- Multi-route `--text` output prints
+  `autocad_equivalence_claim: false` in the top summary.
+- Route Markdown prints `read_only_routing` and
+  `autocad_equivalence_claim` beside the action summary.
+
+Boundary:
+
+- Route metadata only.
+- No routing-rule change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# 12 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 115 passed
+```
+
 Private compatibility smoke:
 
 ```bash
