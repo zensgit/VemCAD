@@ -368,6 +368,18 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- recommended_next_action_domain: `{next_action['domain']}`",
         f"- recommended_next_action_message: {next_action['message']}",
         f"- case_action_domain_counts: `{_format_case_action_counts(summary['case_action_domain_counts'])}`",
+    ]
+    if summary.get("route_count") is not None:
+        lines.extend([
+            f"- route_count: `{summary['route_count']}`",
+            f"- route_kind_counts: `{_format_case_action_counts(summary.get('route_kind_counts') or {})}`",
+            f"- route_status_counts: `{_format_case_action_counts(summary.get('route_status_counts') or {})}`",
+            "- route_recommended_action_counts: "
+            f"`{_format_case_action_counts(summary.get('route_recommended_action_counts') or {})}`",
+            "- route_recommended_action_domain_counts: "
+            f"`{_format_case_action_counts(summary.get('route_recommended_action_domain_counts') or {})}`",
+        ])
+    lines.extend([
         "",
         "## Boundary",
         "",
@@ -380,7 +392,7 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         "",
         f"- input_dir: `{summary['input_dir']}`",
         f"- compare_dir: `{summary['compare_dir']}`",
-    ]
+    ])
     for label, key in (
         ("run artifact index", "run_artifact_index"),
         ("input artifact index", "input_artifact_index"),
@@ -526,6 +538,17 @@ def _write_run_summary(
         out_json=Path(payload["route_summary_json"]),
         out_md=Path(payload["route_summary_markdown"]),
     )
+    payload.update({
+        "route_count": route_payload.get("count"),
+        "route_kind_counts": route_payload.get("kind_counts") or {},
+        "route_status_counts": route_payload.get("status_counts") or {},
+        "route_recommended_action_counts": route_payload.get("recommended_action_counts") or {},
+        "route_recommended_action_domain_counts": (
+            route_payload.get("recommended_action_domain_counts") or {}
+        ),
+    })
+    _write_json(out_dir / "run_summary.json", payload)
+    _write_markdown(out_dir / "run_summary.md", payload)
     return payload
 
 

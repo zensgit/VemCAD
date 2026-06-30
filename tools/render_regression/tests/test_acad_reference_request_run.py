@@ -147,6 +147,21 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert summary["recommended_next_action"]["domain"] == "pass-review"
     assert summary["recommended_next_action"]["artifact"].endswith("summary.md")
     assert summary["case_action_domain_counts"] == {"pass-review": 1}
+    assert summary["route_count"] == 3
+    assert summary["route_kind_counts"] == {
+        "batch": 1,
+        "compare": 1,
+        "request_run": 1,
+    }
+    assert summary["route_status_counts"] == {"pass": 3}
+    assert summary["route_recommended_action_counts"] == {
+        "continue-to-request-run": 1,
+        "review-x3-pass": 2,
+    }
+    assert summary["route_recommended_action_domain_counts"] == {
+        "continue": 1,
+        "pass-review": 2,
+    }
     assert artifact_index["status"] == "pass"
     assert artifact_index["boundary"] == {
         "renders_dxf": False,
@@ -167,6 +182,11 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert "recommended_next_action: `review-x3-pass`" in summary_md
     assert "recommended_next_action_domain: `pass-review`" in summary_md
     assert "case_action_domain_counts: `pass-review=1`" in summary_md
+    assert "route_count: `3`" in summary_md
+    assert "route_kind_counts: `batch=1, compare=1, request_run=1`" in summary_md
+    assert "route_status_counts: `pass=3`" in summary_md
+    assert "route_recommended_action_counts: `continue-to-request-run=1, review-x3-pass=2`" in summary_md
+    assert "route_recommended_action_domain_counts: `continue=1, pass-review=2`" in summary_md
     assert "case actions tsv" in summary_md
     case_actions_tsv = (out / "case_actions.tsv").read_text(encoding="utf-8").splitlines()
     assert case_actions_tsv[0] == (
@@ -236,6 +256,24 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
         "input": 1,
         "pass-review": 1,
     }
+    assert summary["route_count"] == 3
+    assert summary["route_kind_counts"] == {
+        "batch": 1,
+        "compare": 1,
+        "request_run": 1,
+    }
+    assert summary["route_status_counts"] == {
+        "pass": 1,
+        "viewspace_mismatch": 2,
+    }
+    assert summary["route_recommended_action_counts"] == {
+        "continue-to-request-run": 1,
+        "recapture-autocad-or-provide-window": 2,
+    }
+    assert summary["route_recommended_action_domain_counts"] == {
+        "continue": 1,
+        "input": 2,
+    }
     assert "case action counts: recapture-autocad-or-provide-window=1, review-x3-pass=1" in stdout
     assert "case action domain counts: input=1, pass-review=1" in stdout
     assert artifact_index["case_actions"] == summary["case_actions"]
@@ -250,6 +288,11 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert summary["case_actions"][1]["domain"] == "pass-review"
     assert summary["case_actions"][1]["triage_bucket"] == "matched-pass"
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
+    assert "route_status_counts: `pass=1, viewspace_mismatch=2`" in summary_md
+    assert (
+        "route_recommended_action_counts: "
+        "`continue-to-request-run=1, recapture-autocad-or-provide-window=2`"
+    ) in summary_md
     assert "## Case Actions" in summary_md
     assert "| `G12` | G12/B12 | `recapture-autocad-or-provide-window`" in summary_md
     assert "| `G11` | G11/B11 | `review-x3-pass`" in summary_md
