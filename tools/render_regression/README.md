@@ -135,6 +135,50 @@ CLI 仍保持诊断用途并返回 `0`。
 > 实例 G11：填充比 HEIGHT 差 ~0.10 触发，而 aspect_delta 0.0569 仍 **低于**
 > ASPECT_TOL——即原 aspect 守卫静默、正是本检测要补的盲区。
 
+### AutoCAD reference request / route artifacts（无人值守流）
+
+当一批候选图需要 fresh matched-view AutoCAD PNG 时，不直接从低 X3 分数开渲染器
+缺陷。先生成/履行 reference request，再用 artifact route 决定下一步：
+
+```bash
+python3 tools/render_regression/acad_manifest_compare.py \
+  --manifest <acad_manifest.json> \
+  --candidate-cases <candidate_cases.json> \
+  --out-dir <compare-dir>
+
+python3 tools/render_regression/acad_reference_request_run.py \
+  --from-request <compare-dir>/reference_request.json \
+  --candidate-cases <candidate_cases.json> \
+  --reference-dir <returned-autocad-png-dir> \
+  --out-dir <run-dir>
+
+python3 tools/render_regression/acad_artifact_route.py <run-dir> --recursive --text
+```
+
+`artifact_index.json` 与 `route_summary.json/md` 都是机器可读的操作入口：
+
+- artifact indexes carry `boundary` metadata (`renders_dxf`,
+  `compares_renders`, `changes_x3_scoring`, `changes_renderer`,
+  `autocad_equivalence_claim`) so CI can tell whether an artifact is input
+  prep, compare output, or a one-command run summary.
+- route reports carry top-level `recommended_next_action`, including
+  `fix-request-package`, `provide-returned-autocad-pngs`,
+  `recapture-autocad-or-provide-window`, `inspect-renderer-candidate`, and
+  `review-x3-pass`.
+- `acad_artifact_route.py --require-action <code>` exits `2` if the top-level
+  action is not the expected one. Example CI guard:
+
+```bash
+python3 tools/render_regression/acad_artifact_route.py <run-dir> \
+  --recursive \
+  --require-action review-x3-pass
+```
+
+这只是 route assertion：它不重新比较图、不渲染 DXF、不调整 X3 阈值，也不声称
+AutoCAD 等价。`viewspace_mismatch` 仍然路由到重新导出 AutoCAD PNG 或提供明确
+world window；只有 `viewspace_status=match` 且 X3 非 pass 的 case 才进入
+renderer-candidate 桶。
+
 **真正能改分的对等修复**（让 render_cli 按 `--window` 渲到与 AutoCAD 同窗，或把
 AutoCAD 参照重新按 EXTENTS 导出）需要 AutoCAD 环境/渲染端改动，**不在本次改动
 范围**；本检测只负责正确"归因"——把一对 framing 不一致的图标出来，不假装它是渲染
