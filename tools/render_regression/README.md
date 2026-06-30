@@ -229,6 +229,11 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --forbid-action-domain renderer-candidate
 ```
 
+Use `--require-status <status>` / `--forbid-status <status>` when a workflow
+needs to assert the routed status distribution itself, such as requiring
+`viewspace_mismatch` in a recapture test or forbidding any nested `blocked`
+artifact in a supposedly ready batch.
+
 When a workflow also needs to assert that the chosen action points at the
 expected handoff artifact, use `--require-action-artifact <path-suffix>`.
 Suffix matching keeps the guard stable across absolute CI paths:

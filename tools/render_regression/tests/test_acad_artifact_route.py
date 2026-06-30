@@ -727,6 +727,114 @@ def test_cli_forbid_action_domain_fails_on_request_run_case_domain_counts(tmp_pa
     assert "action domain counts: input=1, renderer-candidate=1" in stderr
 
 
+def test_cli_require_status_passes_when_present(tmp_path):
+    input_dir = tmp_path / "input"
+    compare_dir = tmp_path / "compare"
+    input_dir.mkdir()
+    compare_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "review",
+        "case_count": 1,
+        "artifacts": [],
+    })
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"recapture-required": 1},
+        "viewspace_status_counts": {"mismatch": 1},
+        "x3_band_counts": {"fallback": 1},
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        str(compare_dir),
+        "--require-status",
+        "review",
+        "--require-status",
+        "viewspace_mismatch",
+    ]) == 0
+
+
+def test_cli_require_status_fails_closed_when_missing(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "pass",
+        "case_count": 1,
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--require-status",
+        "blocked",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "required status missing: blocked" in stderr
+    assert "status counts: pass=1" in stderr
+
+
+def test_cli_forbid_status_passes_when_absent(tmp_path):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "pass",
+        "case_count": 1,
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--forbid-status",
+        "blocked",
+    ]) == 0
+
+
+def test_cli_forbid_status_fails_closed_when_present(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    compare_dir = tmp_path / "compare"
+    input_dir.mkdir()
+    compare_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "missing_references",
+        "status": "blocked",
+        "case_count": 1,
+        "artifacts": [],
+    })
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"recapture-required": 1},
+        "viewspace_status_counts": {"mismatch": 1},
+        "x3_band_counts": {"fallback": 1},
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        str(compare_dir),
+        "--forbid-status",
+        "blocked",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "forbidden status present: blocked=1" in stderr
+    assert "status counts: blocked=1, viewspace_mismatch=1" in stderr
+
+
 def test_cli_require_issue_code_passes_when_present(tmp_path):
     input_dir = tmp_path / "input"
     input_dir.mkdir()

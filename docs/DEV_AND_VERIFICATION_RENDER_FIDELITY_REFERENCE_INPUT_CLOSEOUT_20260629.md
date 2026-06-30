@@ -392,6 +392,45 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Route Status Guards
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let unattended route steps assert status distribution directly, not only
+  recommended actions or action domains.
+- Make CI fail closed when a required status is absent or a forbidden status
+  appears inside recursive/multi-index route output.
+
+Changes:
+
+- `acad_artifact_route.py` adds repeatable `--require-status <status>`.
+- `acad_artifact_route.py` adds repeatable `--forbid-status <status>`.
+- Single-route payloads derive counts from their own `status`.
+- Batch-route payloads use aggregated `status_counts`.
+- Failure messages print current status counts for operator diagnosis.
+- `tools/render_regression/README.md` documents the operator-facing behavior.
+
+Boundary:
+
+- Route assertion only.
+- No route priority change.
+- No renderer change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up Route Issue Code Guards
 
 Status: implemented in this branch.
