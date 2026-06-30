@@ -296,6 +296,21 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --require-source-boundary autocad_equivalence_claim=false
 ```
 
+When the workflow needs to prove the original AutoCAD recapture request also
+survived the handoff, add `--require-request-boundary key=value`. The guard
+checks every routed artifact that exposes `source_request_boundary`, ignores
+compare-only routes that do not own the request package, and fails if no routed
+artifact exposes the request boundary at all:
+
+```bash
+python3 tools/render_regression/acad_artifact_route.py <run-dir> \
+  --recursive \
+  --require-source-boundary autocad_equivalence_claim=false \
+  --require-request-boundary autocad_equivalence_claim=false \
+  --require-request-boundary requires_returned_autocad_png=true \
+  --require-request-boundary requires_viewspace_match=true
+```
+
 这只是 route assertion：它不重新比较图、不渲染 DXF、不调整 X3 阈值，也不声称
 AutoCAD 等价。`viewspace_mismatch` 仍然路由到重新导出 AutoCAD PNG 或提供明确
 world window；只有 `viewspace_status=match` 且 X3 非 pass 的 case 才进入
