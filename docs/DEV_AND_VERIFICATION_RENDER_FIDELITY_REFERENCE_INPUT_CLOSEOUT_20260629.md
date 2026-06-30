@@ -4141,3 +4141,38 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
+
+## Follow-Up Request-Run Compare CLI Log README
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep the operator-facing render-regression README aligned with the request-run
+  stdout compare distribution lines.
+- Make clear that CI logs now show the compare portion without requiring
+  operators to open uploaded artifacts.
+
+Changes:
+
+- `tools/render_regression/README.md` now states that
+  `acad_reference_request_run.py` prints route compare distributions to stdout
+  when they are present.
+
+Boundary:
+
+- Documentation only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
