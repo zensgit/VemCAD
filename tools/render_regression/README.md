@@ -171,6 +171,9 @@ summary and artifact index when the request is input-blocked.
 The request validation report itself also records the requested expected size
 per row, so operators can verify the capture-size contract before any returned
 AutoCAD PNG exists.
+Both request validation and returned-reference intake reports print
+`issue_code_counts` at the top, so operators can see the issue classes without
+scanning per-case tables.
 The batch, compare, and request-run CLIs also print the recommended action
 domain next to the action code, so CI logs can show the route class without
 opening JSON artifacts.
