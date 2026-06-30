@@ -1934,6 +1934,44 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Missing Reference Capture Contract Columns
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make the missing-reference handoff TSV directly actionable for AutoCAD export.
+- Keep the requested capture method, view contract, and expected size beside the
+  missing output filename/path instead of requiring operators to cross-reference
+  `reference_request.json`.
+
+Changes:
+
+- `missing_references.json` rows now include:
+  - `requested_capture_method`;
+  - `requested_view_contract`;
+  - `requested_expected_size` as a compact `WIDTHxHEIGHT` string when present.
+- `missing_references.tsv` adds the same capture-contract columns.
+- `missing_references.md` shows the capture/view/size fields in its table.
+
+Boundary:
+
+- Missing-input handoff artifact only.
+- No route priority change.
+- No renderer change.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- No private drawing or AutoCAD PNG committed.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up CLI Action Domain Logs
 
 Status: implemented in this branch.

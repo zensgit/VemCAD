@@ -40,6 +40,19 @@ def _tsv(value: Any) -> str:
     return _str(value).replace("\t", " ").replace("\r", " ").replace("\n", " ")
 
 
+def _expected_size_text(expected_size: Any) -> str:
+    if isinstance(expected_size, dict):
+        width = expected_size.get("width")
+        height = expected_size.get("height")
+    elif isinstance(expected_size, (list, tuple)) and len(expected_size) == 2:
+        width, height = expected_size
+    else:
+        return ""
+    width_text = _str(width)
+    height_text = _str(height)
+    return f"{width_text}x{height_text}" if width_text and height_text else ""
+
+
 def _image_size(path: Path) -> tuple[int, int]:
     with Image.open(path) as image:
         return image.size
@@ -789,11 +802,15 @@ def _write_missing_references_report(
         output_name = _required(request, "recommended_output_name", index)
         expected_path = (reference_dir / output_name).resolve()
         if not expected_path.is_file():
+            expected_size = request.get("requested_expected_size") or request.get("expected_size")
             missing.append({
                 "id": case_id,
                 "drawing_id": _str(request.get("drawing_id")),
                 "recommended_output_name": output_name,
                 "expected_path": str(expected_path),
+                "requested_capture_method": _str(request.get("requested_capture_method") or "plot-export"),
+                "requested_view_contract": _str(request.get("requested_view_contract") or "model-extents"),
+                "requested_expected_size": _expected_size_text(expected_size),
             })
     if not missing:
         return 0
@@ -810,13 +827,19 @@ def _write_missing_references_report(
     tsv_path = out_dir / "missing_references.tsv"
     json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     with tsv_path.open("w", encoding="utf-8") as handle:
-        handle.write("id\tdrawing_id\trecommended_output_name\texpected_path\n")
+        handle.write(
+            "id\tdrawing_id\trecommended_output_name\texpected_path\t"
+            "requested_capture_method\trequested_view_contract\trequested_expected_size\n"
+        )
         for item in missing:
             handle.write(
                 f"{_tsv(item['id'])}\t"
                 f"{_tsv(item.get('drawing_id'))}\t"
                 f"{_tsv(item['recommended_output_name'])}\t"
-                f"{_tsv(item['expected_path'])}\n"
+                f"{_tsv(item['expected_path'])}\t"
+                f"{_tsv(item.get('requested_capture_method'))}\t"
+                f"{_tsv(item.get('requested_view_contract'))}\t"
+                f"{_tsv(item.get('requested_expected_size'))}\n"
             )
     lines = [
         "# Missing AutoCAD Reference PNGs",
@@ -826,13 +849,17 @@ def _write_missing_references_report(
         f"- missing_count: `{len(missing)}`",
         f"- missing_references_tsv: `{tsv_path}`",
         "",
-        "| Case | Drawing | Expected PNG | Expected path |",
-        "| --- | --- | --- | --- |",
+        "| Case | Drawing | Expected PNG | Capture | View | Expected size | Expected path |",
+        "| --- | --- | --- | --- | --- | --- | --- |",
     ]
     for item in missing:
         lines.append(
             f"| `{item['id']}` | {_str(item.get('drawing_id'))} | "
-            f"`{item['recommended_output_name']}` | `{item['expected_path']}` |"
+            f"`{item['recommended_output_name']}` | "
+            f"`{item.get('requested_capture_method') or '-'}` | "
+            f"`{item.get('requested_view_contract') or '-'}` | "
+            f"`{item.get('requested_expected_size') or '-'}` | "
+            f"`{item['expected_path']}` |"
         )
     md_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
     return len(missing)
