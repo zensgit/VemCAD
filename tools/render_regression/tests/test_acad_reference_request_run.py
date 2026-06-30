@@ -395,6 +395,10 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert summary["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
     assert summary["recommended_next_action"]["domain"] == "input"
     assert summary["recommended_next_action"]["artifact"].endswith("compare/reference_request.md")
+    assert summary["recommended_next_action_artifact_resolved"] == str(
+        (out / "compare" / "reference_request.md").resolve()
+    )
+    assert summary["recommended_next_action_artifact_exists"] is True
     assert summary["compare_reference_request_json"].endswith("compare/reference_request.json")
     assert summary["compare_reference_request_markdown"].endswith("compare/reference_request.md")
     assert summary["case_action_counts"] == {
@@ -445,12 +449,21 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
         "mismatch": 1,
     }
     assert artifact_index["route_x3_band_counts"] == {"pass": 2}
+    assert artifact_index["recommended_next_action_artifact_resolved"] == str(
+        (out / "compare" / "reference_request.md").resolve()
+    )
+    assert artifact_index["recommended_next_action_artifact_exists"] is True
     artifact_kinds = _run_artifact_kinds(out)
     assert "compare_reference_request_json" in artifact_kinds
     assert "compare_reference_request_markdown" in artifact_kinds
     assert "case action counts: recapture-autocad-or-provide-window=1, review-x3-pass=1" in stdout
     assert "case action domain counts: input=1, pass-review=1" in stdout
     assert f"recommended next action artifact: {out / 'compare' / 'reference_request.md'}" in stdout
+    assert (
+        "recommended next action artifact resolved: "
+        f"{(out / 'compare' / 'reference_request.md').resolve()}"
+    ) in stdout
+    assert "recommended next action artifact exists: True" in stdout
     assert "route compare cases: 2" in stdout
     assert "route compared cases: 2" in stdout
     assert "route triage buckets: matched-pass=1, recapture-required=1" in stdout
@@ -471,6 +484,11 @@ def test_reference_request_run_writes_per_case_actions_for_batch(tmp_path, capsy
     assert summary["case_actions"][1]["artifact"].endswith("compare/summary.md")
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
     assert f"recommended next action artifact: `{out / 'compare' / 'reference_request.md'}`" in summary_md
+    assert (
+        "recommended next action artifact resolved: "
+        f"`{(out / 'compare' / 'reference_request.md').resolve()}`"
+    ) in summary_md
+    assert "recommended next action artifact exists: `True`" in summary_md
     assert f"compare reference request: `{out / 'compare' / 'reference_request.md'}`" in summary_md
     assert f"compare reference request json: `{out / 'compare' / 'reference_request.json'}`" in summary_md
     assert "route_status_counts: `pass=1, viewspace_mismatch=2`" in summary_md
@@ -666,17 +684,30 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
     assert summary["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
     assert summary["recommended_next_action"]["domain"] == "input"
     assert summary["recommended_next_action"]["artifact"].endswith("missing_references.md")
+    assert summary["recommended_next_action_artifact_resolved"] == str(
+        (out / "input" / "missing_references.md").resolve()
+    )
+    assert summary["recommended_next_action_artifact_exists"] is True
     assert summary["case_action_domain_counts"] == {"input": 1}
     assert artifact_index["status"] == "input_blocked"
     assert artifact_index["boundary"]["compares_renders"] is False
     assert artifact_index["boundary"]["autocad_equivalence_claim"] is False
     assert artifact_index["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
     assert artifact_index["recommended_next_action"]["domain"] == "input"
+    assert artifact_index["recommended_next_action_artifact_resolved"] == str(
+        (out / "input" / "missing_references.md").resolve()
+    )
+    assert artifact_index["recommended_next_action_artifact_exists"] is True
     assert artifact_index["case_actions"] == summary["case_actions"]
     assert artifact_index["case_action_counts"] == summary["case_action_counts"]
     assert artifact_index["case_action_domain_counts"] == summary["case_action_domain_counts"]
     assert "recommended next action: provide-returned-autocad-pngs" in stdout
     assert "recommended next action domain: input" in stdout
+    assert (
+        "recommended next action artifact resolved: "
+        f"{(out / 'input' / 'missing_references.md').resolve()}"
+    ) in stdout
+    assert "recommended next action artifact exists: True" in stdout
     assert "case action counts: provide-returned-autocad-pngs=1" in stdout
     assert "case action domain counts: input=1" in stdout
     assert not (out / "compare" / "summary.json").exists()

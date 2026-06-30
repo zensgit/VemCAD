@@ -127,6 +127,13 @@ def _run_artifact_index_payload(
         "count": len(artifacts),
         "artifacts": artifacts,
     }
+    if summary.get("recommended_next_action_artifact_resolved"):
+        payload["recommended_next_action_artifact_resolved"] = (
+            summary["recommended_next_action_artifact_resolved"]
+        )
+        payload["recommended_next_action_artifact_exists"] = bool(
+            summary.get("recommended_next_action_artifact_exists")
+        )
     if summary.get("route_count") is not None:
         payload.update({
             "route_count": summary.get("route_count"),
@@ -151,6 +158,18 @@ def _write_run_artifact_index(
     artifacts: list[dict[str, str]],
 ) -> None:
     _write_json(out_dir / "artifact_index.json", _run_artifact_index_payload(summary, artifacts))
+
+
+def _copy_action_artifact_resolution(summary: dict[str, Any], route_payload: dict[str, Any]) -> None:
+    resolved = str(route_payload.get("action_artifact_resolved") or "")
+    if not resolved:
+        summary.pop("recommended_next_action_artifact_resolved", None)
+        summary.pop("recommended_next_action_artifact_exists", None)
+        return
+    summary["recommended_next_action_artifact_resolved"] = resolved
+    summary["recommended_next_action_artifact_exists"] = bool(
+        route_payload.get("action_artifact_exists")
+    )
 
 
 def _compare_status(compare_summary: Path) -> str:
@@ -566,6 +585,15 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
             lines.append(f"- {label}: {_md_code_cell(value)}")
     if next_action.get("artifact"):
         lines.append(f"- recommended next action artifact: {_md_code_cell(next_action['artifact'])}")
+    if summary.get("recommended_next_action_artifact_resolved"):
+        lines.append(
+            "- recommended next action artifact resolved: "
+            f"{_md_code_cell(summary['recommended_next_action_artifact_resolved'])}"
+        )
+        lines.append(
+            "- recommended next action artifact exists: "
+            f"{_md_code_cell(bool(summary.get('recommended_next_action_artifact_exists')))}"
+        )
     case_actions = summary.get("case_actions") or []
     if case_actions:
         lines.extend([
@@ -702,11 +730,13 @@ def _write_run_summary(
     })
     _write_run_artifact_index(out_dir, payload, artifacts)
     route_payload = artifact_route.route_artifact_indexes(route_inputs)
+    _copy_action_artifact_resolution(payload, route_payload)
     artifact_route.write_route_report_files(
         route_payload,
         out_json=Path(payload["route_summary_json"]),
         out_md=Path(payload["route_summary_markdown"]),
     )
+    _write_run_artifact_index(out_dir, payload, artifacts)
     _write_json(out_dir / "run_summary.json", payload)
     _write_markdown(out_dir / "run_summary.md", payload)
     return payload
@@ -718,6 +748,15 @@ def _print_run_summary(summary: dict[str, Any], out_dir: Path) -> None:
     print(f"  recommended next action domain: {summary['recommended_next_action']['domain']}")
     if summary["recommended_next_action"].get("artifact"):
         print(f"  recommended next action artifact: {summary['recommended_next_action']['artifact']}")
+    if summary.get("recommended_next_action_artifact_resolved"):
+        print(
+            "  recommended next action artifact resolved: "
+            f"{summary['recommended_next_action_artifact_resolved']}"
+        )
+        print(
+            "  recommended next action artifact exists: "
+            f"{bool(summary.get('recommended_next_action_artifact_exists'))}"
+        )
     print(f"  case action counts: {_format_case_action_counts(summary['case_action_counts'])}")
     print(f"  case action domain counts: {_format_case_action_counts(summary['case_action_domain_counts'])}")
     print(
