@@ -1858,6 +1858,43 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Missing References TSV
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Add a spreadsheet-friendly missing-reference handoff artifact.
+- Let operators sort/copy the exact returned AutoCAD PNG filenames and expected
+  paths without scraping `missing_references.md`.
+
+Changes:
+
+- `acad_reference_batch.py` now writes `missing_references.tsv` beside
+  `missing_references.json/md`.
+- `missing_references.md` links the TSV path.
+- Batch artifact indexes include `missing_references_tsv`.
+- `_clear_batch_outputs()` removes stale `missing_references.tsv` on successful
+  reruns, matching the JSON/Markdown cleanup behavior.
+
+Boundary:
+
+- Missing-input reporting artifact only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring or AutoCAD-equivalence wording change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up CLI Action Domain Logs
 
 Status: implemented in this branch.

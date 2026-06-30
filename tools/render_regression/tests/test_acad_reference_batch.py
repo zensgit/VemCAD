@@ -519,6 +519,10 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path, capsys):
     missing_md = (out / "missing_references.md").read_text(encoding="utf-8")
     assert "Missing AutoCAD Reference PNGs" in missing_md
     assert "G11_autocad_model_extents.png" in missing_md
+    assert "missing_references_tsv" in missing_md
+    missing_tsv = (out / "missing_references.tsv").read_text(encoding="utf-8").splitlines()
+    assert missing_tsv[0] == "id\tdrawing_id\trecommended_output_name\texpected_path"
+    assert missing_tsv[1].startswith("G11\tG11/B11\tG11_autocad_model_extents.png\t")
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["stage"] == "missing_references"
     assert artifact_index["status"] == "blocked"
@@ -528,6 +532,7 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path, capsys):
     assert {item["kind"] for item in artifact_index["artifacts"]} == {
         "missing_references_json",
         "missing_references_markdown",
+        "missing_references_tsv",
         "reference_request_validation_json",
         "reference_request_validation_markdown",
         "route_summary_json",
@@ -565,6 +570,7 @@ def test_batch_generator_clears_stale_missing_reports_on_successful_rerun(tmp_pa
         "--out-dir", str(out),
     ]) == 2
     assert (out / "missing_references.md").is_file()
+    assert (out / "missing_references.tsv").is_file()
 
     _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1600, 1131))
     assert batch.main([
@@ -576,10 +582,12 @@ def test_batch_generator_clears_stale_missing_reports_on_successful_rerun(tmp_pa
 
     assert not (out / "missing_references.json").exists()
     assert not (out / "missing_references.md").exists()
+    assert not (out / "missing_references.tsv").exists()
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["stage"] == "reference_intake"
     assert artifact_index["status"] == "pass"
     assert "missing_references_markdown" not in {item["kind"] for item in artifact_index["artifacts"]}
+    assert "missing_references_tsv" not in {item["kind"] for item in artifact_index["artifacts"]}
 
 
 def test_batch_generator_fulfills_subset_of_reference_request(tmp_path):

@@ -36,6 +36,10 @@ def _str(value: Any) -> str:
     return str(value).strip()
 
 
+def _tsv(value: Any) -> str:
+    return _str(value).replace("\t", " ").replace("\r", " ").replace("\n", " ")
+
+
 def _image_size(path: Path) -> tuple[int, int]:
     with Image.open(path) as image:
         return image.size
@@ -803,13 +807,24 @@ def _write_missing_references_report(
     }
     json_path = out_dir / "missing_references.json"
     md_path = out_dir / "missing_references.md"
+    tsv_path = out_dir / "missing_references.tsv"
     json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    with tsv_path.open("w", encoding="utf-8") as handle:
+        handle.write("id\tdrawing_id\trecommended_output_name\texpected_path\n")
+        for item in missing:
+            handle.write(
+                f"{_tsv(item['id'])}\t"
+                f"{_tsv(item.get('drawing_id'))}\t"
+                f"{_tsv(item['recommended_output_name'])}\t"
+                f"{_tsv(item['expected_path'])}\n"
+            )
     lines = [
         "# Missing AutoCAD Reference PNGs",
         "",
         f"- request: `{request_json.resolve()}`",
         f"- reference_dir: `{reference_dir.resolve()}`",
         f"- missing_count: `{len(missing)}`",
+        f"- missing_references_tsv: `{tsv_path}`",
         "",
         "| Case | Drawing | Expected PNG | Expected path |",
         "| --- | --- | --- | --- |",
@@ -831,6 +846,7 @@ def _existing_batch_artifacts(out_dir: Path) -> list[dict[str, str]]:
         ("reference_intake.md", "reference_intake_markdown"),
         ("missing_references.json", "missing_references_json"),
         ("missing_references.md", "missing_references_markdown"),
+        ("missing_references.tsv", "missing_references_tsv"),
         ("reference_request_validation.json", "reference_request_validation_json"),
         ("reference_request_validation.md", "reference_request_validation_markdown"),
         ("route_summary.json", "route_summary_json"),
@@ -852,6 +868,7 @@ def _clear_batch_outputs(out_dir: Path) -> None:
         ("reference_intake.md", "reference_intake_markdown"),
         ("missing_references.json", "missing_references_json"),
         ("missing_references.md", "missing_references_markdown"),
+        ("missing_references.tsv", "missing_references_tsv"),
         ("reference_request_validation.json", "reference_request_validation_json"),
         ("reference_request_validation.md", "reference_request_validation_markdown"),
         ("route_summary.json", "route_summary_json"),

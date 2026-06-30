@@ -162,6 +162,9 @@ summary itself distinguishes input/recapture gates from renderer-candidate
 work before a separate route report is generated. It also writes
 `case_actions.tsv` for spreadsheet-friendly per-case sorting/filtering by
 action code, domain, source, triage bucket, view-space status, and X3 band.
+When returned AutoCAD PNGs are still missing, `acad_reference_batch.py` writes
+`missing_references.tsv` beside the JSON/Markdown report so the expected
+filenames and paths can be handed off without scraping Markdown.
 The batch, compare, and request-run CLIs also print the recommended action
 domain next to the action code, so CI logs can show the route class without
 opening JSON artifacts.
