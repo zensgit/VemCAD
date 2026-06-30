@@ -1340,6 +1340,46 @@ python3 -m pytest tools/render_regression/tests -q
 # 192 passed
 ```
 
+## Follow-Up Reference Intake Markdown Provenance
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let human reviewers confirm the exact returned AutoCAD PNG identity from
+  `reference_intake.md` without opening `reference_intake.json` or the sibling
+  TSV.
+- Keep the human intake report aligned with the machine-readable
+  `reference_intake.tsv` provenance surface.
+
+Changes:
+
+- `reference_intake.md` now adds a `Returned provenance` table column.
+- Each returned provenance cell prints `sha256=<digest> size=<bytes>` when the
+  returned PNG was readable and inspected.
+- The Markdown table escaping test was updated for the extra column.
+- The README documents that intake Markdown shows returned PNG provenance.
+
+Boundary:
+
+- Returned-reference intake Markdown evidence surface only.
+- No intake rule change.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 22 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 192 passed
+```
+
 ## Follow-Up Request Validation TSV
 
 Status: implemented in this branch.

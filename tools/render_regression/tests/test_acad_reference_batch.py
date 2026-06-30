@@ -475,6 +475,7 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
     assert "G11_autocad_model_extents.png" in intake_md
     assert "1600x1131" in intake_md
     assert "reference_intake_tsv" in intake_md
+    assert f"sha256={_sha256(tmp_path / 'returned' / 'G11_autocad_model_extents.png')}" in intake_md
     assert "issue_code_counts: `none`" in intake_md
     intake_tsv = (out / "reference_intake.tsv").read_text(encoding="utf-8").splitlines()
     assert intake_tsv[0] == (
@@ -554,7 +555,7 @@ def test_batch_generator_escapes_reference_intake_markdown_table_cells(tmp_path)
     row = next(line for line in intake_md.splitlines() if line.startswith("| `G11` |"))
     assert "G11\\|bearing cap" in row
     assert "`G11\\|acad_model_extents.png`" in row
-    assert _unescaped_pipe_count(row) == 10
+    assert _unescaped_pipe_count(row) == 11
 
 
 def test_batch_generator_from_request_honors_boundary_guard_before_fulfilment(tmp_path):
