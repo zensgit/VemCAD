@@ -3293,6 +3293,46 @@ python3 -m pytest tools/render_regression/tests -q
 # passed
 ```
 
+## Follow-Up Route Action Domain Count Gate
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let unattended route checks assert exact action-domain distribution, not only
+  the top-level action domain or a forbidden-domain absence.
+- Cover workflows that need to prove a route contains a known mix of `input`,
+  `renderer-candidate`, `pass-review`, or `continue` work without enumerating
+  every concrete action code.
+
+Changes:
+
+- `acad_artifact_route.py` now accepts repeatable
+  `--require-action-domain-count <domain=count>`.
+- Multi-route payloads are checked against `recommended_action_domain_counts`.
+- Request-run payloads are checked against `case_action_domain_counts`.
+- Single-route payloads fall back to the top-level recommended action domain.
+- Failure output prints both the mismatched expectations and the full routed
+  action-domain count summary.
+
+Boundary:
+
+- Route-gate assertion only.
+- No route priority change.
+- No renderer change.
+- No X3 scoring or AutoCAD-equivalence wording change.
+- No private drawing or AutoCAD PNG committed.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+
+python3 -m pytest tools/render_regression/tests -q
+# passed
+```
+
 ## Follow-Up CLI Action Domain Logs
 
 Status: implemented in this branch.
