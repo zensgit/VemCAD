@@ -856,6 +856,53 @@ python3 -m pytest tools/render_regression/tests -q
 # 101 passed
 ```
 
+## Follow-Up Reference Request Boundary Metadata
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make `reference_request.json` self-describing when it is handed off outside
+  the original compare output directory.
+- Preserve the no-equivalence boundary before AutoCAD capture fulfilment, not
+  only after validation/intake reports are generated.
+- Keep the external-input gate explicit: a request asks for fresh matched-view
+  AutoCAD PNGs; it does not render, compare, tune X3, or claim AutoCAD
+  equivalence.
+
+Changes:
+
+- `acad_manifest_compare.py` now writes a top-level `boundary` object into
+  generated `reference_request.json`:
+  - `renders_dxf=false`
+  - `compares_renders=false`
+  - `changes_x3_scoring=false`
+  - `changes_renderer=false`
+  - `requires_returned_autocad_png=true`
+  - `requires_viewspace_match=true`
+  - `autocad_equivalence_claim=false`
+- `acad_reference_batch.py --validate-request` now copies that source request
+  boundary into `reference_request_validation.json` as
+  `source_request_boundary`.
+- The validation Markdown report prints `source_request_boundary` beside the
+  issue counts, so operators can audit the source package before fulfilment.
+
+Boundary:
+
+- Metadata/reporting only.
+- No renderer change.
+- No X3 scoring change.
+- No compare behavior change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py tools/render_regression/tests/test_acad_reference_batch.py -q
+# 22 passed
+```
+
 ## Follow-Up Source Report Issue Code Counts
 
 Status: implemented in this branch.

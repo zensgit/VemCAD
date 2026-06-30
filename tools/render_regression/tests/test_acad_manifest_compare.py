@@ -277,6 +277,15 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert request["schema"] == "vemcad.acad_reference_request/v1"
     assert request["reason"] == "recapture-required"
     assert request["case_count"] == 1
+    assert request["boundary"] == {
+        "renders_dxf": False,
+        "compares_renders": False,
+        "changes_x3_scoring": False,
+        "changes_renderer": False,
+        "requires_returned_autocad_png": True,
+        "requires_viewspace_match": True,
+        "autocad_equivalence_claim": False,
+    }
     assert request["cases"][0]["id"] == "G11"
     assert request["cases"][0]["requested_view_contract"] == "model-extents"
     assert request["cases"][0]["recommended_output_name"] == "G11_autocad_model_extents.png"

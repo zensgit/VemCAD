@@ -100,6 +100,10 @@ def _format_counts(counts: dict[str, Any]) -> str:
     return ", ".join(f"{key}={value}" for key, value in sorted(counts.items())) or "none"
 
 
+def _format_boundary(boundary: dict[str, Any]) -> str:
+    return ", ".join(f"{key}={value}" for key, value in sorted(boundary.items())) or "none"
+
+
 def _near_white(rgb: tuple[int, int, int]) -> bool:
     return min(rgb) >= 245 and (max(rgb) - min(rgb)) <= 10
 
@@ -424,12 +428,20 @@ def _load_candidate_map_with_issues(
     return candidates, issues
 
 
-def _load_request_cases(path: Path) -> list[dict[str, Any]]:
+def _load_request_payload(path: Path) -> dict[str, Any]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise ValueError("reference request JSON must be an object")
     if data.get("schema") != "vemcad.acad_reference_request/v1":
         raise ValueError("reference request schema must be vemcad.acad_reference_request/v1")
+    return data
+
+
+def _load_request_cases(path: Path) -> list[dict[str, Any]]:
+    return _request_cases(_load_request_payload(path))
+
+
+def _request_cases(data: dict[str, Any]) -> list[dict[str, Any]]:
     cases = data.get("cases")
     if not isinstance(cases, list) or not cases:
         raise ValueError("reference request must contain a non-empty cases list")
@@ -437,6 +449,11 @@ def _load_request_cases(path: Path) -> list[dict[str, Any]]:
         if not isinstance(item, dict):
             raise ValueError(f"request case {index}: must be an object")
     return cases
+
+
+def _request_boundary(data: dict[str, Any]) -> dict[str, Any]:
+    boundary = data.get("boundary")
+    return dict(boundary) if isinstance(boundary, dict) else {}
 
 
 def _filter_request_cases(cases: list[dict[str, Any]], case_ids: set[str] | None) -> list[dict[str, Any]]:
@@ -566,7 +583,9 @@ def _write_reference_request_validation_report(
     candidate_cases: Path,
     case_ids: set[str] | None = None,
 ) -> dict[str, Any]:
-    request_cases = _filter_request_cases(_load_request_cases(request_json), case_ids)
+    request_payload = _load_request_payload(request_json)
+    request_boundary = _request_boundary(request_payload)
+    request_cases = _filter_request_cases(_request_cases(request_payload), case_ids)
     selected_case_ids = {_str(item.get("id")) for item in request_cases if _str(item.get("id"))}
     candidates, global_issues = _load_candidate_map_with_issues(
         candidate_cases,
@@ -728,6 +747,7 @@ def _write_reference_request_validation_report(
         "error_count": error_count,
         "warning_count": warning_count,
         "issue_code_counts": issue_code_counts,
+        "source_request_boundary": request_boundary,
         "cases": rows,
         "issues": issues,
         "boundary": {
@@ -750,6 +770,7 @@ def _write_reference_request_validation_report(
         f"- errors: `{error_count}`",
         f"- warnings: `{warning_count}`",
         f"- issue_code_counts: `{_format_counts(issue_code_counts)}`",
+        f"- source_request_boundary: `{_format_boundary(request_boundary)}`",
         "",
         "This validates request-package identity and provenance before AutoCAD PNG fulfilment. "
         "It does not compare renders and does not claim AutoCAD equivalence.",
