@@ -173,9 +173,11 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert summary["reference_request_validation_error_count"] == 0
     assert summary["reference_request_validation_warning_count"] == 0
     assert summary["reference_request_validation_markdown"].endswith("reference_request_validation.md")
+    assert summary["reference_request_validation_tsv"].endswith("reference_request_validation.tsv")
     assert summary["reference_intake_status"] == "pass"
     assert summary["reference_intake_warning_count"] == 0
     assert summary["reference_intake_markdown"].endswith("reference_intake.md")
+    assert summary["reference_intake_tsv"].endswith("reference_intake.tsv")
     assert summary["compare_summary_markdown"].endswith("summary.md")
     assert summary["route_summary_json"].endswith("route_summary.json")
     assert summary["route_summary_markdown"].endswith("route_summary.md")
@@ -294,6 +296,8 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert "route_viewspace_status_counts: `match=1`" in summary_md
     assert "route_x3_band_counts: `pass=1`" in summary_md
     assert "case actions tsv" in summary_md
+    assert "request validation tsv" in summary_md
+    assert "reference intake tsv" in summary_md
     route_summary_md = (out / "route_summary.md").read_text(encoding="utf-8")
     assert "- reference_request_validation_status: `pass`" in route_summary_md
     assert "- reference_intake_status: `pass`" in route_summary_md
@@ -327,8 +331,10 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
         "input_artifact_index",
         "reference_request_validation_json",
         "reference_request_validation_markdown",
+        "reference_request_validation_tsv",
         "reference_intake_json",
         "reference_intake_markdown",
+        "reference_intake_tsv",
         "compare_summary_json",
         "compare_summary_markdown",
         "compare_artifact_index",
@@ -645,6 +651,7 @@ def test_reference_request_run_surfaces_intake_review_warnings(tmp_path):
     assert summary["status"] == "viewspace_mismatch"
     assert summary["reference_request_validation_status"] == "pass"
     assert summary["reference_intake_status"] == "review"
+    assert summary["reference_intake_tsv"].endswith("reference_intake.tsv")
     assert summary["reference_intake_warning_count"] == 2
     assert summary["reference_intake_issue_code_counts"] == {
         "corner_background_not_white": 1,
@@ -660,6 +667,7 @@ def test_reference_request_run_surfaces_intake_review_warnings(tmp_path):
     )
     artifact_index = _run_artifact_index(out)
     assert artifact_index["reference_intake_issue_code_counts"] == summary["reference_intake_issue_code_counts"]
+    assert "reference_intake_tsv" in {item["kind"] for item in artifact_index["artifacts"]}
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
     assert "reference_intake_status: `review`" in summary_md
     assert "reference_intake_warnings: `2`" in summary_md
@@ -698,6 +706,7 @@ def test_reference_request_run_can_fail_closed_on_input_review_warnings(tmp_path
     assert default_summary["final_exit_code"] == 0
     assert default_summary["fail_on_input_review"] is False
     assert default_summary["reference_intake_status"] == "review"
+    assert default_summary["reference_intake_tsv"].endswith("reference_intake.tsv")
     assert default_summary["reference_intake_issue_code_counts"] == {"long_edge_below_requested": 1}
     assert default_summary["recommended_next_action"]["code"] == "inspect-returned-reference-warnings"
     assert default_summary["recommended_next_action"]["domain"] == "input-review"
@@ -721,6 +730,7 @@ def test_reference_request_run_can_fail_closed_on_input_review_warnings(tmp_path
     assert fail_summary["final_exit_code"] == 2
     assert fail_summary["fail_on_input_review"] is True
     assert fail_summary["reference_intake_status"] == "review"
+    assert fail_summary["reference_intake_tsv"].endswith("reference_intake.tsv")
     assert fail_summary["reference_intake_issue_code_counts"] == {"long_edge_below_requested": 1}
     assert fail_summary["recommended_next_action"]["domain"] == "input-review"
     assert fail_summary["case_action_domain_counts"] == {"input-review": 1}
@@ -761,6 +771,7 @@ def test_reference_request_run_routes_intake_blocked_to_fix_returned_input(tmp_p
     assert summary["status"] == "input_blocked"
     assert summary["reference_request_validation_status"] == "pass"
     assert summary["reference_intake_status"] == "blocked"
+    assert summary["reference_intake_tsv"].endswith("reference_intake.tsv")
     assert summary["reference_intake_error_count"] == 1
     assert summary["reference_intake_issue_code_counts"]["returned_png_size_mismatch"] == 1
     assert summary["recommended_next_action"]["code"] == "fix-returned-reference-input"
@@ -776,6 +787,7 @@ def test_reference_request_run_routes_intake_blocked_to_fix_returned_input(tmp_p
     )
     assert artifact_index["recommended_next_action"] == summary["recommended_next_action"]
     assert artifact_index["case_actions"] == summary["case_actions"]
+    assert "reference_intake_tsv" in {item["kind"] for item in artifact_index["artifacts"]}
     assert "recommended next action: fix-returned-reference-input" in stdout
     assert "case action counts: fix-returned-reference-input=1" in stdout
     summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
@@ -806,9 +818,11 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
     assert summary["batch_exit_code"] == 2
     assert summary["compare_exit_code"] is None
     assert summary["reference_request_validation_status"] == "pass"
+    assert summary["reference_request_validation_tsv"].endswith("reference_request_validation.tsv")
     assert summary["missing_references_markdown"].endswith("missing_references.md")
     assert summary["missing_references_tsv"].endswith("missing_references.tsv")
     assert summary["reference_intake_status"] == ""
+    assert summary["reference_intake_tsv"] == ""
     assert summary["reference_intake_warning_count"] is None
     assert summary["compare_summary_markdown"] == ""
     assert summary["recommended_next_action"]["code"] == "provide-returned-autocad-pngs"
@@ -851,6 +865,7 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
         "input_artifact_index",
         "reference_request_validation_json",
         "reference_request_validation_markdown",
+        "reference_request_validation_tsv",
         "missing_references_json",
         "missing_references_markdown",
         "missing_references_tsv",
