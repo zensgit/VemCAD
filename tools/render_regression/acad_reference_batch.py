@@ -589,6 +589,29 @@ def _request_boundary_requirement_issues(
     return issues
 
 
+def _request_case_count_issues(data: dict[str, Any], actual_count: int) -> list[dict[str, str]]:
+    declared = data.get("case_count")
+    if declared is None:
+        return []
+    try:
+        declared_int = int(declared)
+    except Exception:
+        return [{
+            "severity": "error",
+            "case_id": "<request>",
+            "code": "request_case_count_invalid",
+            "message": "request case_count must be an integer when present",
+        }]
+    if declared_int != actual_count:
+        return [{
+            "severity": "error",
+            "case_id": "<request>",
+            "code": "request_case_count_mismatch",
+            "message": f"request case_count {declared_int} != actual cases {actual_count}",
+        }]
+    return []
+
+
 def _filter_request_cases(cases: list[dict[str, Any]], case_ids: set[str] | None) -> list[dict[str, Any]]:
     if not case_ids:
         return cases
@@ -719,7 +742,8 @@ def _write_reference_request_validation_report(
 ) -> dict[str, Any]:
     request_payload = _load_request_payload(request_json)
     request_boundary = _request_boundary(request_payload)
-    request_cases = _filter_request_cases(_request_cases(request_payload), case_ids)
+    all_request_cases = _request_cases(request_payload)
+    request_cases = _filter_request_cases(all_request_cases, case_ids)
     selected_case_ids = {_str(item.get("id")) for item in request_cases if _str(item.get("id"))}
     candidates, global_issues = _load_candidate_map_with_issues(
         candidate_cases,
@@ -731,6 +755,7 @@ def _write_reference_request_validation_report(
         request_boundary,
         request_boundary_expectations or [],
     ))
+    issues.extend(_request_case_count_issues(request_payload, len(all_request_cases)))
     seen_request_ids: set[str] = set()
     seen_output_names: dict[str, str] = {}
 

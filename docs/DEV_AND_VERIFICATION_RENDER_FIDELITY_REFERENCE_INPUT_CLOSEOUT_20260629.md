@@ -1294,6 +1294,43 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 11 passed
 ```
 
+## Follow-Up Request Case Count Validation
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Prevent stale or hand-edited `reference_request.json` metadata from
+  misstating the size of the recapture handoff.
+- Keep `case_count`, when declared, tied to the full request `cases[]` list
+  before any `--case-id` partial processing.
+
+Changes:
+
+- Request validation now reports:
+  - `request_case_count_invalid` when `case_count` is present but not an integer.
+  - `request_case_count_mismatch` when declared `case_count` differs from the
+    full unfiltered `cases[]` length.
+- The check runs before `--case-id` filtering, so validating one selected case
+  from a larger request does not falsely fail.
+- The README documents the case-count consistency check.
+
+Boundary:
+
+- Request-package validation only.
+- Missing `case_count` remains allowed for older/manual request packages.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 26 passed
+```
+
 ## Follow-Up Case Action Current AutoCAD Evidence
 
 Status: implemented in this branch.
