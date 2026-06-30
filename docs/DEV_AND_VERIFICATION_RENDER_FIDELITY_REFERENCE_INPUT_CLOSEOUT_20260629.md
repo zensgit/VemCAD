@@ -670,6 +670,58 @@ python3 tools/render_regression/acad_reference_batch.py \
 # artifact_index.batch_validation_status=pass
 ```
 
+## Follow-Up Compare Artifact Index Status
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make `acad_manifest_compare.py` artifact indexes routeable without opening
+  `summary.json` first.
+- Surface compare status and triage distribution at the same level as uploaded
+  artifacts.
+
+Changes:
+
+- `<compare-dir>/artifact_index.json` now includes:
+  - `status`
+  - `case_count`
+  - `compared_count`
+  - `issue_count`
+  - `triage_bucket_counts`
+  - `viewspace_status_counts`
+  - `x3_band_counts`
+
+Boundary:
+
+- Artifact-index metadata only.
+- No renderer change.
+- No AutoCAD PNG equivalence claim.
+- No X3 scoring change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 6 passed
+```
+
+Private compatibility smoke:
+
+```bash
+python3 tools/render_regression/acad_reference_request_run.py \
+  --from-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir /private/tmp/vemcad-provenance-compat-smoke-20260629/returned \
+  --case-id G11 \
+  --out-dir /private/tmp/vemcad-compare-index-status-smoke-20260629
+# AutoCAD reference request run: viewspace_mismatch
+# compare/artifact_index.status=viewspace_mismatch
+# compare/artifact_index.triage_bucket_counts={'recapture-required': 1}
+# compare/artifact_index.viewspace_status_counts={'mismatch': 1}
+# compare/artifact_index.x3_band_counts={'fallback': 1}
+```
+
 Private compatibility smoke:
 
 ```bash

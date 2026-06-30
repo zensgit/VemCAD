@@ -152,6 +152,13 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path):
     assert (out / "contact_sheet.png").stat().st_size > 1000
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["schema"] == "vemcad.acad_manifest_compare_artifact_index/v1"
+    assert artifact_index["status"] == "pass"
+    assert artifact_index["case_count"] == 1
+    assert artifact_index["compared_count"] == 1
+    assert artifact_index["issue_count"] == 0
+    assert artifact_index["triage_bucket_counts"] == {"matched-pass": 1}
+    assert artifact_index["viewspace_status_counts"] == {"match": 1}
+    assert artifact_index["x3_band_counts"] == {"pass": 1}
     assert {item["kind"] for item in artifact_index["artifacts"]} >= {
         "summary_json",
         "summary_markdown",
@@ -223,6 +230,13 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert "| `G11` | G11/B11 | `mismatch` | `fallback` |" in summary_md
     assert "| 1 | `G11` | `recapture-required` | `mismatch` | `fallback` |" in summary_md
     assert (out / "contact_sheet.png").stat().st_size > 1000
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert artifact_index["status"] == "viewspace_mismatch"
+    assert artifact_index["case_count"] == 1
+    assert artifact_index["compared_count"] == 1
+    assert artifact_index["triage_bucket_counts"] == {"recapture-required": 1}
+    assert artifact_index["viewspace_status_counts"] == {"mismatch": 1}
+    assert artifact_index["x3_band_counts"] == {"fallback": 1}
     request = json.loads((out / "reference_request.json").read_text(encoding="utf-8"))
     assert request["schema"] == "vemcad.acad_reference_request/v1"
     assert request["reason"] == "recapture-required"

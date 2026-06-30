@@ -303,6 +303,12 @@ reference, VemCAD candidate, and overlay, with the view-space status and X3 band
 printed above the row. It is useful for unattended runs, but the JSON/TSV remain
 authoritative.
 
+`compare/artifact_index.json` also carries `status`, `case_count`,
+`compared_count`, `issue_count`, `triage_bucket_counts`,
+`viewspace_status_counts`, and `x3_band_counts`, so artifact consumers can route
+`renderer-candidate` versus `recapture-required` runs before opening
+`summary.json`.
+
 ## Interpret The Result
 
 First inspect:

@@ -270,6 +270,7 @@ def _text_provenance_summary(render_report: str, out_path: Path) -> dict[str, An
 def _artifact_index(
     rows: list[dict[str, Any]],
     *,
+    report: dict[str, Any] | None = None,
     run_artifacts: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
     artifacts: list[dict[str, str]] = []
@@ -290,11 +291,40 @@ def _artifact_index(
         text_summary = (row.get("text_provenance") or {}).get("summary")
         if text_summary:
             artifacts.append({"id": row["id"], "kind": "text_provenance_summary", "path": str(text_summary)})
-    return {
+    payload: dict[str, Any] = {
         "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
         "count": len(artifacts),
         "artifacts": artifacts,
     }
+    if report is not None:
+        payload.update({
+            "status": report.get("status", ""),
+            "case_count": report.get("case_count"),
+            "compared_count": report.get("compared_count"),
+            "issue_count": len(report.get("issues") or []),
+            "triage_bucket_counts": _count_values(rows, "triage_bucket"),
+            "viewspace_status_counts": _count_values(rows, "viewspace_status"),
+            "x3_band_counts": _count_x3_bands(rows),
+        })
+    return payload
+
+
+def _count_values(rows: list[dict[str, Any]], key: str) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        value = _str(row.get(key))
+        if value:
+            counts[value] = counts.get(value, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _count_x3_bands(rows: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        value = _str((row.get("x3_summary") or {}).get("band"))
+        if value:
+            counts[value] = counts.get(value, 0) + 1
+    return dict(sorted(counts.items()))
 
 
 def _md(value: Any) -> str:
@@ -779,6 +809,7 @@ def main(argv: list[str] | None = None) -> int:
     run_artifacts.extend(reference_request_artifacts)
     _write_json(artifact_index, _artifact_index(
         report["rows"],
+        report=report,
         run_artifacts=run_artifacts,
     ))
 
