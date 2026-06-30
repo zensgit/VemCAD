@@ -4491,3 +4491,44 @@ Verification:
 python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
 # passed
 ```
+
+## Follow-Up Route Markdown Code-Span Escaping
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Finish the operator Markdown escaping pass on the route-report layer.
+- Keep `route_summary.md` readable when action artifacts or routed artifact
+  paths contain Markdown code-span delimiters or table metacharacters.
+
+Changes:
+
+- `acad_artifact_route.py` now formats Markdown route report values through
+  safe plain/code cell helpers that collapse CR/LF, escape table pipes, and
+  choose a safe code-span delimiter when values contain backticks.
+- Route Markdown output now applies those helpers to artifact index paths,
+  action artifacts, resolved artifact paths, status/count fields, issue-count
+  summaries, source boundaries, and routed compare distributions.
+- Regression coverage routes a missing-reference artifact whose recommended
+  Markdown path contains both `|` and a backtick, then asserts the rendered
+  route report uses a safe code span and escaped pipe.
+- `tools/render_regression/README.md` now records that route reports use the
+  same safe code-span formatting for action artifacts and count summaries.
+
+Boundary:
+
+- Operator report formatting only.
+- JSON and text route payloads remain unchanged structured sources of truth.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# passed
+```

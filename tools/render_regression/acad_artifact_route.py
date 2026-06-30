@@ -480,6 +480,33 @@ def _format_counts(counts: dict[str, Any]) -> str:
     return ", ".join(f"{key}={value}" for key, value in sorted(counts.items()))
 
 
+def _md_text(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip().replace("\r\n", " ").replace("\n", " ").replace("\r", " ").replace("|", "\\|")
+
+
+def _md_table_cell(value: Any) -> str:
+    text = _md_text(value)
+    if not text:
+        return "-"
+    return text.replace("`", "\\`")
+
+
+def _md_code_cell(value: Any) -> str:
+    text = _md_text(value) or "-"
+    longest_backticks = 0
+    current = 0
+    for char in text:
+        if char == "`":
+            current += 1
+            longest_backticks = max(longest_backticks, current)
+        else:
+            current = 0
+    delimiter = "`" * (longest_backticks + 1)
+    return f"{delimiter}{text}{delimiter}"
+
+
 def _write_text(route: dict[str, Any]) -> str:
     action = route.get("recommended_next_action") or {}
     source_boundary = route.get("artifact_index_boundary") or {}
@@ -641,23 +668,23 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
     lines = [
         f"## {heading}",
         "",
-        f"- artifact_index: `{route.get('artifact_index', '')}`",
-        f"- kind: `{route.get('kind', '')}`",
-        f"- status: `{route.get('status', '')}`",
-        f"- recommended_next_action: `{action['code']}`",
-        f"- recommended_action_domain: `{action['domain']}`",
-        f"- message: {action['message']}",
+        f"- artifact_index: {_md_code_cell(route.get('artifact_index', ''))}",
+        f"- kind: {_md_code_cell(route.get('kind', ''))}",
+        f"- status: {_md_code_cell(route.get('status', ''))}",
+        f"- recommended_next_action: {_md_code_cell(action['code'])}",
+        f"- recommended_action_domain: {_md_code_cell(action['domain'])}",
+        f"- message: {_md_table_cell(action['message'])}",
     ]
     if route.get("stage"):
-        lines.append(f"- stage: `{route.get('stage')}`")
+        lines.append(f"- stage: {_md_code_cell(route.get('stage'))}")
     if route.get("case_count") is not None:
-        lines.append(f"- case_count: `{route.get('case_count')}`")
+        lines.append(f"- case_count: {_md_code_cell(route.get('case_count'))}")
     if route.get("compared_count") is not None:
-        lines.append(f"- compared_count: `{route.get('compared_count')}`")
+        lines.append(f"- compared_count: {_md_code_cell(route.get('compared_count'))}")
     if route.get("error_count") is not None:
-        lines.append(f"- errors: `{route.get('error_count')}`")
+        lines.append(f"- errors: {_md_code_cell(route.get('error_count'))}")
     if route.get("warning_count") is not None:
-        lines.append(f"- warnings: `{route.get('warning_count')}`")
+        lines.append(f"- warnings: {_md_code_cell(route.get('warning_count'))}")
     if boundary:
         lines.extend([
             f"- read_only_routing: `{bool(boundary.get('read_only_routing'))}`",
@@ -669,74 +696,74 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
             f"- source_autocad_equivalence_claim: `{bool(source_boundary.get('autocad_equivalence_claim'))}`",
         ])
     if action["artifact"]:
-        lines.append(f"- action_artifact: `{action['artifact']}`")
+        lines.append(f"- action_artifact: {_md_code_cell(action['artifact'])}")
     if route.get("action_artifact_resolved"):
-        lines.append(f"- action_artifact_resolved: `{route['action_artifact_resolved']}`")
-        lines.append(f"- action_artifact_exists: `{bool(route.get('action_artifact_exists'))}`")
+        lines.append(f"- action_artifact_resolved: {_md_code_cell(route['action_artifact_resolved'])}")
+        lines.append(f"- action_artifact_exists: {_md_code_cell(bool(route.get('action_artifact_exists')))}")
     if route.get("case_action_counts"):
-        lines.append(f"- case_action_counts: `{_format_counts(route['case_action_counts'])}`")
+        lines.append(f"- case_action_counts: {_md_code_cell(_format_counts(route['case_action_counts']))}")
     if route.get("case_action_domain_counts"):
-        lines.append(f"- case_action_domain_counts: `{_format_counts(route['case_action_domain_counts'])}`")
+        lines.append(f"- case_action_domain_counts: {_md_code_cell(_format_counts(route['case_action_domain_counts']))}")
     if route.get("route_count") is not None:
-        lines.append(f"- route_count: `{route.get('route_count')}`")
+        lines.append(f"- route_count: {_md_code_cell(route.get('route_count'))}")
     if route.get("route_kind_counts"):
-        lines.append(f"- route_kind_counts: `{_format_counts(route['route_kind_counts'])}`")
+        lines.append(f"- route_kind_counts: {_md_code_cell(_format_counts(route['route_kind_counts']))}")
     if route.get("route_status_counts"):
-        lines.append(f"- route_status_counts: `{_format_counts(route['route_status_counts'])}`")
+        lines.append(f"- route_status_counts: {_md_code_cell(_format_counts(route['route_status_counts']))}")
     if route.get("route_recommended_action_counts"):
         lines.append(
             "- route_recommended_action_counts: "
-            f"`{_format_counts(route['route_recommended_action_counts'])}`"
+            f"{_md_code_cell(_format_counts(route['route_recommended_action_counts']))}"
         )
     if route.get("route_recommended_action_domain_counts"):
         lines.append(
             "- route_recommended_action_domain_counts: "
-            f"`{_format_counts(route['route_recommended_action_domain_counts'])}`"
+            f"{_md_code_cell(_format_counts(route['route_recommended_action_domain_counts']))}"
         )
     if route.get("route_compare_case_count") is not None:
-        lines.append(f"- route_compare_case_count: `{route.get('route_compare_case_count')}`")
+        lines.append(f"- route_compare_case_count: {_md_code_cell(route.get('route_compare_case_count'))}")
     if route.get("route_compared_count") is not None:
-        lines.append(f"- route_compared_count: `{route.get('route_compared_count')}`")
+        lines.append(f"- route_compared_count: {_md_code_cell(route.get('route_compared_count'))}")
     if route.get("route_triage_bucket_counts"):
-        lines.append(f"- route_triage_bucket_counts: `{_format_counts(route['route_triage_bucket_counts'])}`")
+        lines.append(f"- route_triage_bucket_counts: {_md_code_cell(_format_counts(route['route_triage_bucket_counts']))}")
     if route.get("route_viewspace_status_counts"):
-        lines.append(f"- route_viewspace_status_counts: `{_format_counts(route['route_viewspace_status_counts'])}`")
+        lines.append(f"- route_viewspace_status_counts: {_md_code_cell(_format_counts(route['route_viewspace_status_counts']))}")
     if route.get("route_x3_band_counts"):
-        lines.append(f"- route_x3_band_counts: `{_format_counts(route['route_x3_band_counts'])}`")
+        lines.append(f"- route_x3_band_counts: {_md_code_cell(_format_counts(route['route_x3_band_counts']))}")
     if route.get("reference_request_validation_status"):
         lines.extend([
-            f"- reference_request_validation_status: `{route['reference_request_validation_status']}`",
+            f"- reference_request_validation_status: {_md_code_cell(route['reference_request_validation_status'])}",
             "- reference_request_validation_errors: "
-            f"`{route.get('reference_request_validation_error_count')}`",
+            f"{_md_code_cell(route.get('reference_request_validation_error_count'))}",
             "- reference_request_validation_warnings: "
-            f"`{route.get('reference_request_validation_warning_count')}`",
+            f"{_md_code_cell(route.get('reference_request_validation_warning_count'))}",
         ])
     if route.get("reference_request_validation_issue_code_counts"):
         lines.append(
             "- reference_request_validation_issue_code_counts: "
-            f"`{_format_counts(route['reference_request_validation_issue_code_counts'])}`"
+            f"{_md_code_cell(_format_counts(route['reference_request_validation_issue_code_counts']))}"
         )
     if route.get("source_request_boundary"):
         lines.append(
-            f"- source_request_boundary: `{_format_counts(route['source_request_boundary'])}`"
+            f"- source_request_boundary: {_md_code_cell(_format_counts(route['source_request_boundary']))}"
         )
     if route.get("reference_intake_status"):
         lines.extend([
-            f"- reference_intake_status: `{route['reference_intake_status']}`",
-            f"- reference_intake_errors: `{route.get('reference_intake_error_count')}`",
-            f"- reference_intake_warnings: `{route.get('reference_intake_warning_count')}`",
+            f"- reference_intake_status: {_md_code_cell(route['reference_intake_status'])}",
+            f"- reference_intake_errors: {_md_code_cell(route.get('reference_intake_error_count'))}",
+            f"- reference_intake_warnings: {_md_code_cell(route.get('reference_intake_warning_count'))}",
         ])
     if route.get("reference_intake_issue_code_counts"):
         lines.append(
             "- reference_intake_issue_code_counts: "
-            f"`{_format_counts(route['reference_intake_issue_code_counts'])}`"
+            f"{_md_code_cell(_format_counts(route['reference_intake_issue_code_counts']))}"
         )
     if route.get("triage_bucket_counts"):
-        lines.append(f"- triage_bucket_counts: `{_format_counts(route['triage_bucket_counts'])}`")
+        lines.append(f"- triage_bucket_counts: {_md_code_cell(_format_counts(route['triage_bucket_counts']))}")
     if route.get("viewspace_status_counts"):
-        lines.append(f"- viewspace_status_counts: `{_format_counts(route['viewspace_status_counts'])}`")
+        lines.append(f"- viewspace_status_counts: {_md_code_cell(_format_counts(route['viewspace_status_counts']))}")
     if route.get("x3_band_counts"):
-        lines.append(f"- x3_band_counts: `{_format_counts(route['x3_band_counts'])}`")
+        lines.append(f"- x3_band_counts: {_md_code_cell(_format_counts(route['x3_band_counts']))}")
     return "\n".join(lines)
 
 
@@ -754,30 +781,30 @@ def _write_markdown(payload: dict[str, Any]) -> str:
         lines.extend([
             "## Summary",
             "",
-            f"- route_count: `{payload.get('count', 0)}`",
-            f"- kind_counts: `{_format_counts(payload.get('kind_counts') or {})}`",
-            f"- status_counts: `{_format_counts(payload.get('status_counts') or {})}`",
+            f"- route_count: {_md_code_cell(payload.get('count', 0))}",
+            f"- kind_counts: {_md_code_cell(_format_counts(payload.get('kind_counts') or {}))}",
+            f"- status_counts: {_md_code_cell(_format_counts(payload.get('status_counts') or {}))}",
             "- recommended_action_counts: "
-            f"`{_format_counts(payload.get('recommended_action_counts') or {})}`",
+            f"{_md_code_cell(_format_counts(payload.get('recommended_action_counts') or {}))}",
             "- recommended_action_domain_counts: "
-            f"`{_format_counts(payload.get('recommended_action_domain_counts') or {})}`",
-            f"- recommended_next_action: `{action['code']}`",
-            f"- recommended_action_domain: `{action['domain']}`",
-            f"- message: {action['message']}",
-            f"- read_only_routing: `{bool(boundary.get('read_only_routing'))}`",
-            f"- autocad_equivalence_claim: `{bool(boundary.get('autocad_equivalence_claim'))}`",
+            f"{_md_code_cell(_format_counts(payload.get('recommended_action_domain_counts') or {}))}",
+            f"- recommended_next_action: {_md_code_cell(action['code'])}",
+            f"- recommended_action_domain: {_md_code_cell(action['domain'])}",
+            f"- message: {_md_table_cell(action['message'])}",
+            f"- read_only_routing: {_md_code_cell(bool(boundary.get('read_only_routing')))}",
+            f"- autocad_equivalence_claim: {_md_code_cell(bool(boundary.get('autocad_equivalence_claim')))}",
             "",
         ])
         if payload.get("compare_case_count") is not None:
-            lines.append(f"- compare_case_count: `{payload.get('compare_case_count')}`")
+            lines.append(f"- compare_case_count: {_md_code_cell(payload.get('compare_case_count'))}")
         if payload.get("compared_count") is not None:
-            lines.append(f"- compared_count: `{payload.get('compared_count')}`")
+            lines.append(f"- compared_count: {_md_code_cell(payload.get('compared_count'))}")
         if payload.get("triage_bucket_counts"):
-            lines.append(f"- triage_bucket_counts: `{_format_counts(payload['triage_bucket_counts'])}`")
+            lines.append(f"- triage_bucket_counts: {_md_code_cell(_format_counts(payload['triage_bucket_counts']))}")
         if payload.get("viewspace_status_counts"):
-            lines.append(f"- viewspace_status_counts: `{_format_counts(payload['viewspace_status_counts'])}`")
+            lines.append(f"- viewspace_status_counts: {_md_code_cell(_format_counts(payload['viewspace_status_counts']))}")
         if payload.get("x3_band_counts"):
-            lines.append(f"- x3_band_counts: `{_format_counts(payload['x3_band_counts'])}`")
+            lines.append(f"- x3_band_counts: {_md_code_cell(_format_counts(payload['x3_band_counts']))}")
         if (
             payload.get("compare_case_count") is not None
             or payload.get("compared_count") is not None
@@ -789,12 +816,12 @@ def _write_markdown(payload: dict[str, Any]) -> str:
         if payload.get("reference_request_validation_issue_code_counts"):
             lines.extend([
                 "- reference_request_validation_issue_code_counts: "
-                f"`{_format_counts(payload['reference_request_validation_issue_code_counts'])}`",
+                f"{_md_code_cell(_format_counts(payload['reference_request_validation_issue_code_counts']))}",
             ])
         if payload.get("reference_intake_issue_code_counts"):
             lines.extend([
                 "- reference_intake_issue_code_counts: "
-                f"`{_format_counts(payload['reference_intake_issue_code_counts'])}`",
+                f"{_md_code_cell(_format_counts(payload['reference_intake_issue_code_counts']))}",
             ])
         if (
             payload.get("reference_request_validation_issue_code_counts")
@@ -805,9 +832,9 @@ def _write_markdown(payload: dict[str, Any]) -> str:
             lines.extend([
                 "## Recommended Action Artifact",
                 "",
-                f"- action_artifact: `{action['artifact']}`",
-                f"- action_artifact_resolved: `{payload.get('action_artifact_resolved', '')}`",
-                f"- action_artifact_exists: `{bool(payload.get('action_artifact_exists'))}`",
+                f"- action_artifact: {_md_code_cell(action['artifact'])}",
+                f"- action_artifact_resolved: {_md_code_cell(payload.get('action_artifact_resolved', ''))}",
+                f"- action_artifact_exists: {_md_code_cell(bool(payload.get('action_artifact_exists')))}",
                 "",
             ])
         for index, route in enumerate(payload.get("routes") or [], start=1):
