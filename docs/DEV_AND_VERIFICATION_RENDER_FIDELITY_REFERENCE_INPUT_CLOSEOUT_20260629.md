@@ -5431,3 +5431,45 @@ python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
 python3 -m pytest tools/render_regression/tests -q
 # 189 passed
 ```
+
+## Follow-Up Recapture Route Kind Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make generated `reference_request.md` post-return handoff commands prove the
+  recursive route topology, not just the number of discovered artifact indexes.
+- Fail closed if a run has three routed artifacts but is missing one of the
+  required `batch`, `compare`, or `request_run` evidence nodes.
+- Keep this as an opt-in generated handoff guard; route priority and default
+  route behavior are unchanged.
+
+Changes:
+
+- `acad_manifest_compare.py` now adds `--require-kind batch`,
+  `--require-kind compare`, and `--require-kind request_run` to the generated
+  post-return `acad_artifact_route.py <next-run-dir> --recursive` command in
+  `reference_request.md`.
+- The generated handoff test asserts each required kind guard appears exactly
+  once beside the existing boundary, route-count, and action-artifact guards.
+
+Boundary:
+
+- Generated operator handoff hardening only.
+- No route priority change.
+- No default exit-code behavior change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 8 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 189 passed
+```
