@@ -5726,3 +5726,43 @@ python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
 python3 -m pytest tools/render_regression/tests -q
 # 192 passed
 ```
+
+## Follow-Up Expected Size Summary Surface
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Surface the compare row `expected_size` in operator-readable outputs so the
+  recapture size contract can be audited without opening `summary.json` or the
+  generated request package.
+- Keep this additive: JSON rows already carry the field; this exposes it in the
+  TSV and Markdown summary tables.
+
+Changes:
+
+- `summary.tsv` now includes an `expected_size` column between
+  `recommended_action_domain` and the artifact path columns.
+- `summary.md` case rows now include an `Expected size` column.
+- Existing manifest-compare tests assert `760x570` on a matched case and
+  `800x600` on the recapture/mismatch case.
+
+Boundary:
+
+- Evidence surface hardening only.
+- No wrapper default behavior change.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 11 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 192 passed
+```
