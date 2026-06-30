@@ -375,7 +375,8 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
     assert case_actions_tsv[0] == (
         "id\tdrawing_id\tcode\tdomain\tsource\ttriage_bucket\t"
         "viewspace_status\tx3_band\tissue_count\tissue_codes\trecommended_output_name\t"
-        "source_dxf_sha256\tsource_dxf_size_bytes\tcandidate_png_sha256\t"
+        "source_dxf_sha256\tsource_dxf_size_bytes\tcurrent_acad_png_sha256\t"
+        "current_acad_png_size_bytes\tcandidate_png_sha256\t"
         "candidate_png_size_bytes\treturned_png_sha256\treturned_png_size_bytes\t"
         "returned_png_size\tidentity_advisory\tevidence\t"
         "artifact\tartifact_resolved\tartifact_exists"
@@ -389,6 +390,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path, capsys):
         "matched-pass", "match", "pass",
     ]
     assert row["source_dxf_sha256"] == _sha256(tmp_path / "dxf" / "B11.dxf")
+    assert row["current_acad_png_sha256"] == ""
     assert row["candidate_png_sha256"] == _sha256(tmp_path / "ours" / "G11.png")
     assert row["returned_png_sha256"] == _sha256(tmp_path / "returned" / "G11_autocad_model_extents.png")
     assert row["returned_png_size"] == "1600x1131"
@@ -896,6 +898,61 @@ def test_reference_request_run_routes_intake_blocked_to_fix_returned_input(tmp_p
     assert "reference_intake_errors: `1`" in summary_md
     assert "case_action_counts: `fix-returned-reference-input=1`" in summary_md
     assert "`error:returned_png_size_mismatch, warning:long_edge_below_requested`" in summary_md
+
+
+def test_reference_request_run_case_actions_include_current_acad_reuse_evidence(tmp_path):
+    _dxf(tmp_path / "dxf" / "B11.dxf")
+    _png(tmp_path / "ours" / "G11.png", size=(1600, 1131), box=[40, 30, 1560, 1100])
+    current = tmp_path / "acad" / "G11_rejected.png"
+    _png(current, size=(1600, 1131), box=[400, 300, 1200, 900])
+    returned = tmp_path / "returned" / "G11_autocad_model_extents.png"
+    returned.parent.mkdir(parents=True, exist_ok=True)
+    returned.write_bytes(current.read_bytes())
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "reason": "recapture-required",
+        "boundary": dict(REQUEST_BOUNDARY),
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/B11.dxf",
+            "current_acad_png": "acad/G11_rejected.png",
+            "current_acad_png_sha256": _sha256(current),
+            "current_acad_png_size_bytes": current.stat().st_size,
+            "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_capture_method": "plot-export",
+            "requested_view_contract": "model-extents",
+            "requested_expected_size": {"width": 1600, "height": 1131},
+        }],
+    }), encoding="utf-8")
+    candidates = _candidates(tmp_path / "candidate_cases.json")
+    out = tmp_path / "run"
+
+    assert runner.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--case-id", "G11",
+        "--out-dir", str(out),
+    ]) == 2
+
+    summary = json.loads((out / "run_summary.json").read_text(encoding="utf-8"))
+    action = summary["case_actions"][0]
+    assert action["code"] == "fix-returned-reference-input"
+    assert action["issue_codes"] == "error:returned_png_matches_rejected_reference"
+    assert action["current_acad_png_sha256"] == _sha256(current)
+    assert action["current_acad_png_size_bytes"] == current.stat().st_size
+    assert action["returned_png_sha256"] == _sha256(returned)
+    assert "current_acad=" in action["evidence"]
+    assert "returned=" in action["evidence"]
+    case_actions_tsv = (out / "case_actions.tsv").read_text(encoding="utf-8").splitlines()
+    row = _tsv_record(case_actions_tsv[0], case_actions_tsv[1])
+    assert row["current_acad_png_sha256"] == _sha256(current)
+    assert "current_acad=" in row["evidence"]
+    summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
+    assert "current_acad=" in summary_md
+    assert "returned_png_matches_rejected_reference" in summary_md
 
 
 def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
