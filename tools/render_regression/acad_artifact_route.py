@@ -648,6 +648,14 @@ def _action_domain_counts(payload: dict[str, Any]) -> dict[str, int]:
     return {domain: 1} if domain else {}
 
 
+def _status_counts(payload: dict[str, Any]) -> dict[str, int]:
+    counts = payload.get("status_counts")
+    if isinstance(counts, dict):
+        return {str(key): int(value) for key, value in counts.items() if str(key)}
+    status = str(payload.get("status") or "")
+    return {status: 1} if status else {}
+
+
 def _issue_code_counts(payload: dict[str, Any]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for key in (
@@ -731,6 +739,10 @@ def main(argv: list[str] | None = None) -> int:
                             "exit 2 if any routed action domain count includes this domain; "
                             "may repeat"
                         ))
+    parser.add_argument("--require-status", action="append", default=[],
+                        help="exit 2 unless the routed status counts include this status; may repeat")
+    parser.add_argument("--forbid-status", action="append", default=[],
+                        help="exit 2 if the routed status counts include this status; may repeat")
     parser.add_argument("--require-action-artifact", default="",
                         help=(
                             "exit 2 unless the top-level recommended_next_action.artifact "
@@ -815,6 +827,34 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(
                 "acad_artifact_route: action domain counts: "
+                + _format_counts(counts),
+                file=sys.stderr,
+            )
+            return 2
+    if args.require_status or args.forbid_status:
+        counts = _status_counts(payload)
+        missing = [status for status in args.require_status if not counts.get(status, 0)]
+        if missing:
+            print(
+                "acad_artifact_route: required status missing: "
+                + ", ".join(missing),
+                file=sys.stderr,
+            )
+            print(
+                "acad_artifact_route: status counts: "
+                + _format_counts(counts),
+                file=sys.stderr,
+            )
+            return 2
+        forbidden_statuses = [status for status in args.forbid_status if counts.get(status, 0)]
+        if forbidden_statuses:
+            print(
+                "acad_artifact_route: forbidden status present: "
+                + ", ".join(f"{status}={counts.get(status, 0)}" for status in forbidden_statuses),
+                file=sys.stderr,
+            )
+            print(
+                "acad_artifact_route: status counts: "
                 + _format_counts(counts),
                 file=sys.stderr,
             )
