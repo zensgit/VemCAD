@@ -351,6 +351,8 @@ Use compare-distribution guards when a workflow needs to assert the compare
 portion itself, even if a higher-priority input route controls the top-level
 recommendation:
 
+- `--require-compare-case-count <n>`;
+- `--require-compared-count <n>`;
 - `--require-triage-bucket <bucket=count>` /
   `--forbid-triage-bucket <bucket>`;
 - `--require-viewspace-status <status=count>` /
@@ -363,6 +365,8 @@ view-space mismatch, even when the top-level action is an input repair:
 ```bash
 python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --recursive \
+  --require-compare-case-count 1 \
+  --require-compared-count 1 \
   --forbid-viewspace-status mismatch
 ```
 
@@ -371,6 +375,8 @@ And this asserts a matched renderer-candidate distribution exactly:
 ```bash
 python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --recursive \
+  --require-compare-case-count 1 \
+  --require-compared-count 1 \
   --require-triage-bucket renderer-candidate=1 \
   --require-viewspace-status match=1 \
   --require-x3-band fail=1
