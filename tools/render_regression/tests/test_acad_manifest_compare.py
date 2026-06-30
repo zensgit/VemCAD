@@ -162,6 +162,8 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path):
     assert {item["kind"] for item in artifact_index["artifacts"]} >= {
         "summary_json",
         "summary_markdown",
+        "route_summary_json",
+        "route_summary_markdown",
         "summary_tsv",
         "contact_sheet",
         "autocad_reference",
@@ -169,6 +171,12 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path):
         "x3_overlay",
         "viewspace_report",
     }
+    route_summary = json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
+    route_summary_md = (out / "route_summary.md").read_text(encoding="utf-8")
+    assert route_summary["kind"] == "compare"
+    assert route_summary["recommended_next_action"]["code"] == "review-x3-pass"
+    assert "AutoCAD Artifact Route Report" in route_summary_md
+    assert "claim AutoCAD equivalence" in route_summary_md
     assert not (out / "reference_request.json").exists()
     assert not (out / "reference_request.md").exists()
 
@@ -237,6 +245,10 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert artifact_index["triage_bucket_counts"] == {"recapture-required": 1}
     assert artifact_index["viewspace_status_counts"] == {"mismatch": 1}
     assert artifact_index["x3_band_counts"] == {"fallback": 1}
+    route_summary = json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
+    route_summary_md = (out / "route_summary.md").read_text(encoding="utf-8")
+    assert route_summary["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
+    assert "recapture-autocad-or-provide-window" in route_summary_md
     request = json.loads((out / "reference_request.json").read_text(encoding="utf-8"))
     assert request["schema"] == "vemcad.acad_reference_request/v1"
     assert request["reason"] == "recapture-required"
@@ -262,6 +274,8 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert {item["kind"] for item in artifact_index["artifacts"]} >= {
         "reference_request_json",
         "reference_request_markdown",
+        "route_summary_json",
+        "route_summary_markdown",
     }
 
 
@@ -289,7 +303,11 @@ def test_manifest_harness_stops_on_blocked_manifest(tmp_path):
     assert {item["kind"] for item in artifact_index["artifacts"]} == {
         "summary_json",
         "summary_markdown",
+        "route_summary_json",
+        "route_summary_markdown",
     }
+    route_summary = json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
+    assert route_summary["recommended_next_action"]["code"] == "inspect-compare-input-block"
 
 
 def test_triage_rows_prioritize_matched_fail_then_recapture_then_pass():

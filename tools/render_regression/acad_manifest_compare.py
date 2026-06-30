@@ -24,6 +24,7 @@ from PIL import Image, ImageDraw, ImageOps
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import acad_reference_manifest as arm  # noqa: E402
+import acad_artifact_route as artifact_route  # noqa: E402
 import compare_vs_acad as cva  # noqa: E402
 import text_provenance_diagnostics as tpd  # noqa: E402
 
@@ -787,6 +788,8 @@ def main(argv: list[str] | None = None) -> int:
     summary_md = args.out_dir / "summary.md"
     summary_tsv = args.out_dir / "summary.tsv"
     artifact_index = args.out_dir / "artifact_index.json"
+    route_summary_json = args.out_dir / "route_summary.json"
+    route_summary_md = args.out_dir / "route_summary.md"
     _write_json(summary_json, report)
     contact_sheet = ""
     if report["rows"] and not args.dry_run:
@@ -801,6 +804,8 @@ def main(argv: list[str] | None = None) -> int:
     run_artifacts = [
         {"id": "", "kind": "summary_json", "path": str(summary_json)},
         {"id": "", "kind": "summary_markdown", "path": str(summary_md)},
+        {"id": "", "kind": "route_summary_json", "path": str(route_summary_json)},
+        {"id": "", "kind": "route_summary_markdown", "path": str(route_summary_md)},
     ]
     if summary_tsv.is_file():
         run_artifacts.append({"id": "", "kind": "summary_tsv", "path": str(summary_tsv)})
@@ -812,6 +817,12 @@ def main(argv: list[str] | None = None) -> int:
         report=report,
         run_artifacts=run_artifacts,
     ))
+    route_payload = artifact_route.route_artifact_index(artifact_index)
+    artifact_route.write_route_report_files(
+        route_payload,
+        out_json=route_summary_json,
+        out_md=route_summary_md,
+    )
 
     print(
         f"AutoCAD manifest compare: {report['status']} "
