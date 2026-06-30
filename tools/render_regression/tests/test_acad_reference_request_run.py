@@ -366,6 +366,7 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
     assert summary["compare_exit_code"] is None
     assert summary["reference_request_validation_status"] == "pass"
     assert summary["missing_references_markdown"].endswith("missing_references.md")
+    assert summary["missing_references_tsv"].endswith("missing_references.tsv")
     assert summary["reference_intake_status"] == ""
     assert summary["reference_intake_warning_count"] is None
     assert summary["compare_summary_markdown"] == ""
@@ -397,7 +398,11 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
         "reference_request_validation_markdown",
         "missing_references_json",
         "missing_references_markdown",
+        "missing_references_tsv",
     }
+    summary_md = (out / "run_summary.md").read_text(encoding="utf-8")
+    assert "missing references tsv" in summary_md
+    assert "missing_references.tsv" in summary_md
     assert "compare_summary_json" not in _run_artifact_kinds(out)
     route_summary = json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
     assert route_summary["recommended_action_counts"] == {
