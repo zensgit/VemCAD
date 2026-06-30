@@ -101,6 +101,7 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
             "recommended_output_name": "G11_autocad_model_extents.png",
             "requested_capture_method": "plot-export",
             "requested_view_contract": "model-extents",
+            "requested_expected_size": {"width": 1600, "height": 1131},
         }],
     }), encoding="utf-8")
     candidates = tmp_path / "candidate_cases.json"
@@ -152,6 +153,43 @@ def test_batch_generator_fulfills_reference_request(tmp_path):
     ]) == 0
 
 
+def test_batch_generator_blocks_returned_png_size_mismatch_when_request_declares_size(tmp_path):
+    _dxf(tmp_path / "dxf" / "G11.dxf")
+    _png(tmp_path / "ours" / "G11.png", (760, 570))
+    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1200, 900))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_expected_size": {"width": 1600, "height": 1131},
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--out-dir", str(out),
+    ]) == 2
+
+    manifest = json.loads((out / "acad_manifest.json").read_text(encoding="utf-8"))
+    assert manifest["cases"][0]["expected_size"] == {"width": 1600, "height": 1131}
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert {item["kind"] for item in artifact_index["artifacts"]} >= {
+        "acad_manifest",
+        "candidate_cases",
+        "reference_intake_json",
+        "reference_intake_markdown",
+    }
+
+
 def test_batch_generator_blocks_request_without_returned_png(tmp_path):
     _dxf(tmp_path / "dxf" / "G11.dxf")
     _png(tmp_path / "ours" / "G11.png", (760, 570))
@@ -189,6 +227,45 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path):
         "missing_references_json",
         "missing_references_markdown",
     }
+
+
+def test_batch_generator_clears_stale_missing_reports_on_successful_rerun(tmp_path):
+    _dxf(tmp_path / "dxf" / "G11.dxf")
+    _png(tmp_path / "ours" / "G11.png", (760, 570))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "recommended_output_name": "G11_autocad_model_extents.png",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--out-dir", str(out),
+    ]) == 2
+    assert (out / "missing_references.md").is_file()
+
+    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (1600, 1131))
+    assert batch.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--out-dir", str(out),
+    ]) == 0
+
+    assert not (out / "missing_references.json").exists()
+    assert not (out / "missing_references.md").exists()
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert "missing_references_markdown" not in {item["kind"] for item in artifact_index["artifacts"]}
 
 
 def test_batch_generator_fulfills_subset_of_reference_request(tmp_path):

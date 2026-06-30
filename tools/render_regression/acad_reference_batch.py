@@ -128,7 +128,15 @@ def _diagnostics(item: dict[str, Any]) -> dict[str, str]:
 def _manifest_case(item: dict[str, Any], base: Path, index: int) -> dict[str, Any]:
     case_id = _required(item, "id", index)
     acad_png = Path(_resolve(base, _required(item, "acad_png", index)))
-    width, height = _image_size(acad_png)
+    expected_size = item.get("expected_size")
+    if isinstance(expected_size, dict):
+        width = int(expected_size["width"])
+        height = int(expected_size["height"])
+    elif isinstance(expected_size, (list, tuple)) and len(expected_size) == 2:
+        width = int(expected_size[0])
+        height = int(expected_size[1])
+    else:
+        width, height = _image_size(acad_png)
     return {
         "id": case_id,
         "drawing_id": _required(item, "drawing_id", index),
@@ -265,6 +273,9 @@ def _fulfilled_cases(
             "capture_method": _str(request.get("requested_capture_method") or "plot-export"),
             "view_contract": _str(request.get("requested_view_contract") or "model-extents"),
         }
+        expected_size = request.get("requested_expected_size") or request.get("expected_size")
+        if expected_size is not None:
+            item["expected_size"] = expected_size
         for key in ("render_report", "semantic_mask", "semantic_report"):
             if key in candidate:
                 item[key] = _resolve(candidate_cases.parent, candidate[key])
@@ -342,6 +353,21 @@ def _existing_batch_artifacts(out_dir: Path) -> list[dict[str, str]]:
         if path.is_file():
             artifacts.append({"kind": kind, "path": str(path)})
     return artifacts
+
+
+def _clear_batch_outputs(out_dir: Path) -> None:
+    for name, _kind in (
+        ("acad_manifest.json", "acad_manifest"),
+        ("candidate_cases.json", "candidate_cases"),
+        ("reference_intake.json", "reference_intake_json"),
+        ("reference_intake.md", "reference_intake_markdown"),
+        ("missing_references.json", "missing_references_json"),
+        ("missing_references.md", "missing_references_markdown"),
+        ("artifact_index.json", "artifact_index"),
+    ):
+        path = out_dir / name
+        if path.is_file():
+            path.unlink()
 
 
 def _write_batch_artifact_index(out_dir: Path) -> Path | None:
@@ -505,6 +531,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="with --from-request, fulfill only this case id; may repeat")
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args(argv)
+
+    _clear_batch_outputs(args.out_dir)
 
     try:
         if args.from_request is not None:

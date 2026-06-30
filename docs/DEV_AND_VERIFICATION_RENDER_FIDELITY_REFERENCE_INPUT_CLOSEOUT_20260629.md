@@ -163,3 +163,45 @@ python3 tools/render_regression/acad_reference_request_run.py \
 
 Only if the resulting compare reaches `viewspace_status=match` should X3 be
 interpreted as a render-fidelity signal.
+
+## Follow-Up Hardening From Review
+
+Status: implemented in this branch.
+
+The post-closeout review correctly noted that the manifest check was partly a
+declaration gate: in the `--from-request` path, `expected_size` had been derived
+from the returned PNG itself, so the size check could not catch a wrong-sized
+return.
+
+Changes:
+
+- Generated `reference_request.json` now carries `requested_expected_size`
+  when the current AutoCAD PNG size can be read.
+- `acad_reference_batch.py --from-request` uses
+  `requested_expected_size`/`expected_size` from the request when present,
+  rather than deriving `expected_size` from the returned PNG.
+- A wrong-sized returned PNG now produces an `expected_size_mismatch` manifest
+  block.
+- `acad_reference_batch.py` clears only its known generated files at the start
+  of each run, so a successful re-run in the same `out-dir` cannot leave stale
+  `missing_references.*` reports behind.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 8 passed
+
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# 6 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 94 passed
+```
+
+Boundary:
+
+- Input-chain hardening only.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- Still no AutoCAD-equivalence claim without `viewspace_status=match`.
