@@ -1291,6 +1291,56 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 11 passed
 ```
 
+## Follow-Up Batch Input-Review Fail Flag
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Give the standalone `acad_reference_batch.py --from-request` path the same
+  opt-in fail-closed control as the one-command request runner.
+- Keep default behavior unchanged: returned-reference intake warnings remain a
+  soft `review` lane and the batch command exits `0` when manifest generation
+  succeeds.
+- Let CI jobs that stop at batch/intake artifacts fail closed on returned PNG
+  quality or identity warnings without needing to invoke the wrapper or a
+  separate route command.
+
+Changes:
+
+- `acad_reference_batch.py` now accepts `--fail-on-input-review`.
+- When returned-reference intake status is `review`, the default final exit
+  remains `0`; with the flag, the command returns `2`.
+- The batch `artifact_index.json` records:
+  - `fail_on_input_review`;
+  - `final_exit_code`.
+- Regression coverage creates a low-resolution but otherwise valid returned
+  AutoCAD PNG path:
+  - default batch behavior remains soft-review;
+  - flagged batch behavior exits `2`;
+  - `acad_manifest.json` and `candidate_cases.json` are still written, so the
+    failure is an operator/CI gate, not a data-loss path.
+- `tools/render_regression/README.md` documents that the lower-level batch path
+  supports the same flag and artifact provenance as request-run.
+
+Boundary:
+
+- Standalone batch operator/CI fail-closed control only.
+- No default behavior change.
+- No renderer change.
+- No compare metric change.
+- No route priority change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 22 passed
+```
+
 ## Follow-Up Per-Case Action Artifact Resolution
 
 Status: implemented in this branch.

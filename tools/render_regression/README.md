@@ -185,6 +185,10 @@ unattended job should exit `2` if the run's recommended action is in the
 `input-review` domain. The run summary records `fail_on_input_review` and
 `final_exit_code`, so uploaded artifacts explain this opt-in failure even when
 the semantic run status remains `pass`.
+The lower-level `acad_reference_batch.py --from-request` path accepts the same
+`--fail-on-input-review` flag and records `fail_on_input_review` /
+`final_exit_code` in its `artifact_index.json`, so scripts that stop before the
+one-command wrapper can use the same opt-in hard gate.
 The run summary and run-level
 artifact index also surface route-level `route_count`, `route_kind_counts`,
 `route_status_counts`,

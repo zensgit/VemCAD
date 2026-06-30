@@ -986,6 +986,8 @@ def test_batch_generator_intake_warns_on_low_resolution_or_non_white_png(tmp_pat
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
     assert artifact_index["stage"] == "reference_intake"
     assert artifact_index["status"] == "review"
+    assert artifact_index["final_exit_code"] == 0
+    assert artifact_index["fail_on_input_review"] is False
     assert artifact_index["warning_count"] == 2
     assert artifact_index["reference_intake_status"] == "review"
     assert artifact_index["reference_request_validation_issue_code_counts"] == {}
@@ -1000,6 +1002,45 @@ def test_batch_generator_intake_warns_on_low_resolution_or_non_white_png(tmp_pat
     assert "long_edge_below_requested=1" in intake_md
     assert "warning:long_edge_below_requested" in intake_md
     assert "warning:corner_background_not_white" in intake_md
+
+
+def test_batch_generator_can_fail_closed_on_input_review_warnings(tmp_path):
+    _dxf(tmp_path / "dxf" / "G11.dxf")
+    _png(tmp_path / "ours" / "G11.png", (900, 600), box=[220, 165, 580, 435])
+    _png(tmp_path / "returned" / "G11_autocad_model_extents.png", (900, 600), box=[220, 165, 580, 435])
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "recommended_output_name": "G11_autocad_model_extents.png",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--fail-on-input-review",
+        "--out-dir", str(out),
+    ]) == 2
+
+    intake = json.loads((out / "reference_intake.json").read_text(encoding="utf-8"))
+    assert intake["status"] == "review"
+    assert intake["issue_code_counts"] == {"long_edge_below_requested": 1}
+    assert (out / "acad_manifest.json").is_file()
+    assert (out / "candidate_cases.json").is_file()
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert artifact_index["stage"] == "reference_intake"
+    assert artifact_index["status"] == "review"
+    assert artifact_index["final_exit_code"] == 2
+    assert artifact_index["fail_on_input_review"] is True
+    assert artifact_index["reference_intake_issue_code_counts"] == {"long_edge_below_requested": 1}
 
 
 def test_batch_generator_intake_warns_on_candidate_returned_ink_aspect_divergence(tmp_path):

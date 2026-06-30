@@ -1088,7 +1088,11 @@ def _clear_batch_outputs(out_dir: Path) -> None:
             path.unlink()
 
 
-def _write_batch_artifact_index(out_dir: Path, validation: dict[str, Any] | None = None) -> Path | None:
+def _write_batch_artifact_index(
+    out_dir: Path,
+    validation: dict[str, Any] | None = None,
+    run_metadata: dict[str, Any] | None = None,
+) -> Path | None:
     artifacts = _existing_batch_artifacts(out_dir)
     if not artifacts:
         return None
@@ -1105,6 +1109,7 @@ def _write_batch_artifact_index(out_dir: Path, validation: dict[str, Any] | None
         "schema": BATCH_ARTIFACT_INDEX_SCHEMA,
         "boundary": dict(BATCH_ARTIFACT_BOUNDARY),
         **metadata,
+        **(run_metadata or {}),
         "count": len(artifacts),
         "artifacts": artifacts,
     }
@@ -1143,6 +1148,18 @@ def _print_route_summary(out_dir: Path, route_payload: dict[str, Any] | None, *,
             f"  recommended next action artifact exists: {bool(route_payload.get('action_artifact_exists'))}",
             file=target,
         )
+
+
+def _batch_final_exit_code(
+    status: str,
+    *,
+    fail_on_input_review: bool,
+) -> int:
+    if status == "pass":
+        return 0
+    if status == "review":
+        return 2 if fail_on_input_review else 0
+    return 2
 
 
 def _batch_index_metadata(out_dir: Path, batch_validation: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -1409,6 +1426,11 @@ def main(argv: list[str] | None = None) -> int:
                         help="with --from-request/--validate-request, process only this case id; may repeat")
     parser.add_argument("--require-request-boundary", action="append", default=[],
                         help="with --from-request/--validate-request, require request boundary key=value; may repeat")
+    parser.add_argument("--fail-on-input-review", action="store_true",
+                        help=(
+                            "return exit code 2 when returned-reference intake is in review, "
+                            "without changing the default soft-review behavior"
+                        ))
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args(argv)
 
@@ -1431,9 +1453,22 @@ def main(argv: list[str] | None = None) -> int:
                 case_ids=set(args.case_id or []) or None,
                 request_boundary_expectations=request_boundary_expectations,
             )
-            index_path = _write_batch_artifact_index(args.out_dir, validation=validation)
+            final_exit_code = _batch_final_exit_code(
+                str(validation.get("status") or ""),
+                fail_on_input_review=args.fail_on_input_review,
+            )
+            index_path = _write_batch_artifact_index(
+                args.out_dir,
+                validation=validation,
+                run_metadata={
+                    "fail_on_input_review": bool(args.fail_on_input_review),
+                    "final_exit_code": final_exit_code,
+                },
+            )
             route_payload = _write_batch_route_report(index_path)
             print(f"AutoCAD reference request validation: {validation['status']} ({validation['case_count']} cases)")
+            print(f"  final exit code: {final_exit_code}")
+            print(f"  fail on input review: {bool(args.fail_on_input_review)}")
             print(f"  validation     : {args.out_dir / 'reference_request_validation.json'}")
             if index_path is not None:
                 print(f"  artifact index : {index_path}")
@@ -1441,7 +1476,7 @@ def main(argv: list[str] | None = None) -> int:
             if validation["issues"]:
                 for issue in validation["issues"]:
                     print(f"  {issue['severity']} {issue.get('case_id', '')} {issue['code']}: {issue['message']}")
-            return 0 if validation["status"] == "pass" else 2
+            return final_exit_code
         if args.from_request is not None:
             if args.candidate_cases is None or args.reference_dir is None:
                 raise ValueError("--candidate-cases and --reference-dir are required with --from-request")
@@ -1456,17 +1491,39 @@ def main(argv: list[str] | None = None) -> int:
         else:
             manifest_path, candidates_path, validation = build_files(args.cases, args.out_dir)
     except Exception as exc:
-        index_path = _write_batch_artifact_index(args.out_dir)
+        index_path = _write_batch_artifact_index(
+            args.out_dir,
+            run_metadata={
+                "fail_on_input_review": bool(args.fail_on_input_review),
+                "final_exit_code": 2,
+            },
+        )
         route_payload = _write_batch_route_report(index_path)
         print(f"AutoCAD reference batch: blocked ({exc})", file=sys.stderr)
+        print("  final exit code: 2", file=sys.stderr)
+        print(f"  fail on input review: {bool(args.fail_on_input_review)}", file=sys.stderr)
         if index_path is not None:
             print(f"  artifact index : {index_path}", file=sys.stderr)
         _print_route_summary(args.out_dir, route_payload, stream=sys.stderr)
         return 2
 
-    index_path = _write_batch_artifact_index(args.out_dir, validation=validation)
+    metadata = _batch_index_metadata(args.out_dir, batch_validation=validation)
+    final_exit_code = _batch_final_exit_code(
+        str(metadata.get("status") or validation.get("status") or ""),
+        fail_on_input_review=args.fail_on_input_review,
+    )
+    index_path = _write_batch_artifact_index(
+        args.out_dir,
+        validation=validation,
+        run_metadata={
+            "fail_on_input_review": bool(args.fail_on_input_review),
+            "final_exit_code": final_exit_code,
+        },
+    )
     route_payload = _write_batch_route_report(index_path)
     print(f"AutoCAD reference batch: {validation['status']} ({validation['case_count']} cases)")
+    print(f"  final exit code: {final_exit_code}")
+    print(f"  fail on input review: {bool(args.fail_on_input_review)}")
     print(f"  manifest       : {manifest_path}")
     print(f"  candidate cases: {candidates_path}")
     if index_path is not None:
@@ -1475,7 +1532,7 @@ def main(argv: list[str] | None = None) -> int:
     if validation["issues"]:
         for issue in validation["issues"]:
             print(f"  {issue['severity']} {issue['case_id']} {issue['code']}: {issue['message']}")
-    return 0 if validation["status"] == "pass" else 2
+    return final_exit_code
 
 
 if __name__ == "__main__":
