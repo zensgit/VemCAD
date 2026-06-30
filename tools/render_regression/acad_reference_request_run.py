@@ -88,6 +88,19 @@ def _intake_status(intake_json: Path) -> dict[str, Any]:
     }
 
 
+def _action_domain(code: str) -> str:
+    return artifact_route.ACTION_DOMAINS.get(code, "inspect")
+
+
+def _action(code: str, message: str, *, artifact: str = "") -> dict[str, str]:
+    return {
+        "code": code,
+        "message": message,
+        "artifact": artifact,
+        "domain": _action_domain(code),
+    }
+
+
 def _recommended_next_action(summary: dict[str, Any]) -> dict[str, str]:
     validation_status = str(summary.get("reference_request_validation_status") or "")
     validation_errors = summary.get("reference_request_validation_error_count")
@@ -95,46 +108,46 @@ def _recommended_next_action(summary: dict[str, Any]) -> dict[str, str]:
     status = str(summary.get("status") or "")
 
     if validation_status in {"blocked", "unreadable"} or validation_errors:
-        return {
-            "code": "fix-request-package",
-            "message": "Fix the request package before exporting or returning AutoCAD PNGs.",
-            "artifact": str(summary.get("reference_request_validation_markdown") or ""),
-        }
+        return _action(
+            "fix-request-package",
+            "Fix the request package before exporting or returning AutoCAD PNGs.",
+            artifact=str(summary.get("reference_request_validation_markdown") or ""),
+        )
     if status == "input_blocked" and summary.get("missing_references_markdown"):
-        return {
-            "code": "provide-returned-autocad-pngs",
-            "message": "Place the returned AutoCAD PNGs using the requested filenames, then rerun the wrapper.",
-            "artifact": str(summary.get("missing_references_markdown") or ""),
-        }
+        return _action(
+            "provide-returned-autocad-pngs",
+            "Place the returned AutoCAD PNGs using the requested filenames, then rerun the wrapper.",
+            artifact=str(summary.get("missing_references_markdown") or ""),
+        )
     if intake_status == "review":
-        return {
-            "code": "inspect-returned-reference-warnings",
-            "message": "Inspect returned-reference intake warnings before trusting visual conclusions.",
-            "artifact": str(summary.get("reference_intake_markdown") or ""),
-        }
+        return _action(
+            "inspect-returned-reference-warnings",
+            "Inspect returned-reference intake warnings before trusting visual conclusions.",
+            artifact=str(summary.get("reference_intake_markdown") or ""),
+        )
     if status == "viewspace_mismatch":
-        return {
-            "code": "recapture-autocad-or-provide-window",
-            "message": "Recapture AutoCAD at matched model extents or provide the real world window; do not tune the renderer.",
-            "artifact": str(summary.get("compare_summary_markdown") or ""),
-        }
+        return _action(
+            "recapture-autocad-or-provide-window",
+            "Recapture AutoCAD at matched model extents or provide the real world window; do not tune the renderer.",
+            artifact=str(summary.get("compare_summary_markdown") or ""),
+        )
     if status == "pass":
-        return {
-            "code": "review-x3-pass",
-            "message": "Review X3 and artifacts; open renderer work only for a concrete matched-view defect.",
-            "artifact": str(summary.get("compare_summary_markdown") or ""),
-        }
+        return _action(
+            "review-x3-pass",
+            "Review X3 and artifacts; open renderer work only for a concrete matched-view defect.",
+            artifact=str(summary.get("compare_summary_markdown") or ""),
+        )
     if status == "compare_failed":
-        return {
-            "code": "inspect-compare-failure",
-            "message": "Inspect compare outputs and per-case logs before changing renderer code.",
-            "artifact": str(summary.get("compare_summary_markdown") or ""),
-        }
-    return {
-        "code": "inspect-run-summary",
-        "message": "Inspect the run summary and artifact index before choosing the next action.",
-        "artifact": str(summary.get("run_artifact_index") or ""),
-    }
+        return _action(
+            "inspect-compare-failure",
+            "Inspect compare outputs and per-case logs before changing renderer code.",
+            artifact=str(summary.get("compare_summary_markdown") or ""),
+        )
+    return _action(
+        "inspect-run-summary",
+        "Inspect the run summary and artifact index before choosing the next action.",
+        artifact=str(summary.get("run_artifact_index") or ""),
+    )
 
 
 def _case_action_counts(case_actions: list[dict[str, Any]]) -> dict[str, int]:
@@ -143,6 +156,15 @@ def _case_action_counts(case_actions: list[dict[str, Any]]) -> dict[str, int]:
         code = str(action.get("code") or "")
         if code:
             counts[code] = counts.get(code, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _case_action_domain_counts(case_actions: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for action in case_actions:
+        domain = str(action.get("domain") or _action_domain(str(action.get("code") or "")))
+        if domain:
+            counts[domain] = counts.get(domain, 0) + 1
     return dict(sorted(counts.items()))
 
 
@@ -167,6 +189,7 @@ def _put_case_action(
         "id": case_id,
         "drawing_id": drawing_id,
         "code": code,
+        "domain": _action_domain(code),
         "message": message,
         "source": source,
         "artifact": artifact,
@@ -292,7 +315,9 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
         f"- reference_intake_status: `{summary['reference_intake_status']}`",
         f"- reference_intake_warnings: `{summary['reference_intake_warning_count']}`",
         f"- recommended_next_action: `{next_action['code']}`",
+        f"- recommended_next_action_domain: `{next_action['domain']}`",
         f"- recommended_next_action_message: {next_action['message']}",
+        f"- case_action_domain_counts: `{_format_case_action_counts(summary['case_action_domain_counts'])}`",
         "",
         "## Boundary",
         "",
@@ -328,15 +353,16 @@ def _write_markdown(path: Path, summary: dict[str, Any]) -> None:
             "",
             "## Case Actions",
             "",
-            "| Case | Drawing | Action | Source | Triage | Artifact |",
-            "| --- | --- | --- | --- | --- | --- |",
+            "| Case | Drawing | Action | Domain | Source | Triage | Artifact |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
         ])
         for action in case_actions:
             triage = action.get("triage_bucket") or action.get("issue_count") or "-"
             artifact = action.get("artifact") or ""
             lines.append(
                 f"| `{action.get('id', '')}` | {action.get('drawing_id', '')} | "
-                f"`{action.get('code', '')}` | `{action.get('source', '')}` | "
+                f"`{action.get('code', '')}` | `{action.get('domain', '')}` | "
+                f"`{action.get('source', '')}` | "
                 f"`{triage}` | `{artifact}` |"
             )
     path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
@@ -393,6 +419,7 @@ def _write_run_summary(
     payload["recommended_next_action"] = _recommended_next_action(payload)
     payload["case_actions"] = _case_actions(payload)
     payload["case_action_counts"] = _case_action_counts(payload["case_actions"])
+    payload["case_action_domain_counts"] = _case_action_domain_counts(payload["case_actions"])
     _write_json(out_dir / "run_summary.json", payload)
     _write_markdown(out_dir / "run_summary.md", payload)
     artifacts = [
@@ -423,6 +450,7 @@ def _write_run_summary(
         "recommended_next_action": payload["recommended_next_action"],
         "case_actions": payload["case_actions"],
         "case_action_counts": payload["case_action_counts"],
+        "case_action_domain_counts": payload["case_action_domain_counts"],
         "count": len(artifacts),
         "artifacts": artifacts,
     })
@@ -476,7 +504,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(f"AutoCAD reference request run: {summary['status']}")
         print(f"  recommended next action: {summary['recommended_next_action']['code']}")
+        print(f"  recommended next action domain: {summary['recommended_next_action']['domain']}")
         print(f"  case action counts: {_format_case_action_counts(summary['case_action_counts'])}")
+        print(f"  case action domain counts: {_format_case_action_counts(summary['case_action_domain_counts'])}")
         print(f"  run summary: {args.out_dir / 'run_summary.md'}")
         return batch_rc
 
@@ -494,7 +524,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     print(f"AutoCAD reference request run: {summary['status']}")
     print(f"  recommended next action: {summary['recommended_next_action']['code']}")
+    print(f"  recommended next action domain: {summary['recommended_next_action']['domain']}")
     print(f"  case action counts: {_format_case_action_counts(summary['case_action_counts'])}")
+    print(f"  case action domain counts: {_format_case_action_counts(summary['case_action_domain_counts'])}")
     print(f"  run summary: {args.out_dir / 'run_summary.md'}")
     return compare_rc
 

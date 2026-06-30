@@ -155,6 +155,12 @@ python3 tools/render_regression/acad_reference_request_run.py \
 python3 tools/render_regression/acad_artifact_route.py <run-dir> --recursive --text
 ```
 
+`acad_reference_request_run.py` writes `run_summary.json/md` and a run-level
+`artifact_index.json`. These carry both `case_action_counts` and
+`case_action_domain_counts`, plus `recommended_next_action.domain`, so the run
+summary itself distinguishes input/recapture gates from renderer-candidate
+work before a separate route report is generated.
+
 `artifact_index.json` 与 `route_summary.json/md` 都是机器可读的操作入口：
 
 - artifact indexes carry `boundary` metadata (`renders_dxf`,
