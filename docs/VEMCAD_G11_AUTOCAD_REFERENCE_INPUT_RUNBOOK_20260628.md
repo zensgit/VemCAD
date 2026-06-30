@@ -153,6 +153,11 @@ All generated helper artifacts, including missing-reference reports on blocked
 runs, are listed in `artifact_index.json` so unattended runs have one stable
 entry point for review.
 
+The batch-level `artifact_index.json` also carries `stage`, `status`,
+`case_count`, `error_count`, `warning_count`, and any available
+validation/intake/missing-reference status fields. This lets CI or an operator
+route blocked/review input-prep runs before opening individual artifact files.
+
 The intake preflight checks obvious capture-quality signals before X3:
 
 - long edge is at least `1600px`;

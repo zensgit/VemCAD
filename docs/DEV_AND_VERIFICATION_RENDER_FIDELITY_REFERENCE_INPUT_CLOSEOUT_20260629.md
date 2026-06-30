@@ -610,6 +610,66 @@ python3 tools/render_regression/acad_reference_request_run.py \
 # case_actions[0].triage_bucket=recapture-required
 ```
 
+## Follow-Up Batch Artifact Index Status
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make input-level `acad_reference_batch.py` artifact indexes self-describing,
+  not just file lists.
+- Let unattended validation/intake/missing-reference jobs be routed before the
+  wrapper creates a run summary.
+
+Changes:
+
+- `acad_reference_batch.py` now writes status metadata to
+  `<out-dir>/artifact_index.json`:
+  - `stage`
+  - `status`
+  - `case_count`
+  - `error_count`
+  - `warning_count`
+  - `reference_request_validation_status`
+  - `reference_intake_status`
+  - `missing_count`
+  - `batch_validation_status`
+- The index preserves intake `review` status when returned PNGs have warnings,
+  even if the generated manifest itself validates as `pass`.
+- Manifest-level validation can still override the index to `blocked` when the
+  generated manifest is not usable.
+
+Boundary:
+
+- Artifact-index metadata only.
+- No renderer change.
+- No AutoCAD PNG equivalence claim.
+- No exit-code change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 13 passed
+```
+
+Private compatibility smoke:
+
+```bash
+python3 tools/render_regression/acad_reference_batch.py \
+  --from-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir /private/tmp/vemcad-provenance-compat-smoke-20260629/returned \
+  --case-id G11 \
+  --out-dir /private/tmp/vemcad-batch-index-status-smoke-20260629
+# AutoCAD reference batch: pass (1 cases)
+# artifact_index.stage=reference_intake
+# artifact_index.status=pass
+# artifact_index.reference_request_validation_status=pass
+# artifact_index.reference_intake_status=pass
+# artifact_index.batch_validation_status=pass
+```
+
 Private compatibility smoke:
 
 ```bash
