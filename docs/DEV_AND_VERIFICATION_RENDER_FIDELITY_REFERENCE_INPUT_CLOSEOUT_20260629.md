@@ -180,8 +180,8 @@ Changes:
 - `acad_reference_batch.py --from-request` uses
   `requested_expected_size`/`expected_size` from the request when present,
   rather than deriving `expected_size` from the returned PNG.
-- A wrong-sized returned PNG now produces an `expected_size_mismatch` manifest
-  block.
+- A wrong-sized returned PNG is now caught by returned-reference intake as
+  `returned_png_size_mismatch`; the run stops before producing compare inputs.
 - `acad_reference_batch.py` clears only its known generated files at the start
   of each run, so a successful re-run in the same `out-dir` cannot leave stale
   `missing_references.*` reports behind.
