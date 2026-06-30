@@ -4447,3 +4447,47 @@ Verification:
 python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
 # passed
 ```
+
+## Follow-Up Manifest Compare Markdown Cell Escaping
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Bring the manifest-compare summary and generated recapture request Markdown
+  tables onto the same safe table/code-cell formatting used by the input and
+  request-run reports.
+- Keep `summary.md` and `reference_request.md` structurally reliable when case
+  IDs, drawing IDs, or recommended output names contain Markdown table
+  metacharacters.
+
+Changes:
+
+- `acad_manifest_compare.py` now has Markdown-safe plain/table/code cell
+  helpers that collapse CR/LF, escape Markdown table pipes, and choose a safe
+  code-span delimiter for code-style cells.
+- The compare summary Issues/Cases/Triage tables, artifact-path bullets, and
+  generated recapture request table now use those helpers.
+- Regression coverage runs a real `viewspace_mismatch` compare with a case ID
+  containing `|` and a drawing ID containing `|` plus a newline, then asserts
+  the summary Cases table, Triage table, and recapture request table keep their
+  expected number of unescaped Markdown delimiters.
+- `tools/render_regression/README.md` now records that manifest-compare
+  Markdown reports also use the same safe cell formatting.
+
+Boundary:
+
+- Operator report formatting only.
+- JSON and TSV payloads remain unchanged structured sources of truth.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_manifest_compare.py -q
+# passed
+```
