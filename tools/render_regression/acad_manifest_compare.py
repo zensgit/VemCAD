@@ -641,6 +641,10 @@ def _write_reference_request(
         expected_size = row.get("expected_size") or _png_size(_str(row.get("acad_png")))
         if expected_size is not None:
             case["requested_expected_size"] = expected_size
+        current_acad_provenance = _file_provenance(_str(row.get("acad_png")))
+        if current_acad_provenance is not None:
+            case["current_acad_png_sha256"] = current_acad_provenance["sha256"]
+            case["current_acad_png_size_bytes"] = current_acad_provenance["size_bytes"]
         source_provenance = _file_provenance(_str(row.get("source_dxf")))
         if source_provenance is not None:
             case["source_dxf_sha256"] = source_provenance["sha256"]
@@ -665,9 +669,9 @@ def _write_reference_request(
         "",
         (
             "| Rank | Case | Drawing | Current view | Current X3 | Expected size | "
-            "Requested PNG | Source DXF | Source SHA256 | Candidate SHA256 |"
+            "Requested PNG | Source DXF | Current AutoCAD SHA256 | Source SHA256 | Candidate SHA256 |"
         ),
-        "| ---: | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| ---: | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for case in cases:
         lines.append(
@@ -677,6 +681,7 @@ def _write_reference_request(
             f"{_md_code_cell(case.get('current_x3_band'))} | "
             f"{_md_code_cell(_expected_size_text(case.get('requested_expected_size')))} | "
             f"{_md_code_cell(case['recommended_output_name'])} | {_md_code_cell(case['source_dxf'])} | "
+            f"{_md_code_cell(case.get('current_acad_png_sha256'))} | "
             f"{_md_code_cell(case.get('source_dxf_sha256'))} | {_md_code_cell(case.get('candidate_png_sha256'))} |"
         )
     lines.extend([

@@ -444,6 +444,8 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert request["cases"][0]["requested_view_contract"] == "model-extents"
     assert request["cases"][0]["recommended_output_name"] == "G11_autocad_model_extents.png"
     assert request["cases"][0]["requested_expected_size"] == {"width": 800, "height": 600}
+    assert request["cases"][0]["current_acad_png_sha256"] == _sha256(acad)
+    assert request["cases"][0]["current_acad_png_size_bytes"] == Path(acad).stat().st_size
     assert request["cases"][0]["source_dxf_sha256"] == _sha256(dxf)
     assert request["cases"][0]["source_dxf_size_bytes"] == Path(dxf).stat().st_size
     assert request["cases"][0]["candidate_png_sha256"] == _sha256(ours)
@@ -451,6 +453,7 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     request_md = (out / "reference_request.md").read_text(encoding="utf-8")
     assert "AutoCAD Reference Recapture Request" in request_md
     assert "G11_autocad_model_extents.png" in request_md
+    assert _sha256(acad) in request_md
     assert "Before Capture Or Fulfilment" in request_md
     assert "acad_reference_batch.py" in request_md
     assert "--validate-request" in request_md
@@ -572,7 +575,7 @@ def test_manifest_harness_escapes_markdown_table_cells(tmp_path):
     request_row = next(line for line in request_md.splitlines() if "G11\\|bearing cap" in line)
     assert "`G\\|11`" in request_row
     assert "`G_11_autocad_model_extents.png`" in request_row
-    assert _unescaped_pipe_count(request_row) == 11
+    assert _unescaped_pipe_count(request_row) == 12
 
 
 def test_manifest_harness_stops_on_blocked_manifest(tmp_path, capsys):

@@ -1294,6 +1294,50 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 11 passed
 ```
 
+## Follow-Up Rejected Reference Reuse Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Prevent a recapture loop from accidentally reusing the exact AutoCAD PNG that
+  was already rejected as `viewspace_mismatch`.
+- Make the generated recapture request carry enough provenance for the intake
+  side to fail closed when the returned PNG is byte-identical to the rejected
+  `current_acad_png`.
+
+Changes:
+
+- Generated `reference_request.json` recapture cases now include:
+  - `current_acad_png_sha256`
+  - `current_acad_png_size_bytes`
+- Generated `reference_request.md` now shows the current rejected AutoCAD PNG
+  SHA256 beside source and candidate provenance.
+- Returned-reference intake now emits an error
+  `returned_png_matches_rejected_reference` when the returned PNG SHA256 equals
+  `current_acad_png_sha256`.
+- The README documents the guard as a stale-reference reuse blocker.
+
+Boundary:
+
+- Input fail-closed guard only.
+- This detects exact byte reuse of the rejected AutoCAD reference; it does not
+  infer DXF-to-PNG content identity from a PNG.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_manifest_compare.py \
+  tools/render_regression/tests/test_acad_reference_batch.py -q
+# 34 passed
+```
+
 ## Follow-Up Case Action Diagnostic Evidence
 
 Status: implemented in this branch.
