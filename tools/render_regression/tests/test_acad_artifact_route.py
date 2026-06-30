@@ -136,6 +136,45 @@ def test_cli_multiple_directories_text(tmp_path, capsys):
     assert "recommended_next_action: recapture-autocad-or-provide-window" in output
 
 
+def test_cli_recursive_discovers_nested_artifact_indexes(tmp_path, capsys):
+    run_dir = tmp_path / "run"
+    input_dir = run_dir / "input"
+    compare_dir = run_dir / "compare"
+    input_dir.mkdir(parents=True)
+    compare_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "pass",
+        "case_count": 1,
+        "artifacts": [],
+    })
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"recapture-required": 1},
+        "viewspace_status_counts": {"mismatch": 1},
+        "x3_band_counts": {"fallback": 1},
+        "artifacts": [],
+    })
+
+    assert route.main([str(run_dir), "--recursive", "--text"]) == 0
+    output = capsys.readouterr().out
+
+    assert "route: 1" in output
+    assert "route: 2" in output
+    assert "input/artifact_index.json" in output
+    assert "compare/artifact_index.json" in output
+    assert "recommended_next_action: continue-to-request-run" in output
+    assert "recommended_next_action: recapture-autocad-or-provide-window" in output
+
+
+def test_recursive_rejects_directory_without_artifact_indexes(tmp_path):
+    assert route.main([str(tmp_path), "--recursive"]) == 2
+
+
 def test_routes_compare_renderer_candidate_before_recapture(tmp_path):
     index = _write(tmp_path / "artifact_index.json", {
         "schema": "vemcad.acad_manifest_compare_artifact_index/v1",

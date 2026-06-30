@@ -32,6 +32,27 @@ def _resolve_artifact_index(path: Path) -> Path:
     return path
 
 
+def _discover_artifact_indexes(paths: list[Path]) -> list[Path]:
+    discovered: list[Path] = []
+    seen: set[Path] = set()
+    for path in paths:
+        if path.is_dir():
+            candidates = sorted(path.rglob("artifact_index.json"))
+        else:
+            candidates = [_resolve_artifact_index(path)]
+        if not candidates:
+            raise ValueError(f"no artifact indexes found recursively under: {path}")
+        for candidate in candidates:
+            key = candidate.resolve()
+            if key in seen:
+                continue
+            seen.add(key)
+            discovered.append(candidate)
+    if not discovered:
+        raise ValueError("at least one artifact index is required")
+    return discovered
+
+
 def _action(code: str, message: str, *, artifact: str = "") -> dict[str, str]:
     return {
         "code": code,
@@ -200,14 +221,17 @@ def main(argv: list[str] | None = None) -> int:
         description="Read an AutoCAD reference artifact index and print the next safe action.")
     parser.add_argument("artifact_index", type=Path, nargs="+",
                         help="artifact_index.json, or directories containing artifact_index.json")
+    parser.add_argument("--recursive", action="store_true",
+                        help="discover artifact_index.json files recursively under directory inputs")
     parser.add_argument("--text", action="store_true", help="print a human-readable summary instead of JSON")
     args = parser.parse_args(argv)
 
     try:
-        if len(args.artifact_index) == 1:
-            payload = route_artifact_index(args.artifact_index[0])
+        paths = _discover_artifact_indexes(args.artifact_index) if args.recursive else args.artifact_index
+        if len(paths) == 1:
+            payload = route_artifact_index(paths[0])
         else:
-            payload = route_artifact_indexes(args.artifact_index)
+            payload = route_artifact_indexes(paths)
     except Exception as exc:
         print(f"acad_artifact_route: {exc}", file=sys.stderr)
         return 2
