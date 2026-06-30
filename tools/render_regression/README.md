@@ -211,6 +211,18 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --require-action-domain input
 ```
 
+Use `--forbid-action-domain <domain>` when a mixed route must fail even if the
+top-level action points somewhere else. This is useful for unattended input
+runs that should not hide a `renderer-candidate` route behind a higher-priority
+input repair:
+
+```bash
+python3 tools/render_regression/acad_artifact_route.py <run-dir> \
+  --recursive \
+  --require-action-domain input \
+  --forbid-action-domain renderer-candidate
+```
+
 When a workflow also needs to assert that the chosen action points at the
 expected handoff artifact, use `--require-action-artifact <path-suffix>`.
 Suffix matching keeps the guard stable across absolute CI paths:

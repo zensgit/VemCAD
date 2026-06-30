@@ -71,6 +71,7 @@ def test_routes_run_case_actions(tmp_path):
             "artifact": "compare/summary.md",
         },
         "case_action_counts": {"recapture-autocad-or-provide-window": 1},
+        "case_action_domain_counts": {"input": 1},
         "case_actions": [{
             "id": "G11",
             "code": "recapture-autocad-or-provide-window",
@@ -85,7 +86,9 @@ def test_routes_run_case_actions(tmp_path):
     assert payload["recommended_next_action"]["code"] == "recapture-autocad-or-provide-window"
     assert payload["recommended_next_action"]["domain"] == "input"
     assert payload["case_action_counts"] == {"recapture-autocad-or-provide-window": 1}
+    assert payload["case_action_domain_counts"] == {"input": 1}
     assert "case_action_counts: recapture-autocad-or-provide-window=1" in text
+    assert "case_action_domain_counts: input=1" in text
 
 
 def test_routes_multiple_directories_as_batch(tmp_path):
@@ -484,6 +487,99 @@ def test_cli_require_action_domain_fails_closed_on_unexpected_domain(tmp_path, c
     assert "required action domain 'input'" in stderr
     assert "got 'renderer-candidate'" in stderr
     assert "for action 'inspect-renderer-candidate'" in stderr
+
+
+def test_cli_forbid_action_domain_passes_when_domain_absent(tmp_path):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "missing_references",
+        "status": "blocked",
+        "case_count": 1,
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--require-action-domain",
+        "input",
+        "--forbid-action-domain",
+        "renderer-candidate",
+    ]) == 0
+
+
+def test_cli_forbid_action_domain_fails_on_mixed_hidden_renderer_candidate(tmp_path, capsys):
+    validation_dir = tmp_path / "validation"
+    compare_dir = tmp_path / "compare"
+    validation_dir.mkdir()
+    compare_dir.mkdir()
+    _write(validation_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "request_validation",
+        "status": "blocked",
+        "case_count": 1,
+        "artifacts": [],
+    })
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "compare_failed",
+        "case_count": 1,
+        "compared_count": 1,
+        "triage_bucket_counts": {"renderer-candidate": 1},
+        "viewspace_status_counts": {"match": 1},
+        "x3_band_counts": {"fail": 1},
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(validation_dir),
+        str(compare_dir),
+        "--require-action-domain",
+        "input",
+        "--forbid-action-domain",
+        "renderer-candidate",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "forbidden action domain present: renderer-candidate=1" in stderr
+    assert "action domain counts: input=1, renderer-candidate=1" in stderr
+
+
+def test_cli_forbid_action_domain_fails_on_request_run_case_domain_counts(tmp_path, capsys):
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    _write(run_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_request_run_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "recommended_next_action": {
+            "code": "recapture-autocad-or-provide-window",
+            "message": "recapture",
+            "domain": "input",
+        },
+        "case_action_counts": {
+            "recapture-autocad-or-provide-window": 1,
+            "inspect-renderer-candidate": 1,
+        },
+        "case_action_domain_counts": {
+            "input": 1,
+            "renderer-candidate": 1,
+        },
+        "case_actions": [],
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(run_dir),
+        "--require-action-domain",
+        "input",
+        "--forbid-action-domain",
+        "renderer-candidate",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "forbidden action domain present: renderer-candidate=1" in stderr
+    assert "action domain counts: input=1, renderer-candidate=1" in stderr
 
 
 def test_cli_require_source_boundary_passes_when_all_routes_match(tmp_path):
