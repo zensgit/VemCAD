@@ -411,6 +411,19 @@ assert the routed artifact topology itself. This catches incomplete recursive
 inputs, such as a run that accidentally uploads only the input batch artifacts
 and never includes the compare artifact index.
 
+Use `--require-artifact-kind <kind>` / `--forbid-artifact-kind <kind>` when a
+workflow needs to assert the uploaded handoff artifacts themselves, not only the
+route types. This catches runs that route as `batch` or `request_run` but fail
+to upload a specific operator artifact such as `reference_request_validation_tsv`,
+`reference_intake_tsv`, or `missing_references_tsv`:
+
+```bash
+python3 tools/render_regression/acad_artifact_route.py <run-dir> \
+  --recursive \
+  --require-artifact-kind reference_request_validation_tsv \
+  --require-artifact-kind reference_intake_tsv
+```
+
 Use `--require-route-count <n>` when a workflow also needs to prove the
 recursive route discovered the expected number of artifact indexes. This catches
 missing or extra extracted artifacts that still happen to include the expected

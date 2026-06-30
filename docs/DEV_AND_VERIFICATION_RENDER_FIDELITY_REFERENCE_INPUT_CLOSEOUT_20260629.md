@@ -1294,6 +1294,51 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 11 passed
 ```
 
+## Follow-Up Route Artifact-Kind Guards
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let CI fail closed when a recursive route contains the expected route shapes
+  but omits a required uploaded operator artifact.
+- Distinguish route kinds (`batch`, `compare`, `request_run`) from the artifact
+  kinds inside each routed `artifact_index.json`, such as
+  `reference_request_validation_tsv`, `reference_intake_tsv`, and
+  `missing_references_tsv`.
+- Make the route JSON/text/Markdown summaries show artifact-kind counts so an
+  operator can see whether the handoff files were actually present.
+
+Changes:
+
+- `acad_artifact_route.py` now records `artifact_kind_counts` on each route and
+  aggregates them in batch-route summaries.
+- Route text and Markdown reports surface the artifact-kind count distribution.
+- The CLI adds `--require-artifact-kind` and `--forbid-artifact-kind`, which
+  exit 2 when required handoff artifacts are missing or forbidden ones are
+  present.
+- Focused tests cover pass, missing-required, and forbidden-present cases.
+
+Boundary:
+
+- Route/operator evidence guard only.
+- No route priority change.
+- No request-run behavior change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# 73 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 195 passed
+```
+
 ## Follow-Up Request-Run Input TSV Artifacts
 
 Status: implemented in this branch.
