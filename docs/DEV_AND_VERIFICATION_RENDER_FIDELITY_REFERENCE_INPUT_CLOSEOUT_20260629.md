@@ -610,6 +610,70 @@ python3 tools/render_regression/acad_reference_request_run.py \
 # artifact_index.case_actions[0].triage_bucket=recapture-required
 ```
 
+## Follow-Up Artifact Route Helper
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Provide one read-only command that can route any AutoCAD reference artifact
+  index: batch input-prep, request run, or compare output.
+- Let CI or an operator ask "what next?" without hand-writing different `jq`
+  expressions for each artifact index schema.
+
+New command:
+
+```bash
+python3 tools/render_regression/acad_artifact_route.py <artifact_index.json>
+python3 tools/render_regression/acad_artifact_route.py <artifact_index.json> --text
+```
+
+Behavior:
+
+- Batch indexes route missing PNGs, request validation blocks, intake review,
+  and pass/continue states.
+- Request-run indexes preserve `recommended_next_action`, `case_actions`, and
+  `case_action_counts`.
+- Compare indexes route `renderer-candidate` before `recapture-required`,
+  because a matched-view renderer candidate is actionable whereas
+  `viewspace_mismatch` remains an input issue.
+
+Boundary:
+
+- Read-only artifact routing only.
+- No renderer change.
+- No X3 scoring change.
+- No AutoCAD PNG equivalence claim.
+- Unknown schemas fail closed with exit code `2`.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# 4 passed
+```
+
+Private compatibility smoke:
+
+```bash
+python3 tools/render_regression/acad_reference_request_run.py \
+  --from-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir /private/tmp/vemcad-provenance-compat-smoke-20260629/returned \
+  --case-id G11 \
+  --out-dir /private/tmp/vemcad-artifact-route-smoke-20260629
+
+python3 tools/render_regression/acad_artifact_route.py \
+  /private/tmp/vemcad-artifact-route-smoke-20260629/artifact_index.json --text
+# recommended_next_action: recapture-autocad-or-provide-window
+# case_action_counts: recapture-autocad-or-provide-window=1
+
+python3 tools/render_regression/acad_artifact_route.py \
+  /private/tmp/vemcad-artifact-route-smoke-20260629/compare/artifact_index.json --text
+# recommended_next_action: recapture-autocad-or-provide-window
+# triage_bucket_counts: recapture-required=1
+```
+
 Private compatibility smoke:
 
 ```bash

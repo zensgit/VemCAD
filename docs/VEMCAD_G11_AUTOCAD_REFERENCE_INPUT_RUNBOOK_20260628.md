@@ -310,6 +310,16 @@ authoritative.
 `renderer-candidate` versus `recapture-required` runs before opening
 `summary.json`.
 
+To route any batch/run/compare artifact index through one command:
+
+```bash
+python3 tools/render_regression/acad_artifact_route.py <artifact_index.json> --text
+```
+
+The route helper is read-only. It does not compare renders, does not change
+exit semantics, and does not claim AutoCAD equivalence; it only translates the
+artifact index into the next safe operator action.
+
 ## Interpret The Result
 
 First inspect:
