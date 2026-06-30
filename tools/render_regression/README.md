@@ -206,7 +206,10 @@ scanning per-case tables. Returned-reference intake also prints the requested
 expected size next to the actual returned PNG size and blocks with
 `returned_png_size_mismatch` when a returned AutoCAD PNG does not match the
 request-declared size; in that case the run stops before writing a compare
-manifest.
+manifest. The intake Markdown table also prints a compact diagnostic-only
+identity advisory (`returned=...`, `candidate=...`, optional
+`aspect_delta=...`) so operators can spot likely wrong-file, blank-export, or
+capture-window issues without opening `reference_intake.json`.
 The batch, compare, and request-run CLIs also print the recommended action
 domain next to the action code, so CI logs can show the route class without
 opening JSON artifacts.

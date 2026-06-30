@@ -300,6 +300,28 @@ def _identity_advisory(returned_png: Path, candidate_png: Path | None) -> tuple[
     return advisory, issues
 
 
+def _identity_advisory_text(advisory: dict[str, Any]) -> str:
+    status = _str(advisory.get("status"))
+    if not status:
+        return "-"
+    parts = [f"status={status}"]
+    returned = advisory.get("returned_ink")
+    if isinstance(returned, dict) and returned.get("status"):
+        parts.append(f"returned={returned.get('status')}")
+    candidate = advisory.get("candidate_ink")
+    if isinstance(candidate, dict) and candidate.get("status"):
+        parts.append(f"candidate={candidate.get('status')}")
+    if advisory.get("ink_bbox_aspect_delta") is not None:
+        parts.append(f"aspect_delta={advisory.get('ink_bbox_aspect_delta')}")
+    if advisory.get("diagnostic_only") is True:
+        parts.append("diagnostic-only")
+    if advisory.get("reason"):
+        parts.append(f"reason={advisory.get('reason')}")
+    if advisory.get("error"):
+        parts.append(f"error={advisory.get('error')}")
+    return " ".join(_str(part) for part in parts if _str(part))
+
+
 def _resolve(base: Path, value: Any) -> str:
     raw = _str(value)
     if not raw:
@@ -1261,8 +1283,8 @@ def _write_reference_intake_report(
         "",
         "This is a capture-quality preflight only. It does not compare against VemCAD and does not claim AutoCAD equivalence.",
         "",
-        "| Case | Drawing | PNG | Size | Expected size | Long edge | Corner white | Issues |",
-        "| --- | --- | --- | ---: | ---: | ---: | ---: | --- |",
+        "| Case | Drawing | PNG | Size | Expected size | Long edge | Corner white | Identity advisory | Issues |",
+        "| --- | --- | --- | ---: | ---: | ---: | ---: | --- | --- |",
     ]
     for row in rows:
         inspection = row["inspection"]
@@ -1277,6 +1299,7 @@ def _write_reference_intake_report(
             f"`{row['recommended_output_name']}` | {size} | "
             f"{inspection.get('requested_expected_size', '-')} | "
             f"{inspection.get('long_edge', '-')} | {inspection.get('corner_white_ratio', '-')} | "
+            f"{_identity_advisory_text(inspection.get('identity_advisory') or {})} | "
             f"{issue_text} |"
         )
     md_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")

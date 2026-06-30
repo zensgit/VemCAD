@@ -916,6 +916,10 @@ def test_batch_generator_intake_warns_on_candidate_returned_ink_aspect_divergenc
     advisory = row["inspection"]["identity_advisory"]
     assert advisory["diagnostic_only"] is True
     assert advisory["ink_bbox_aspect_delta"] > 0.25
+    intake_md = (out / "reference_intake.md").read_text(encoding="utf-8")
+    assert "Identity advisory" in intake_md
+    assert "status=available returned=available candidate=available aspect_delta=" in intake_md
+    assert "diagnostic-only" in intake_md
 
 
 def test_batch_generator_intake_warns_on_blank_returned_reference(tmp_path):
@@ -954,6 +958,8 @@ def test_batch_generator_intake_warns_on_blank_returned_reference(tmp_path):
     assert advisory["candidate_ink"]["status"] == "available"
     intake_md = (out / "reference_intake.md").read_text(encoding="utf-8")
     assert "warning:returned_reference_blank" in intake_md
+    assert "returned=blank" in intake_md
+    assert "candidate=available" in intake_md
 
 
 def test_batch_generator_intake_warns_on_blank_candidate_render(tmp_path):
@@ -992,3 +998,5 @@ def test_batch_generator_intake_warns_on_blank_candidate_render(tmp_path):
     assert advisory["candidate_ink"]["status"] == "blank"
     intake_md = (out / "reference_intake.md").read_text(encoding="utf-8")
     assert "warning:candidate_render_blank" in intake_md
+    assert "returned=available" in intake_md
+    assert "candidate=blank" in intake_md
