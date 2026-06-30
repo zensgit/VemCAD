@@ -9,6 +9,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import acad_reference_request_run as runner  # noqa: E402
 
 
+def _run_artifact_kinds(out: Path) -> set[str]:
+    payload = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert payload["schema"] == "vemcad.acad_reference_request_run_artifact_index/v1"
+    return {item["kind"] for item in payload["artifacts"]}
+
+
 def _png(path: Path, size=(760, 570), box=None, color=(255, 255, 255)) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
     image = Image.new("RGB", size, color)
@@ -74,6 +80,7 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path):
     compare_summary = json.loads((out / "compare" / "summary.json").read_text(encoding="utf-8"))
     assert summary["schema"] == "vemcad.acad_reference_request_run/v1"
     assert summary["status"] == "pass"
+    assert summary["run_artifact_index"].endswith("artifact_index.json")
     assert summary["batch_exit_code"] == 0
     assert summary["compare_exit_code"] == 0
     assert summary["boundary"]["autocad_equivalence_claim"] is False
@@ -86,6 +93,18 @@ def test_reference_request_run_fulfills_and_compares_match(tmp_path):
     assert summary["compare_summary_markdown"].endswith("summary.md")
     assert compare_summary["status"] == "pass"
     assert (out / "run_summary.md").is_file()
+    assert _run_artifact_kinds(out) >= {
+        "run_summary_json",
+        "run_summary_markdown",
+        "input_artifact_index",
+        "reference_request_validation_json",
+        "reference_request_validation_markdown",
+        "reference_intake_json",
+        "reference_intake_markdown",
+        "compare_summary_json",
+        "compare_summary_markdown",
+        "compare_artifact_index",
+    }
 
 
 def test_reference_request_run_preserves_viewspace_mismatch_exit(tmp_path):
@@ -169,6 +188,16 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path):
     assert summary["reference_intake_warning_count"] is None
     assert summary["compare_summary_markdown"] == ""
     assert not (out / "compare" / "summary.json").exists()
+    assert _run_artifact_kinds(out) >= {
+        "run_summary_json",
+        "run_summary_markdown",
+        "input_artifact_index",
+        "reference_request_validation_json",
+        "reference_request_validation_markdown",
+        "missing_references_json",
+        "missing_references_markdown",
+    }
+    assert "compare_summary_json" not in _run_artifact_kinds(out)
 
 
 def test_reference_request_run_surfaces_request_validation_block(tmp_path):
@@ -203,3 +232,12 @@ def test_reference_request_run_surfaces_request_validation_block(tmp_path):
     assert summary["reference_request_validation_markdown"].endswith("reference_request_validation.md")
     assert summary["reference_intake_status"] == ""
     assert not (out / "compare" / "summary.json").exists()
+    assert _run_artifact_kinds(out) >= {
+        "run_summary_json",
+        "run_summary_markdown",
+        "input_artifact_index",
+        "reference_request_validation_json",
+        "reference_request_validation_markdown",
+    }
+    assert "reference_intake_json" not in _run_artifact_kinds(out)
+    assert "compare_summary_json" not in _run_artifact_kinds(out)

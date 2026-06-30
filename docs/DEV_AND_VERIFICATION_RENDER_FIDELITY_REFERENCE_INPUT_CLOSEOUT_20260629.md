@@ -511,3 +511,55 @@ python3 tools/render_regression/acad_reference_request_run.py \
 # AutoCAD reference request run: viewspace_mismatch
 # run_summary: reference_request_validation_status=pass, reference_intake_status=pass
 ```
+
+## Follow-Up Run Artifact Index
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Give each one-command request run a stable artifact index at the run root.
+- Make unattended artifact uploads reviewable from one top-level JSON, even
+  when the run stops before compare.
+
+Changes:
+
+- `acad_reference_request_run.py` now writes `<run-dir>/artifact_index.json`.
+- The index lists:
+  - `run_summary.json/md`;
+  - input artifact index;
+  - request validation artifacts;
+  - intake or missing-reference artifacts when present;
+  - compare summary/index artifacts when compare ran.
+- `run_summary.json/md` now point back to the run-level artifact index.
+
+Boundary:
+
+- Reporting/indexing only.
+- No renderer change.
+- No AutoCAD PNG equivalence claim.
+- No X3 semantics change.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 5 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 101 passed
+```
+
+Private compatibility smoke:
+
+```bash
+python3 tools/render_regression/acad_reference_request_run.py \
+  --from-request /private/tmp/vemcad-autocad-batch-current-rerun-20260629-request/compare/reference_request.json \
+  --candidate-cases /private/tmp/vemcad-autocad-batch-current/input/candidate_cases.json \
+  --reference-dir /private/tmp/vemcad-provenance-compat-smoke-20260629/returned \
+  --case-id G11 \
+  --out-dir /private/tmp/vemcad-run-artifact-index-smoke-20260629
+# AutoCAD reference request run: viewspace_mismatch
+# artifact_index.schema=vemcad.acad_reference_request_run_artifact_index/v1
+# artifact_index.count=10
+```

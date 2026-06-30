@@ -204,6 +204,8 @@ The wrapper writes:
 - `$NEXT_DIR/compare/` — X3 compare outputs;
 - `$NEXT_DIR/run_summary.json`;
 - `$NEXT_DIR/run_summary.md`.
+- `$NEXT_DIR/artifact_index.json` — run-level index for the summary, input
+  artifacts, and compare artifacts that were actually produced.
 
 It returns the comparison exit code, so `viewspace_mismatch` still exits `2`.
 The wrapper is only an orchestration convenience; it does not render DXFs and
