@@ -777,6 +777,10 @@ def _write_reference_request(
         "```",
         "",
         "For a partial return, repeat `--case-id <ID>` to process only the cases that have PNGs.",
+        (
+            "When doing that, replace the three positive compare-distribution counts "
+            "(`matched-pass`, `match`, `pass`) with the number of selected returned cases."
+        ),
         "The wrapper preserves the X3 exit code: `viewspace_mismatch` still exits `2` and is not an AutoCAD-equivalence result.",
     ])
     md_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")

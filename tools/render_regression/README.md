@@ -575,6 +575,8 @@ The generated strict post-return route command requires the positive compare
 distribution to match the requested case count, for example `matched-pass=1`,
 `match=1`, and `pass=1` for a one-case request, in addition to forbidding
 mismatch/review/fallback buckets.
+For a partial return that uses repeated `--case-id <ID>`, adjust those three
+positive distribution counts to the number of selected returned cases.
 
 For example, this fails closed if any nested compare route still has a
 view-space mismatch, even when the top-level action is an input repair:
