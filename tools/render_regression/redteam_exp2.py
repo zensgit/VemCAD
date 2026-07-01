@@ -64,7 +64,8 @@ b = titled(TMP/"t_b.png",'B')  # same layout, very different glyph ink
 r = compare(a,b)
 print(f"font-sub (outline vs solid glyph): iou={r.geometry_ink_iou:.4f} band={r.band} ssim={r.ssim:.3f}")
 print("  -> if this FAILS, font substitution would trip the gate the spec says")
-print("     should be geometry-only. Code has NO text/geometry separation.")
+print("     should be geometry-only. The current gate is still combined ink,")
+print("     despite candidate-side semantic diagnostics.")
 
 print("\n=== (4) the REAL scale-hiding case: drawing window/extents wrong, ===")
 print("    same content but baseline frames a sub-region candidate frames whole ===")
