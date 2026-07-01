@@ -1218,6 +1218,37 @@ def test_cli_require_action_count_rejects_bad_expectation(tmp_path, capsys):
     assert "count expectation value must be an integer" in stderr
 
 
+def test_cli_require_action_count_ignores_non_integer_artifact_counts(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_request_run_artifact_index/v1",
+        "status": "viewspace_mismatch",
+        "recommended_next_action": {
+            "code": "recapture-autocad-or-provide-window",
+            "message": "recapture",
+            "domain": "input",
+        },
+        "case_action_counts": {
+            "provide-returned-autocad-pngs": True,
+            "fix-request-package": 1.5,
+            "continue-to-request-run": "1",
+            "inspect-artifact-index": -1,
+        },
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--require-action-count",
+        "provide-returned-autocad-pngs=1",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "required action count mismatch: provide-returned-autocad-pngs=1 (got 0)" in stderr
+    assert "action counts: continue-to-request-run=1" in stderr
+
+
 def test_cli_require_action_domain_count_passes_for_request_run_cases(tmp_path):
     run_dir = tmp_path / "run"
     run_dir.mkdir()
@@ -1327,6 +1358,26 @@ def test_cli_require_compare_counts_passes_for_batch(tmp_path):
         "--require-compared-count",
         "2",
     ]) == 0
+
+
+def test_cli_require_compare_counts_ignore_non_integer_artifact_counts(tmp_path, capsys):
+    compare_dir = tmp_path / "compare"
+    compare_dir.mkdir()
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "pass",
+        "case_count": 1.5,
+        "compared_count": True,
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(compare_dir),
+        "--require-compare-case-count", "1",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "required compare case count 1 but got None" in stderr
 
 
 def test_cli_require_compare_counts_passes_for_request_run_route_fields(tmp_path):
