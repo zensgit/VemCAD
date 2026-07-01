@@ -1597,6 +1597,50 @@ python3 -m pytest \
 # 104 passed
 ```
 
+## Follow-Up Strict Compare Distribution Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make generated post-return strict route commands positively require the
+  matched-view compare distribution, not only forbid known bad compare buckets.
+- Ensure the strict handoff proves the compare route has:
+  - triage bucket `matched-pass=1`;
+  - viewspace status `match=1`;
+  - X3 band `pass=1`.
+
+Changes:
+
+- Generated `reference_request.md` strict route commands now include:
+  - `--require-triage-bucket matched-pass=1`;
+  - `--require-viewspace-status match=1`;
+  - `--require-x3-band pass=1`.
+- The README strict route example and compare-distribution guard section now
+  describe the positive requirements alongside the existing mismatch /
+  review / fallback forbids.
+- The request-run strict route helper in tests uses the same positive compare
+  distribution requirements.
+
+Boundary:
+
+- Generated operator command / compare-distribution assertion hardening only.
+- Matched-view X3 pass artifacts still require human review before any
+  AutoCAD-equivalence wording.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_manifest_compare.py \
+  tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 25 passed
+```
+
 ## Follow-Up Strict Action-Domain Distribution Guard
 
 Status: implemented in this branch.

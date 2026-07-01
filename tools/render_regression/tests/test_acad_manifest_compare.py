@@ -116,7 +116,10 @@ def test_readme_recapture_route_example_documents_handoff_guards():
         "--forbid-status blocked",
         "--forbid-status review",
         "--forbid-status viewspace_mismatch",
+        "--require-triage-bucket matched-pass=1",
+        "--require-viewspace-status match=1",
         "--forbid-viewspace-status mismatch",
+        "--require-x3-band pass=1",
         "--forbid-x3-band review",
         "--forbid-x3-band fallback",
         "--require-kind batch",
@@ -525,7 +528,10 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert request_md.count("--forbid-status blocked") == 1
     assert request_md.count("--forbid-status review") == 1
     assert request_md.count("--forbid-status viewspace_mismatch") == 1
+    assert request_md.count("--require-triage-bucket matched-pass=1") == 1
+    assert request_md.count("--require-viewspace-status match=1") == 1
     assert request_md.count("--forbid-viewspace-status mismatch") == 1
+    assert request_md.count("--require-x3-band pass=1") == 1
     assert request_md.count("--forbid-x3-band review") == 1
     assert request_md.count("--forbid-x3-band fallback") == 1
     assert request_md.count("--require-kind batch") == 1
@@ -568,7 +574,10 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
         "--forbid-status blocked",
         "--forbid-status review",
         "--forbid-status viewspace_mismatch",
+        "--require-triage-bucket matched-pass=1",
+        "--require-viewspace-status match=1",
         "--forbid-viewspace-status mismatch",
+        "--require-x3-band pass=1",
         "--forbid-x3-band review",
         "--forbid-x3-band fallback",
         "--require-kind batch",
