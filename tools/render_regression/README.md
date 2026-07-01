@@ -238,9 +238,10 @@ validation and returned-reference intake reports: source DXF SHA/size,
 current/rejected AutoCAD PNG SHA/size when available, candidate PNG SHA/size,
 returned AutoCAD PNG SHA/size, returned PNG dimensions, and the
 identity-advisory text. This keeps the per-case action spreadsheet
-self-contained for operator routing, including rejected-reference reuse
-failures. These fields identify the files that were checked; they are not an
-AutoCAD-equivalence proof and do not replace matched-view/X3.
+self-contained for operator routing, including missing-returned-reference
+handoffs and rejected-reference reuse failures. These fields identify the files
+that were checked; they are not an AutoCAD-equivalence proof and do not replace
+matched-view/X3.
 When returned AutoCAD PNGs are still missing, `acad_reference_batch.py` writes
 `missing_references.tsv` beside the JSON/Markdown report so the expected
 source DXF, optional source hash, current/rejected AutoCAD PNG hash when
