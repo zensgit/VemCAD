@@ -176,6 +176,9 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --forbid-action-domain renderer-candidate \
   --forbid-issue-code current_acad_png_missing \
   --forbid-issue-code current_acad_matches_candidate_png \
+  --forbid-status blocked \
+  --forbid-status review \
+  --forbid-status viewspace_mismatch \
   --forbid-viewspace-status mismatch \
   --forbid-x3-band review \
   --forbid-x3-band fallback \
@@ -453,6 +456,9 @@ Use `--require-status <status>` / `--forbid-status <status>` when a workflow
 needs to assert the routed status distribution itself, such as requiring
 `viewspace_mismatch` in a recapture test or forbidding any nested `blocked`
 artifact in a supposedly ready batch.
+The generated strict post-return route command forbids `blocked`, `review`, and
+`viewspace_mismatch`, so a route cannot pass merely because the top-level action
+domain or issue-code counts look acceptable.
 
 Use `--require-kind <kind>` / `--forbid-kind <kind>` when a workflow needs to
 assert the routed artifact topology itself. This catches incomplete recursive

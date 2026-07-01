@@ -1382,6 +1382,48 @@ python3 -m pytest \
 # 24 passed
 ```
 
+## Follow-Up Strict Route Status Guards
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make generated post-return strict route commands fail closed on routed
+  artifact statuses as well as action domains, issue codes, viewspace status,
+  and X3 bands.
+- Catch mixed or malformed route bundles where a nested route is still
+  `blocked`, `review`, or `viewspace_mismatch` even if another assertion surface
+  looks acceptable.
+
+Changes:
+
+- Generated `reference_request.md` route commands now include:
+  - `--forbid-status blocked`;
+  - `--forbid-status review`;
+  - `--forbid-status viewspace_mismatch`.
+- The README strict route example and status-guard documentation now state that
+  generated strict commands forbid those statuses by default.
+- The request-run strict route helper in tests uses the same status guards, so
+  local regression coverage matches generated operator handoffs.
+
+Boundary:
+
+- Generated operator command / route-status assertion hardening only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_manifest_compare.py \
+  tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 24 passed
+```
+
 ## Follow-Up Request Validation Review Routing
 
 Status: implemented in this branch.
