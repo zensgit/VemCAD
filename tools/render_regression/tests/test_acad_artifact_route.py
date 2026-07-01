@@ -1345,6 +1345,7 @@ def test_cli_require_compare_counts_passes_for_batch(tmp_path):
         "compared_count": 2,
         "triage_bucket_counts": {"renderer-candidate": 1, "recapture-required": 1},
         "viewspace_status_counts": {"match": 1, "mismatch": 1},
+        "viewspace_gate_evidence_counts": {"false": 1, "true": 1},
         "x3_band_counts": {"fail": 1, "fallback": 1},
         "artifacts": [],
     })
@@ -1360,6 +1361,10 @@ def test_cli_require_compare_counts_passes_for_batch(tmp_path):
         "match=1",
         "--require-viewspace-status",
         "mismatch=1",
+        "--require-viewspace-gate-evidence",
+        "true=1",
+        "--require-viewspace-gate-evidence",
+        "false=1",
         "--require-x3-band",
         "fail=1",
         "--require-x3-band",
@@ -1408,6 +1413,7 @@ def test_cli_require_compare_counts_passes_for_request_run_route_fields(tmp_path
         "route_compared_count": 2,
         "route_triage_bucket_counts": {"matched-pass": 1, "recapture-required": 1},
         "route_viewspace_status_counts": {"match": 1, "mismatch": 1},
+        "route_viewspace_gate_evidence_counts": {"false": 1, "true": 1},
         "route_x3_band_counts": {"fallback": 1, "pass": 1},
         "case_actions": [],
         "artifacts": [],
@@ -1419,6 +1425,8 @@ def test_cli_require_compare_counts_passes_for_request_run_route_fields(tmp_path
         "recapture-required=1",
         "--require-viewspace-status",
         "mismatch=1",
+        "--require-viewspace-gate-evidence",
+        "true=1",
         "--require-x3-band",
         "fallback=1",
         "--require-compare-case-count",
@@ -1426,6 +1434,29 @@ def test_cli_require_compare_counts_passes_for_request_run_route_fields(tmp_path
         "--require-compared-count",
         "2",
     ]) == 0
+
+
+def test_cli_require_viewspace_gate_evidence_fails_closed(tmp_path, capsys):
+    compare_dir = tmp_path / "compare"
+    compare_dir.mkdir()
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "pass",
+        "case_count": 1,
+        "compared_count": 1,
+        "viewspace_gate_evidence_counts": {"true": 1},
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(compare_dir),
+        "--require-viewspace-gate-evidence",
+        "false=1",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "required viewspace gate evidence count mismatch: false=1 (got 0)" in stderr
+    assert "viewspace gate evidence counts: true=1" in stderr
 
 
 def test_cli_require_compare_case_count_fails_closed_for_mismatch(tmp_path, capsys):
