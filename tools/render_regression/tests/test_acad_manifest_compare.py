@@ -599,6 +599,8 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert request_md.count("--forbid-status viewspace_mismatch") == 1
     assert request_md.count("--require-triage-bucket matched-pass=1") == 1
     assert request_md.count("--require-viewspace-status match=1") == 1
+    assert request_md.count("--require-viewspace-gate-evidence true=1") == 1
+    assert request_md.count("--forbid-viewspace-gate-evidence false") == 1
     assert request_md.count("--forbid-viewspace-status mismatch") == 1
     assert request_md.count("--require-x3-band pass=1") == 1
     assert request_md.count("--forbid-x3-band review") == 1
@@ -646,6 +648,8 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
         "--forbid-status viewspace_mismatch",
         "--require-triage-bucket matched-pass=1",
         "--require-viewspace-status match=1",
+        "--require-viewspace-gate-evidence true=1",
+        "--forbid-viewspace-gate-evidence false",
         "--forbid-viewspace-status mismatch",
         "--require-x3-band pass=1",
         "--forbid-x3-band review",
@@ -722,9 +726,12 @@ def test_reference_request_strict_route_counts_all_requested_cases(tmp_path):
     )
     assert "--require-triage-bucket matched-pass=2" in route_block
     assert "--require-viewspace-status match=2" in route_block
+    assert "--require-viewspace-gate-evidence true=2" in route_block
+    assert "--forbid-viewspace-gate-evidence false" in route_block
     assert "--require-x3-band pass=2" in route_block
     assert "--require-triage-bucket matched-pass=1" not in route_block
     assert "--require-viewspace-status match=1" not in route_block
+    assert "--require-viewspace-gate-evidence true=1" not in route_block
     assert "--require-x3-band pass=1" not in route_block
 
 

@@ -198,6 +198,8 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --forbid-status viewspace_mismatch \
   --require-triage-bucket matched-pass=1 \
   --require-viewspace-status match=1 \
+  --require-viewspace-gate-evidence true=1 \
+  --forbid-viewspace-gate-evidence false \
   --forbid-viewspace-status mismatch \
   --require-x3-band pass=1 \
   --forbid-x3-band review \
@@ -590,13 +592,16 @@ recommendation:
   `--forbid-triage-bucket <bucket>`;
 - `--require-viewspace-status <status=count>` /
   `--forbid-viewspace-status <status>`;
+- `--require-viewspace-gate-evidence <true|false=count>` /
+  `--forbid-viewspace-gate-evidence <true|false>`;
 - `--require-x3-band <band=count>` / `--forbid-x3-band <band>`.
 The generated strict post-return route command requires the positive compare
 distribution to match the requested case count, for example `matched-pass=1`,
-`match=1`, and `pass=1` for a one-case request, in addition to forbidding
-mismatch/review/fallback buckets.
-For a partial return that uses repeated `--case-id <ID>`, adjust those three
-positive distribution counts to the number of selected returned cases.
+`match=1`, `true=1` gate evidence, and `pass=1` for a one-case request, in
+addition to forbidding mismatch/review/fallback buckets and `false` gate
+evidence.
+For a partial return that uses repeated `--case-id <ID>`, adjust those positive
+distribution counts to the number of selected returned cases.
 
 For example, this fails closed if any nested compare route still has a
 view-space mismatch, even when the top-level action is an input repair:

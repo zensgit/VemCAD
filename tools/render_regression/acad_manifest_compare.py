@@ -765,6 +765,8 @@ def _write_reference_request(
         "  --forbid-status viewspace_mismatch \\",
         f"  --require-triage-bucket matched-pass={strict_pass_count} \\",
         f"  --require-viewspace-status match={strict_pass_count} \\",
+        f"  --require-viewspace-gate-evidence true={strict_pass_count} \\",
+        "  --forbid-viewspace-gate-evidence false \\",
         "  --forbid-viewspace-status mismatch \\",
         f"  --require-x3-band pass={strict_pass_count} \\",
         "  --forbid-x3-band review \\",
