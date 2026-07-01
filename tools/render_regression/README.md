@@ -511,7 +511,8 @@ codes or triage buckets.
 For example, a strict request-package job can add
 `--forbid-issue-code current_acad_matches_candidate_png` to reject a package
 where the current/rejected AutoCAD PNG is byte-identical to the VemCAD
-candidate PNG.
+candidate PNG, or `--forbid-issue-code current_acad_png_missing` to reject a
+package whose declared rejected-reference PNG cannot be read.
 Use `--require-issue-code-count <code=count>` when the job must pin the exact
 number of a known issue class, for example `returned_png_size_mismatch=1`.
 
