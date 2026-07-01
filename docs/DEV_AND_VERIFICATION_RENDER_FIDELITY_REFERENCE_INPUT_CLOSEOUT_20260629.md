@@ -1341,6 +1341,53 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 11 passed
 ```
 
+## Follow-Up Request Validation Review Routing
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Prevent warning-only request-validation issues from being hidden behind a
+  top-level `review-x3-pass` recommendation when the matched-view compare
+  itself passes.
+- Treat request-package warnings like returned-reference intake warnings:
+  visible by default as `input-review`, and optionally hard-failing with
+  `--fail-on-input-review`.
+
+Changes:
+
+- `acad_reference_request_run.py` now recommends
+  `inspect-request-package-warnings` when request validation is in `review` or
+  has warnings but no errors.
+- Warning-only request-validation case actions now use
+  `inspect-request-package-warnings` instead of the harder
+  `fix-request-package`; error cases still use `fix-request-package`.
+- `acad_artifact_route.py` classifies the new action as `input-review` and
+  ranks it with returned-reference warning review.
+- `test_reference_request_run_surfaces_request_validation_review_warnings`
+  proves a `current_acad_png_missing` warning remains visible in the top-level
+  recommendation and can become exit `2` with `--fail-on-input-review`.
+- The README documents that request-validation warnings are also covered by
+  the input-review lane.
+
+Boundary:
+
+- Operator routing/reporting hardening only.
+- No renderer change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 13 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 206 passed
+```
+
 ## Follow-Up Missing Current AutoCAD Warning Route Guard
 
 Status: implemented in this branch.
