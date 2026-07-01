@@ -243,10 +243,12 @@ failures. These fields identify the files that were checked; they are not an
 AutoCAD-equivalence proof and do not replace matched-view/X3.
 When returned AutoCAD PNGs are still missing, `acad_reference_batch.py` writes
 `missing_references.tsv` beside the JSON/Markdown report so the expected
-source DXF, optional source hash, output filenames, paths, capture method, view
-contract, and expected size can be handed off in spreadsheet form. The
-Markdown handoff shows the same source SHA column, so a human can verify source
-identity without opening JSON or TSV. The `acad_reference_request_run.py`
+source DXF, optional source hash, current/rejected AutoCAD PNG hash when
+available, output filenames, paths, capture method, view contract, and expected
+size can be handed off in spreadsheet form. The Markdown handoff shows the same
+source and current AutoCAD SHA columns, so a human can verify source identity
+and the rejected-reference sentinel without opening JSON or TSV. The
+`acad_reference_request_run.py`
 wrapper also surfaces that TSV in its run summary and artifact index when the
 request is input-blocked. The wrapper likewise surfaces
 `reference_request_validation.tsv` and `reference_intake.tsv` in its run summary

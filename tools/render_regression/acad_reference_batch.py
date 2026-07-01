@@ -1106,6 +1106,9 @@ def _write_missing_references_report(
                 "drawing_id": _str(request.get("drawing_id")),
                 "source_dxf": source_dxf,
                 "source_dxf_sha256": _str(request.get("source_dxf_sha256")),
+                "current_acad_png": _str(request.get("current_acad_png")),
+                "current_acad_png_sha256": _str(request.get("current_acad_png_sha256")),
+                "current_acad_png_size_bytes": _str(request.get("current_acad_png_size_bytes")),
                 "recommended_output_name": output_name,
                 "expected_path": str(expected_path),
                 "requested_capture_method": _str(request.get("requested_capture_method") or "plot-export"),
@@ -1128,7 +1131,8 @@ def _write_missing_references_report(
     json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     with tsv_path.open("w", encoding="utf-8") as handle:
         handle.write(
-            "id\tdrawing_id\tsource_dxf\tsource_dxf_sha256\trecommended_output_name\texpected_path\t"
+            "id\tdrawing_id\tsource_dxf\tsource_dxf_sha256\tcurrent_acad_png\t"
+            "current_acad_png_sha256\tcurrent_acad_png_size_bytes\trecommended_output_name\texpected_path\t"
             "requested_capture_method\trequested_view_contract\trequested_expected_size\n"
         )
         for item in missing:
@@ -1137,6 +1141,9 @@ def _write_missing_references_report(
                 f"{_tsv(item.get('drawing_id'))}\t"
                 f"{_tsv(item.get('source_dxf'))}\t"
                 f"{_tsv(item.get('source_dxf_sha256'))}\t"
+                f"{_tsv(item.get('current_acad_png'))}\t"
+                f"{_tsv(item.get('current_acad_png_sha256'))}\t"
+                f"{_tsv(item.get('current_acad_png_size_bytes'))}\t"
                 f"{_tsv(item['recommended_output_name'])}\t"
                 f"{_tsv(item['expected_path'])}\t"
                 f"{_tsv(item.get('requested_capture_method'))}\t"
@@ -1151,14 +1158,19 @@ def _write_missing_references_report(
         f"- missing_count: `{len(missing)}`",
         f"- missing_references_tsv: `{tsv_path}`",
         "",
-        "| Case | Drawing | Source DXF | Source SHA256 | Expected PNG | Capture | View | Expected size | Expected path |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        (
+            "| Case | Drawing | Source DXF | Source SHA256 | Current AutoCAD | "
+            "Current AutoCAD SHA256 | Expected PNG | Capture | View | Expected size | Expected path |"
+        ),
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for item in missing:
         lines.append(
             f"| {_md_code_cell(item['id'])} | {_md_table_cell(item.get('drawing_id'))} | "
             f"{_md_code_cell(item.get('source_dxf'))} | "
             f"{_md_code_cell(item.get('source_dxf_sha256'))} | "
+            f"{_md_code_cell(item.get('current_acad_png'))} | "
+            f"{_md_code_cell(item.get('current_acad_png_sha256'))} | "
             f"{_md_code_cell(item['recommended_output_name'])} | "
             f"{_md_code_cell(item.get('requested_capture_method'))} | "
             f"{_md_code_cell(item.get('requested_view_contract'))} | "
