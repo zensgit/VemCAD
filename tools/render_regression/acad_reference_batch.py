@@ -709,14 +709,13 @@ def _capture_contract_issues(case_id: str, capture_method: Any, view_contract: A
 def _size_mismatch_issue(case_id: str, label: str, declared: Any, actual: int) -> list[dict[str, str]]:
     if declared is None:
         return []
-    try:
-        declared_int = int(declared)
-    except Exception:
+    declared_int = _nonnegative_int(declared)
+    if declared_int is None:
         return [{
             "severity": "error",
             "case_id": case_id,
             "code": f"{label}_size_invalid",
-            "message": f"{label} size declaration must be an integer",
+            "message": f"{label} size declaration must be a non-negative integer",
         }]
     if declared_int != actual:
         return [{
@@ -726,6 +725,16 @@ def _size_mismatch_issue(case_id: str, label: str, declared: Any, actual: int) -
             "message": f"{label} size mismatch ({actual} != {declared_int})",
         }]
     return []
+
+
+def _nonnegative_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return None
 
 
 def _sha_mismatch_issue(case_id: str, label: str, declared: Any, actual: str) -> list[dict[str, str]]:
