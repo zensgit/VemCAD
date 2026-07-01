@@ -7,7 +7,7 @@ each golden drawing:
   2. pass-1 vs pass-2 compare lands in the `pass` band (render determinism +
      the full compare/scoring loop verified on real Linux renders).
 
-This is the genuine render→compare end-to-end the D2 PR deferred to D3.
+This is the shipped render→compare end-to-end CI gate for the golden corpus.
 """
 import argparse
 import json
