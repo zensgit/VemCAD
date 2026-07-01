@@ -185,7 +185,10 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --forbid-status blocked \
   --forbid-status review \
   --forbid-status viewspace_mismatch \
+  --require-triage-bucket matched-pass=1 \
+  --require-viewspace-status match=1 \
   --forbid-viewspace-status mismatch \
+  --require-x3-band pass=1 \
   --forbid-x3-band review \
   --forbid-x3-band fallback \
   --require-kind batch \
@@ -564,6 +567,9 @@ recommendation:
 - `--require-viewspace-status <status=count>` /
   `--forbid-viewspace-status <status>`;
 - `--require-x3-band <band=count>` / `--forbid-x3-band <band>`.
+The generated strict post-return route command requires the positive compare
+distribution `matched-pass=1`, `match=1`, and `pass=1`, in addition to
+forbidding mismatch/review/fallback buckets.
 
 For example, this fails closed if any nested compare route still has a
 view-space mismatch, even when the top-level action is an input repair:
