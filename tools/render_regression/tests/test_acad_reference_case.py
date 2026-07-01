@@ -2,6 +2,7 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -34,6 +35,8 @@ def test_case_generator_writes_valid_manifest_and_candidate_cases(tmp_path):
         "--source-dxf", dxf,
         "--acad-png", acad,
         "--ours", ours,
+        "--capture-method", "plot-export",
+        "--view-contract", "model-extents",
         "--render-report", str(report),
         "--render-image", "ghcr.io/zensgit/vemcad-render:main",
         "--diagnostic", "window_source=model-extents",
@@ -59,6 +62,27 @@ def test_case_generator_writes_valid_manifest_and_candidate_cases(tmp_path):
     ]) == 0
 
 
+def test_case_generator_requires_capture_contract(tmp_path, capsys):
+    acad = _png(tmp_path / "acad.png")
+    ours = _png(tmp_path / "ours.png")
+    dxf = _dxf(tmp_path / "B11.dxf")
+
+    with pytest.raises(SystemExit) as exc:
+        casegen.main([
+            "--case-id", "G11",
+            "--drawing-id", "G11/B11",
+            "--source-dxf", dxf,
+            "--acad-png", acad,
+            "--ours", ours,
+            "--out-dir", str(tmp_path / "case"),
+        ])
+
+    assert exc.value.code == 2
+    stderr = capsys.readouterr().err
+    assert "--capture-method" in stderr
+    assert "--view-contract" in stderr
+
+
 def test_case_generator_blocks_unreadable_autocad_png(tmp_path):
     acad = tmp_path / "acad.png"
     acad.write_text("not an image", encoding="utf-8")
@@ -71,5 +95,7 @@ def test_case_generator_blocks_unreadable_autocad_png(tmp_path):
         "--source-dxf", dxf,
         "--acad-png", str(acad),
         "--ours", ours,
+        "--capture-method", "plot-export",
+        "--view-contract", "model-extents",
         "--out-dir", str(tmp_path / "case"),
     ]) == 2

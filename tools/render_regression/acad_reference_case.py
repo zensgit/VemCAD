@@ -96,9 +96,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--acad-png", type=Path, required=True)
     parser.add_argument("--ours", type=Path, required=True, help="VemCAD candidate PNG")
     parser.add_argument("--out-dir", type=Path, required=True)
-    parser.add_argument("--capture-method", default="plot-export",
+    parser.add_argument("--capture-method", required=True,
                         choices=sorted(arm.GATE_CAPTURE_METHODS))
-    parser.add_argument("--view-contract", default="model-extents",
+    parser.add_argument("--view-contract", required=True,
                         choices=sorted(arm.MATCHED_VIEW_CONTRACTS))
     parser.add_argument("--render-report", type=Path, default=None)
     parser.add_argument("--semantic-mask", type=Path, default=None)
