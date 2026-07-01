@@ -301,6 +301,9 @@ When the request package also includes a readable `current_acad_png` path,
 request validation checks its declared SHA/size before fulfilment, so a hand
 edited or stale recapture request cannot silently weaken that rejected-reference
 reuse guard.
+If `current_acad_png` is declared but the file is not readable, request
+validation emits a `current_acad_png_missing` warning because the rejected
+reference sentinel could not be verified.
 If that current/rejected AutoCAD PNG is byte-identical to the VemCAD candidate
 PNG, request validation emits a `current_acad_matches_candidate_png` warning.
 That warning is an operator wrong-file signal only; it does not claim whether
