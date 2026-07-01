@@ -411,10 +411,45 @@ def test_batch_generator_rejects_invalid_request_case_count(tmp_path):
         "severity": "error",
         "case_id": "<request>",
         "code": "request_case_count_invalid",
-        "message": "request case_count must be an integer when present",
+        "message": "request case_count must be a non-negative integer when present",
     }]
     validation_md = (out / "reference_request_validation.md").read_text(encoding="utf-8")
     assert "request_case_count_invalid=1" in validation_md
+
+
+def test_batch_generator_rejects_bool_or_fractional_request_case_count(tmp_path):
+    for declared in (True, 1.5):
+        source = Path(_dxf(tmp_path / str(declared) / "dxf" / "G11.dxf"))
+        ours = Path(_png(tmp_path / str(declared) / "ours" / "G11.png", (760, 570)))
+        request = tmp_path / str(declared) / "reference_request.json"
+        request.write_text(json.dumps({
+            "schema": "vemcad.acad_reference_request/v1",
+            "case_count": declared,
+            "cases": [{
+                "id": "G11",
+                "drawing_id": "G11/B11",
+                "source_dxf": "dxf/G11.dxf",
+                "source_dxf_sha256": _sha256(source),
+                "candidate_png_sha256": _sha256(ours),
+                "recommended_output_name": "G11_autocad_model_extents.png",
+                "requested_capture_method": "plot-export",
+                "requested_view_contract": "model-extents",
+                "requested_expected_size": {"width": 1600, "height": 1131},
+            }],
+        }), encoding="utf-8")
+        candidates = tmp_path / str(declared) / "candidate_cases.json"
+        candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+        out = tmp_path / str(declared) / "out"
+
+        assert batch.main([
+            "--validate-request", str(request),
+            "--candidate-cases", str(candidates),
+            "--out-dir", str(out),
+        ]) == 2
+
+        validation = json.loads((out / "reference_request_validation.json").read_text(encoding="utf-8"))
+        assert validation["issue_code_counts"] == {"request_case_count_invalid": 1}
+        assert validation["issues"][0]["message"] == "request case_count must be a non-negative integer when present"
 
 
 def test_batch_generator_case_count_validation_uses_full_request_before_case_filter(tmp_path):
