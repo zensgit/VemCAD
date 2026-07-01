@@ -742,6 +742,8 @@ def _write_reference_request(
         "  --forbid-action-domain input \\",
         "  --forbid-action-domain input-review \\",
         "  --forbid-action-domain renderer-candidate \\",
+        "  --require-action-count continue-to-request-run=1 \\",
+        "  --require-action-count review-x3-pass=2 \\",
         "  --require-action-domain-count continue=1 \\",
         "  --require-action-domain-count pass-review=2 \\",
         "  --forbid-issue-code current_acad_png_missing \\",

@@ -175,6 +175,8 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --forbid-action-domain input \
   --forbid-action-domain input-review \
   --forbid-action-domain renderer-candidate \
+  --require-action-count continue-to-request-run=1 \
+  --require-action-count review-x3-pass=2 \
   --require-action-domain-count continue=1 \
   --require-action-domain-count pass-review=2 \
   --forbid-issue-code current_acad_png_missing \
@@ -440,6 +442,9 @@ exact routed action distribution. For multi-route payloads this checks
 `recommended_action_counts`; for request-run payloads it checks
 `case_action_counts`; for a single route it checks the top-level action as
 count `1`.
+The generated strict post-return route command requires
+`continue-to-request-run=1` and `review-x3-pass=2`, so the route must have the
+expected input-prep continuation plus compare/request-run pass-review actions.
 
 Use `--require-action-domain-count <domain=count>` when a workflow needs to
 assert the exact routed action-domain distribution. This is useful when an
