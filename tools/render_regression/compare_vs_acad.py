@@ -50,7 +50,14 @@ FRAMING_VERDICT = (
 )
 
 
-def _viewspace_report(acad: Path, ours: Path, result: cmp.CompareResult, framing: dict) -> dict:
+def _viewspace_report(
+    acad: Path,
+    ours: Path,
+    result: cmp.CompareResult,
+    framing: dict,
+    *,
+    require_viewspace_match: bool,
+) -> dict:
     """Machine-readable X3 view-space contract.
 
     The human CLI text is useful during a review, but G11-style work needs a
@@ -77,6 +84,8 @@ def _viewspace_report(acad: Path, ours: Path, result: cmp.CompareResult, framing
         "schema": "vemcad.x3_viewspace_contract/v1",
         "reference": str(acad),
         "candidate": str(ours),
+        "gate_mode": "require-viewspace-match" if require_viewspace_match else "diagnostic-only",
+        "gate_evidence": bool(require_viewspace_match and status == "match"),
         "status": status,
         "reason": reason,
         "recommended_action": recommended_action,
@@ -187,7 +196,13 @@ def main(argv=None) -> int:
         framing["fill_divergence_x"], framing["fill_divergence_y"], cmp.FRAMING_TOL))
     viewspace_payload = None
     if args.viewspace_report is not None or args.require_viewspace_match:
-        viewspace_payload = _viewspace_report(args.acad, args.ours, res, framing)
+        viewspace_payload = _viewspace_report(
+            args.acad,
+            args.ours,
+            res,
+            framing,
+            require_viewspace_match=args.require_viewspace_match,
+        )
         if args.viewspace_report is not None:
             args.viewspace_report.parent.mkdir(parents=True, exist_ok=True)
             args.viewspace_report.write_text(

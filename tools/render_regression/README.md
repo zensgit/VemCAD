@@ -131,7 +131,8 @@ python3 tools/render_regression/compare_vs_acad.py acad.png ours.png \
 ```
 
 `--viewspace-report` 写出 `schema=vemcad.x3_viewspace_contract/v1`，包含
-`status=match|mismatch|unavailable`、填充比、阈值、X3 summary 与建议动作。
+`status=match|mismatch|unavailable`、`gate_mode`、`gate_evidence`、填充比、
+阈值、X3 summary 与建议动作。
 `--require-viewspace-match` 在 `mismatch`/`unavailable` 时返回 `2`，用于阻止
 把不同窗 AutoCAD PNG 的低分误当成 renderer fidelity 结论。默认不加该 flag 时，
 CLI 仍保持诊断用途并返回 `0`，并在 stdout 标出
