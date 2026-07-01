@@ -572,8 +572,9 @@ recommendation:
   `--forbid-viewspace-status <status>`;
 - `--require-x3-band <band=count>` / `--forbid-x3-band <band>`.
 The generated strict post-return route command requires the positive compare
-distribution `matched-pass=1`, `match=1`, and `pass=1`, in addition to
-forbidding mismatch/review/fallback buckets.
+distribution to match the requested case count, for example `matched-pass=1`,
+`match=1`, and `pass=1` for a one-case request, in addition to forbidding
+mismatch/review/fallback buckets.
 
 For example, this fails closed if any nested compare route still has a
 view-space mismatch, even when the top-level action is an input repair:

@@ -661,6 +661,7 @@ def _write_reference_request(
         "boundary": dict(REFERENCE_REQUEST_BOUNDARY),
         "cases": cases,
     }
+    strict_pass_count = len(cases)
     _write_json(json_path, payload)
     lines = [
         "# AutoCAD Reference Recapture Request",
@@ -752,10 +753,10 @@ def _write_reference_request(
         "  --forbid-status blocked \\",
         "  --forbid-status review \\",
         "  --forbid-status viewspace_mismatch \\",
-        "  --require-triage-bucket matched-pass=1 \\",
-        "  --require-viewspace-status match=1 \\",
+        f"  --require-triage-bucket matched-pass={strict_pass_count} \\",
+        f"  --require-viewspace-status match={strict_pass_count} \\",
         "  --forbid-viewspace-status mismatch \\",
-        "  --require-x3-band pass=1 \\",
+        f"  --require-x3-band pass={strict_pass_count} \\",
         "  --forbid-x3-band review \\",
         "  --forbid-x3-band fallback \\",
         "  --require-kind batch \\",

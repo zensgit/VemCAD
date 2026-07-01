@@ -615,6 +615,49 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     }
 
 
+def test_reference_request_strict_route_counts_all_requested_cases(tmp_path):
+    rows = [
+        {
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/B11.dxf",
+            "viewspace_status": "mismatch",
+            "x3_summary": {"band": "fallback", "ink_iou": 0.1},
+            "triage_rank": 1,
+            "triage_bucket": "recapture-required",
+        },
+        {
+            "id": "G12",
+            "drawing_id": "G12/B12",
+            "source_dxf": "dxf/B12.dxf",
+            "viewspace_status": "mismatch",
+            "x3_summary": {"band": "fallback", "ink_iou": 0.2},
+            "triage_rank": 2,
+            "triage_bucket": "recapture-required",
+        },
+    ]
+
+    artifacts = harness._write_reference_request(tmp_path, rows, candidate_cases="candidate_cases.json")
+
+    assert {item["kind"] for item in artifacts} == {
+        "reference_request_json",
+        "reference_request_markdown",
+    }
+    request = json.loads((tmp_path / "reference_request.json").read_text(encoding="utf-8"))
+    assert request["case_count"] == 2
+    request_md = (tmp_path / "reference_request.md").read_text(encoding="utf-8")
+    route_block = _markdown_block_after(
+        request_md,
+        "python3 tools/render_regression/acad_artifact_route.py <next-run-dir> \\",
+    )
+    assert "--require-triage-bucket matched-pass=2" in route_block
+    assert "--require-viewspace-status match=2" in route_block
+    assert "--require-x3-band pass=2" in route_block
+    assert "--require-triage-bucket matched-pass=1" not in route_block
+    assert "--require-viewspace-status match=1" not in route_block
+    assert "--require-x3-band pass=1" not in route_block
+
+
 def test_manifest_harness_escapes_markdown_table_cells(tmp_path):
     acad = _png(tmp_path / "acad.png", size=(800, 600), box=[220, 165, 580, 435])
     ours = _png(tmp_path / "ours.png", size=(760, 570), box=[20, 15, 740, 555])
