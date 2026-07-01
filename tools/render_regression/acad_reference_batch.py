@@ -423,8 +423,8 @@ def _manifest_case(item: dict[str, Any], base: Path, index: int) -> dict[str, An
         "drawing_id": _required(item, "drawing_id", index),
         "source_dxf": _resolve(base, _required(item, "source_dxf", index)),
         "acad_png": str(acad_png),
-        "capture_method": _str(item.get("capture_method") or "plot-export"),
-        "view_contract": _str(item.get("view_contract") or "model-extents"),
+        "capture_method": _required(item, "capture_method", index),
+        "view_contract": _required(item, "view_contract", index),
         "expected_size": {
             "width": width,
             "height": height,

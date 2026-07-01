@@ -121,9 +121,11 @@ The batch helper writes the same two harness inputs:
 - `$BATCH_DIR/artifact_index.json`
 
 Relative paths inside `cases.json` resolve relative to the JSON file. Each
-AutoCAD reference PNG is opened to record the accepted reference image size as
-manifest `expected_size`; unreadable images or missing required fields fail
-closed before the comparison step.
+case must declare `capture_method` and `view_contract`; the helper does not
+silently assume `plot-export`/`model-extents`. Each AutoCAD reference PNG is
+opened to record the accepted reference image size as manifest `expected_size`
+when an explicit `expected_size` is omitted; unreadable images or missing
+required fields fail closed before the comparison step.
 
 ## Fulfill A Recapture Request
 
