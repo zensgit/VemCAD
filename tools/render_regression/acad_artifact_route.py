@@ -128,10 +128,32 @@ def _optional_int_value(payload: dict[str, Any], key: str) -> int | None:
     value = payload.get(key)
     if value is None:
         return None
-    try:
-        return int(value)
-    except Exception:
+    return _nonnegative_int(value)
+
+
+def _nonnegative_int(value: Any) -> int | None:
+    if isinstance(value, bool):
         return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return None
+
+
+def _strict_count_map(values: Any) -> dict[str, int]:
+    if not isinstance(values, dict):
+        return {}
+    counts: dict[str, int] = {}
+    for key, value in values.items():
+        key_text = str(key)
+        if not key_text:
+            continue
+        count = _nonnegative_int(value)
+        if count is None:
+            continue
+        counts[key_text] = count
+    return dict(sorted(counts.items()))
 
 
 def _normalize_recommended_action(action: Any, fallback: dict[str, str]) -> dict[str, str]:
@@ -364,9 +386,8 @@ def _sum_count_maps(routes: list[dict[str, Any]], key: str) -> dict[str, int]:
             code_text = str(code)
             if not code_text:
                 continue
-            try:
-                count_int = int(count)
-            except Exception:
+            count_int = _nonnegative_int(count)
+            if count_int is None:
                 continue
             counts[code_text] = counts.get(code_text, 0) + count_int
     return dict(sorted(counts.items()))
@@ -392,10 +413,10 @@ def _sum_int_field(routes: list[dict[str, Any]], key: str) -> int | None:
         value = route.get(key)
         if value is None:
             continue
-        try:
-            total += int(value)
-        except Exception:
+        value_int = _nonnegative_int(value)
+        if value_int is None:
             continue
+        total += value_int
         seen = True
     return total if seen else None
 
@@ -1091,10 +1112,10 @@ def _recommended_action_domain(payload: dict[str, Any]) -> str:
 def _action_domain_counts(payload: dict[str, Any]) -> dict[str, int]:
     counts = payload.get("recommended_action_domain_counts")
     if isinstance(counts, dict):
-        return {str(key): int(value) for key, value in counts.items() if str(key)}
+        return _strict_count_map(counts)
     counts = payload.get("case_action_domain_counts")
     if isinstance(counts, dict):
-        return {str(key): int(value) for key, value in counts.items() if str(key)}
+        return _strict_count_map(counts)
     domain = _recommended_action_domain(payload)
     return {domain: 1} if domain else {}
 
@@ -1102,10 +1123,10 @@ def _action_domain_counts(payload: dict[str, Any]) -> dict[str, int]:
 def _action_counts(payload: dict[str, Any]) -> dict[str, int]:
     counts = payload.get("recommended_action_counts")
     if isinstance(counts, dict):
-        return {str(key): int(value) for key, value in counts.items() if str(key)}
+        return _strict_count_map(counts)
     counts = payload.get("case_action_counts")
     if isinstance(counts, dict):
-        return {str(key): int(value) for key, value in counts.items() if str(key)}
+        return _strict_count_map(counts)
     action = _recommended_action_code(payload)
     return {action: 1} if action else {}
 
@@ -1113,7 +1134,7 @@ def _action_counts(payload: dict[str, Any]) -> dict[str, int]:
 def _status_counts(payload: dict[str, Any]) -> dict[str, int]:
     counts = payload.get("status_counts")
     if isinstance(counts, dict):
-        return {str(key): int(value) for key, value in counts.items() if str(key)}
+        return _strict_count_map(counts)
     status = str(payload.get("status") or "")
     return {status: 1} if status else {}
 
@@ -1121,7 +1142,7 @@ def _status_counts(payload: dict[str, Any]) -> dict[str, int]:
 def _kind_counts(payload: dict[str, Any]) -> dict[str, int]:
     counts = payload.get("kind_counts")
     if isinstance(counts, dict):
-        return {str(key): int(value) for key, value in counts.items() if str(key)}
+        return _strict_count_map(counts)
     kind = str(payload.get("kind") or "")
     return {kind: 1} if kind else {}
 
@@ -1129,16 +1150,13 @@ def _kind_counts(payload: dict[str, Any]) -> dict[str, int]:
 def _artifact_kind_counts(payload: dict[str, Any]) -> dict[str, int]:
     counts = payload.get("artifact_kind_counts")
     if isinstance(counts, dict):
-        return {str(key): int(value) for key, value in counts.items() if str(key)}
+        return _strict_count_map(counts)
     return {}
 
 
 def _route_count(payload: dict[str, Any]) -> int:
     if payload.get("schema") == BATCH_SCHEMA:
-        try:
-            return int(payload.get("count") or 0)
-        except Exception:
-            return 0
+        return _nonnegative_int(payload.get("count")) or 0
     return 1
 
 
@@ -1147,26 +1165,16 @@ def _optional_int(payload: dict[str, Any], *keys: str) -> int | None:
         value = payload.get(key)
         if value is None:
             continue
-        try:
-            return int(value)
-        except Exception:
-            continue
+        value_int = _nonnegative_int(value)
+        if value_int is not None:
+            return value_int
     return None
 
 
 def _final_exit_code_counts(payload: dict[str, Any]) -> dict[str, int]:
     counts = payload.get("final_exit_code_counts")
     if isinstance(counts, dict):
-        parsed: dict[str, int] = {}
-        for code, count in counts.items():
-            code_text = str(code)
-            if not code_text:
-                continue
-            try:
-                parsed[code_text] = int(count)
-            except Exception:
-                continue
-        return dict(sorted(parsed.items()))
+        return _strict_count_map(counts)
     final_exit_code = _optional_int(payload, "final_exit_code")
     return {str(final_exit_code): 1} if final_exit_code is not None else {}
 
@@ -1200,9 +1208,8 @@ def _issue_code_counts(payload: dict[str, Any]) -> dict[str, int]:
             code_text = str(code)
             if not code_text:
                 continue
-            try:
-                count_int = int(count)
-            except Exception:
+            count_int = _nonnegative_int(count)
+            if count_int is None:
                 continue
             counts[code_text] = counts.get(code_text, 0) + count_int
     return dict(sorted(counts.items()))
@@ -1225,10 +1232,10 @@ def _count_map(payload: dict[str, Any], key: str) -> dict[str, int]:
         name_text = str(name)
         if not name_text:
             continue
-        try:
-            counts[name_text] = int(count)
-        except Exception:
+        count_int = _nonnegative_int(count)
+        if count_int is None:
             continue
+        counts[name_text] = count_int
     return dict(sorted(counts.items()))
 
 
