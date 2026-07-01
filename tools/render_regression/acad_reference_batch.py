@@ -602,14 +602,13 @@ def _request_case_count_issues(data: dict[str, Any], actual_count: int) -> list[
     declared = data.get("case_count")
     if declared is None:
         return []
-    try:
-        declared_int = int(declared)
-    except Exception:
+    declared_int = _nonnegative_int(declared)
+    if declared_int is None:
         return [{
             "severity": "error",
             "case_id": "<request>",
             "code": "request_case_count_invalid",
-            "message": "request case_count must be an integer when present",
+            "message": "request case_count must be a non-negative integer when present",
         }]
     if declared_int != actual_count:
         return [{

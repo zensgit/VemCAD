@@ -343,9 +343,10 @@ If that current/rejected AutoCAD PNG is byte-identical to the VemCAD candidate
 PNG, request validation emits a `current_acad_matches_candidate_png` warning.
 That warning is an operator wrong-file signal only; it does not claim whether
 the drawing matches AutoCAD.
-If `reference_request.json` declares `case_count`, request validation checks it
-against the full unfiltered `cases[]` list before any `--case-id` selection, so
-stale or hand-edited request metadata cannot silently misstate the handoff size.
+If `reference_request.json` declares `case_count`, request validation requires a
+non-negative integer and checks it against the full unfiltered `cases[]` list
+before any `--case-id` selection, so stale or hand-edited request metadata
+cannot silently misstate the handoff size.
 It also shows the current view-space status, current X3 band, and requested
 expected size for each recapture case, so the handoff explains why a fresh
 AutoCAD export is needed and what size contract it should satisfy.
