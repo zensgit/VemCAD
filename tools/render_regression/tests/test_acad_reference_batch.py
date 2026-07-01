@@ -259,6 +259,7 @@ def test_batch_generator_escapes_reference_request_validation_markdown_table_cel
             "source_dxf": "dxf/G11.dxf",
             "source_dxf_sha256": _sha256(source),
             "recommended_output_name": "G11|acad_model_extents.png",
+            "requested_expected_size": {"width": 900, "height": 600},
         }],
     }), encoding="utf-8")
     candidates = tmp_path / "candidate_cases.json"
@@ -296,6 +297,7 @@ def test_batch_generator_can_require_reference_request_boundary(tmp_path):
             "source_dxf_sha256": _sha256(source),
             "candidate_png_sha256": _sha256(ours),
             "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_expected_size": {"width": 900, "height": 600},
         }],
     }), encoding="utf-8")
     candidates = tmp_path / "candidate_cases.json"
@@ -337,6 +339,7 @@ def test_batch_generator_validates_request_case_count(tmp_path):
             "source_dxf_sha256": _sha256(source),
             "candidate_png_sha256": _sha256(ours),
             "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_expected_size": {"width": 900, "height": 600},
         }],
     }), encoding="utf-8")
     candidates = tmp_path / "candidate_cases.json"
@@ -379,6 +382,7 @@ def test_batch_generator_rejects_invalid_request_case_count(tmp_path):
             "source_dxf_sha256": _sha256(source),
             "candidate_png_sha256": _sha256(ours),
             "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_expected_size": {"width": 1600, "height": 1131},
         }],
     }), encoding="utf-8")
     candidates = tmp_path / "candidate_cases.json"
@@ -420,12 +424,14 @@ def test_batch_generator_case_count_validation_uses_full_request_before_case_fil
                 "source_dxf_sha256": _sha256(source),
                 "candidate_png_sha256": _sha256(ours),
                 "recommended_output_name": "G11_autocad_model_extents.png",
+                "requested_expected_size": {"width": 1600, "height": 1131},
             },
             {
                 "id": "G12",
                 "drawing_id": "G12/B12",
                 "source_dxf": "dxf/G12.dxf",
                 "recommended_output_name": "G12_autocad_model_extents.png",
+                "requested_expected_size": {"width": 1600, "height": 1131},
             },
         ],
     }), encoding="utf-8")
@@ -473,6 +479,7 @@ def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(t
                 "drawing_id": "G12/B12",
                 "source_dxf": "dxf/missing.dxf",
                 "recommended_output_name": "../G11.png",
+                "requested_expected_size": {"width": 1600, "height": 1131},
             },
         ],
     }), encoding="utf-8")
@@ -541,6 +548,45 @@ def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(t
     } <= {item["kind"] for item in artifact_index["artifacts"]}
 
 
+def test_batch_generator_validation_blocks_missing_requested_expected_size(tmp_path):
+    source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
+    ours = Path(_png(tmp_path / "ours" / "G11.png", (760, 570)))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "source_dxf_sha256": _sha256(source),
+            "candidate_png_sha256": _sha256(ours),
+            "recommended_output_name": "G11_autocad_model_extents.png",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--validate-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--out-dir", str(out),
+    ]) == 2
+
+    validation = json.loads((out / "reference_request_validation.json").read_text(encoding="utf-8"))
+    assert validation["status"] == "blocked"
+    assert validation["issue_code_counts"] == {"missing_requested_expected_size": 1}
+    assert validation["cases"][0]["requested_expected_size"] == ""
+    validation_md = (out / "reference_request_validation.md").read_text(encoding="utf-8")
+    assert "missing_requested_expected_size=1" in validation_md
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert artifact_index["stage"] == "request_validation"
+    assert artifact_index["status"] == "blocked"
+    assert artifact_index["reference_request_validation_issue_code_counts"] == {
+        "missing_requested_expected_size": 1,
+    }
+
+
 def test_batch_generator_validates_current_acad_png_provenance_when_available(tmp_path):
     source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
     ours = Path(_png(tmp_path / "ours" / "G11.png", (760, 570)))
@@ -559,6 +605,7 @@ def test_batch_generator_validates_current_acad_png_provenance_when_available(tm
             "candidate_png_sha256": _sha256(ours),
             "candidate_png_size_bytes": ours.stat().st_size,
             "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_expected_size": {"width": 1600, "height": 1131},
         }],
     }), encoding="utf-8")
     candidates = tmp_path / "candidate_cases.json"
@@ -605,6 +652,7 @@ def test_batch_generator_warns_when_current_acad_png_is_declared_but_missing(tmp
             "candidate_png_sha256": _sha256(ours),
             "candidate_png_size_bytes": ours.stat().st_size,
             "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_expected_size": {"width": 1600, "height": 1131},
             "requested_capture_method": "plot-export",
             "requested_view_contract": "model-extents",
         }],
@@ -677,6 +725,7 @@ def test_batch_generator_warns_when_current_acad_matches_candidate_png(tmp_path)
             "candidate_png_sha256": _sha256(ours),
             "candidate_png_size_bytes": ours.stat().st_size,
             "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_expected_size": {"width": 1600, "height": 1131},
             "requested_capture_method": "plot-export",
             "requested_view_contract": "model-extents",
         }],
@@ -892,6 +941,7 @@ def test_batch_generator_escapes_reference_intake_markdown_table_cells(tmp_path)
             "source_dxf": "dxf/G11.dxf",
             "source_dxf_sha256": _sha256(source),
             "recommended_output_name": "G11|acad_model_extents.png",
+            "requested_expected_size": {"width": 1600, "height": 1131},
         }],
     }), encoding="utf-8")
     candidates = tmp_path / "candidate_cases.json"
@@ -1026,6 +1076,7 @@ def test_batch_generator_blocks_request_when_source_dxf_provenance_drifts(tmp_pa
             "source_dxf": "dxf/G11.dxf",
             "source_dxf_sha256": "0" * 64,
             "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_expected_size": {"width": 1600, "height": 1131},
         }],
     }), encoding="utf-8")
     candidates = tmp_path / "candidate_cases.json"
@@ -1062,6 +1113,7 @@ def test_batch_generator_blocks_request_when_candidate_png_provenance_drifts(tmp
             "source_dxf": "dxf/G11.dxf",
             "candidate_png_sha256": "f" * 64,
             "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_expected_size": {"width": 1600, "height": 1131},
         }],
     }), encoding="utf-8")
     candidates = tmp_path / "candidate_cases.json"
@@ -1241,6 +1293,7 @@ def test_batch_generator_escapes_missing_reference_markdown_table_cells(tmp_path
             "source_dxf": "dxf/G11.dxf",
             "source_dxf_sha256": _sha256(source),
             "recommended_output_name": "G11|acad_model_extents.png",
+            "requested_expected_size": {"width": 1600, "height": 1131},
         }],
     }), encoding="utf-8")
     candidates = tmp_path / "candidate_cases.json"
@@ -1274,6 +1327,7 @@ def test_batch_generator_clears_stale_missing_reports_on_successful_rerun(tmp_pa
             "drawing_id": "G11/B11",
             "source_dxf": "dxf/G11.dxf",
             "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_expected_size": {"width": 1600, "height": 1131},
         }],
     }), encoding="utf-8")
     candidates = tmp_path / "candidate_cases.json"
@@ -1322,12 +1376,14 @@ def test_batch_generator_fulfills_subset_of_reference_request(tmp_path):
                 "drawing_id": "G11/B11",
                 "source_dxf": "dxf/G11.dxf",
                 "recommended_output_name": "G11_autocad_model_extents.png",
+                "requested_expected_size": {"width": 1600, "height": 1131},
             },
             {
                 "id": "G04",
                 "drawing_id": "G04/B04",
                 "source_dxf": "dxf/G04.dxf",
                 "recommended_output_name": "G04_autocad_model_extents.png",
+                "requested_expected_size": {"width": 1600, "height": 1131},
             },
         ],
     }), encoding="utf-8")
@@ -1372,6 +1428,7 @@ def test_batch_generator_intake_warns_on_low_resolution_or_non_white_png(tmp_pat
             "drawing_id": "G11/B11",
             "source_dxf": "dxf/G11.dxf",
             "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_expected_size": {"width": 900, "height": 600},
         }],
     }), encoding="utf-8")
     candidates = tmp_path / "candidate_cases.json"
@@ -1428,6 +1485,7 @@ def test_batch_generator_can_fail_closed_on_input_review_warnings(tmp_path):
             "drawing_id": "G11/B11",
             "source_dxf": "dxf/G11.dxf",
             "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_expected_size": {"width": 900, "height": 600},
         }],
     }), encoding="utf-8")
     candidates = tmp_path / "candidate_cases.json"
@@ -1468,6 +1526,7 @@ def test_batch_generator_intake_warns_on_candidate_returned_ink_aspect_divergenc
             "drawing_id": "G11/B11",
             "source_dxf": "dxf/G11.dxf",
             "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_expected_size": {"width": 1600, "height": 1131},
         }],
     }), encoding="utf-8")
     candidates = tmp_path / "candidate_cases.json"
@@ -1507,6 +1566,7 @@ def test_batch_generator_intake_warns_on_blank_returned_reference(tmp_path):
             "drawing_id": "G11/B11",
             "source_dxf": "dxf/G11.dxf",
             "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_expected_size": {"width": 1600, "height": 1131},
         }],
     }), encoding="utf-8")
     candidates = tmp_path / "candidate_cases.json"
@@ -1547,6 +1607,7 @@ def test_batch_generator_intake_warns_on_blank_candidate_render(tmp_path):
             "drawing_id": "G11/B11",
             "source_dxf": "dxf/G11.dxf",
             "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_expected_size": {"width": 1600, "height": 1131},
         }],
     }), encoding="utf-8")
     candidates = tmp_path / "candidate_cases.json"
