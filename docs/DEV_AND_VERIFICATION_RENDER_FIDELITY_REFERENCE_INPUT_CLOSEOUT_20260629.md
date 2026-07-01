@@ -1341,6 +1341,45 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 11 passed
 ```
 
+## Follow-Up Missing Current AutoCAD Warning Route Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Prove the existing route-level issue-code guard can fail closed on
+  `current_acad_png_missing`.
+- Give strict CI jobs a direct guard for rejecting request packages whose
+  declared rejected-reference PNG cannot be read.
+
+Changes:
+
+- `test_cli_forbid_missing_current_acad_warning` asserts
+  `acad_artifact_route.py --forbid-issue-code current_acad_png_missing` exits
+  `2` and reports the exact issue count when the warning appears in routed
+  request-validation counts.
+- The README documents the strict guard example beside
+  `current_acad_matches_candidate_png`.
+
+Boundary:
+
+- Guard coverage/documentation only; `--forbid-issue-code` already existed.
+- No route priority change.
+- No renderer change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# 75 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 205 passed
+```
+
 ## Follow-Up Missing Current AutoCAD Path Warning
 
 Status: implemented in this branch.
