@@ -1464,6 +1464,53 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
 # 29 passed
 ```
 
+## Follow-Up Strict Route Status Distribution Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let route checks assert an exact routed status distribution, not only require
+  or forbid known status names.
+- Make generated post-return strict route commands prove the expected successful
+  three-artifact shape: input-prep, compare, and request-run all at
+  `status=pass`.
+- Catch future unknown or renamed status values that would not be covered by
+  the existing forbid list.
+
+Changes:
+
+- `acad_artifact_route.py` adds repeatable
+  `--require-status-count <status=count>`.
+- Generated `reference_request.md` strict route commands now include
+  `--require-status-count pass=3`.
+- The README strict route example and status-guard documentation describe the
+  exact `pass=3` requirement.
+- Regression coverage proves:
+  - `--require-status-count pass=3` succeeds for three routed pass artifacts;
+  - a `pass=1, review=1` route fails with a status-count mismatch;
+  - generated handoff Markdown and the request-run strict helper carry the
+    same status-count guard.
+
+Boundary:
+
+- Route assertion / generated operator command hardening only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_artifact_route.py \
+  tools/render_regression/tests/test_acad_manifest_compare.py \
+  tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 102 passed
+```
+
 ## Follow-Up Strict Action-Domain Distribution Guard
 
 Status: implemented in this branch.

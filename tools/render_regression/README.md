@@ -179,6 +179,7 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --require-action-domain-count pass-review=2 \
   --forbid-issue-code current_acad_png_missing \
   --forbid-issue-code current_acad_matches_candidate_png \
+  --require-status-count pass=3 \
   --forbid-status blocked \
   --forbid-status review \
   --forbid-status viewspace_mismatch \
@@ -469,6 +470,9 @@ artifact in a supposedly ready batch.
 The generated strict post-return route command forbids `blocked`, `review`, and
 `viewspace_mismatch`, so a route cannot pass merely because the top-level action
 domain or issue-code counts look acceptable.
+Use `--require-status-count <status=count>` when the exact distribution matters.
+The generated strict command requires `pass=3`, proving that input-prep,
+compare, and wrapper artifacts all reached pass status.
 
 Use `--require-kind <kind>` / `--forbid-kind <kind>` when a workflow needs to
 assert the routed artifact topology itself. This catches incomplete recursive
