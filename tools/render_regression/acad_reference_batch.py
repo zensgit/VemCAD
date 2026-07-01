@@ -411,14 +411,13 @@ def _manifest_case(item: dict[str, Any], base: Path, index: int) -> dict[str, An
     case_id = _required(item, "id", index)
     acad_png = Path(_resolve(base, _required(item, "acad_png", index)))
     expected_size = item.get("expected_size")
-    if isinstance(expected_size, dict):
-        width = int(expected_size["width"])
-        height = int(expected_size["height"])
-    elif isinstance(expected_size, (list, tuple)) and len(expected_size) == 2:
-        width = int(expected_size[0])
-        height = int(expected_size[1])
-    else:
+    if expected_size is None:
         width, height = _image_size(acad_png)
+    else:
+        dimensions = _expected_size_dimensions(expected_size)
+        if dimensions is None:
+            raise ValueError(f"case {index}: expected_size must contain positive integer width and height")
+        width, height = dimensions
     return {
         "id": case_id,
         "drawing_id": _required(item, "drawing_id", index),
