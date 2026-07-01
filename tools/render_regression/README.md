@@ -362,6 +362,10 @@ inside these generated output directories if they need to survive a rerun.
   an opt-in input-review hard failure returned exit `2`.
 - when the routed source artifact already contains a human-readable action
   report, route reports also surface it as `action_artifact`.
+- for request-run artifacts, route text and Markdown also print the per-case
+  `case_actions` rows, including compact evidence such as `current_acad=...`,
+  so the top-level route report remains useful even before opening
+  `run_summary.md`.
 - every recommended action also carries `domain`, such as `input`,
   `renderer-candidate`, `pass-review`, or `continue`, so unattended jobs can
   distinguish "get better AutoCAD input" from "inspect renderer output" without

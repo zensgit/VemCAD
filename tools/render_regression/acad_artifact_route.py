@@ -585,6 +585,26 @@ def _md_code_cell(value: Any) -> str:
     return f"{delimiter}{text}{delimiter}"
 
 
+def _case_action_line(action: dict[str, Any]) -> str:
+    parts = [
+        str(action.get("id") or "<missing>"),
+        str(action.get("code") or "<missing>"),
+    ]
+    for label, key in (
+        ("domain", "domain"),
+        ("source", "source"),
+        ("issue_codes", "issue_codes"),
+        ("evidence", "evidence"),
+    ):
+        value = str(action.get(key) or "")
+        if value:
+            parts.append(f"{label}={value}")
+    artifact = str(action.get("artifact_resolved") or action.get("artifact") or "")
+    if artifact:
+        parts.append(f"artifact={artifact}")
+    return "; ".join(parts)
+
+
 def _write_text(route: dict[str, Any]) -> str:
     action = route.get("recommended_next_action") or {}
     source_boundary = route.get("artifact_index_boundary") or {}
@@ -628,6 +648,9 @@ def _write_text(route: dict[str, Any]) -> str:
         lines.append(f"case_action_domain_counts: {_format_counts(route['case_action_domain_counts'])}")
     if route.get("case_action_issue_code_counts"):
         lines.append(f"case_action_issue_code_counts: {_format_counts(route['case_action_issue_code_counts'])}")
+    for action in route.get("case_actions") or []:
+        if isinstance(action, dict):
+            lines.append(f"case_action: {_case_action_line(action)}")
     if route.get("route_count") is not None:
         lines.append(f"route_count: {route.get('route_count')}")
     if route.get("route_kind_counts"):
@@ -906,6 +929,26 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         lines.append(f"- viewspace_status_counts: {_md_code_cell(_format_counts(route['viewspace_status_counts']))}")
     if route.get("x3_band_counts"):
         lines.append(f"- x3_band_counts: {_md_code_cell(_format_counts(route['x3_band_counts']))}")
+    case_actions = [item for item in route.get("case_actions") or [] if isinstance(item, dict)]
+    if case_actions:
+        lines.extend([
+            "",
+            "### Case Actions",
+            "",
+            "| Case | Action | Domain | Source | Issue codes | Evidence | Artifact |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
+        ])
+        for action_item in case_actions:
+            artifact = action_item.get("artifact_resolved") or action_item.get("artifact") or ""
+            lines.append(
+                f"| {_md_code_cell(action_item.get('id', ''))} | "
+                f"{_md_code_cell(action_item.get('code', ''))} | "
+                f"{_md_code_cell(action_item.get('domain', ''))} | "
+                f"{_md_code_cell(action_item.get('source', ''))} | "
+                f"{_md_code_cell(action_item.get('issue_codes', ''))} | "
+                f"{_md_code_cell(action_item.get('evidence', ''))} | "
+                f"{_md_code_cell(artifact)} |"
+            )
     return "\n".join(lines)
 
 

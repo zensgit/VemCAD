@@ -275,7 +275,11 @@ def test_routes_run_case_actions(tmp_path):
         "case_actions": [{
             "id": "G11",
             "code": "recapture-autocad-or-provide-window",
+            "domain": "input",
+            "source": "missing_references",
             "issue_codes": "warning:corner_background_not_white, warning:long_edge_below_requested",
+            "evidence": "current_acad=abc123def456:42; source=feedface9999:99",
+            "artifact": "input/missing_references.md",
         }],
         "artifacts": [],
     })
@@ -346,6 +350,12 @@ def test_routes_run_case_actions(tmp_path):
         "case_action_issue_code_counts: warning:corner_background_not_white=1, "
         "warning:long_edge_below_requested=1"
     ) in text
+    assert (
+        "case_action: G11; recapture-autocad-or-provide-window; domain=input; "
+        "source=missing_references"
+    ) in text
+    assert "evidence=current_acad=abc123def456:42; source=feedface9999:99" in text
+    assert "artifact=input/missing_references.md" in text
     assert "final_exit_code: 2" in text
     assert "route_count: 3" in text
     assert "route_kind_counts: batch=1, compare=1, request_run=1" in text
@@ -374,6 +384,13 @@ def test_routes_run_case_actions(tmp_path):
         "- case_action_issue_code_counts: `warning:corner_background_not_white=1, "
         "warning:long_edge_below_requested=1`"
     ) in markdown
+    assert "### Case Actions" in markdown
+    assert (
+        "| `G11` | `recapture-autocad-or-provide-window` | `input` | "
+        "`missing_references` |"
+    ) in markdown
+    assert "`current_acad=abc123def456:42; source=feedface9999:99`" in markdown
+    assert "`input/missing_references.md`" in markdown
     assert "- route_count: `3`" in markdown
     assert "- route_final_exit_code_counts: `0=2, 2=1`" in markdown
     assert "- route_triage_bucket_counts: `matched-pass=1, recapture-required=1`" in markdown
