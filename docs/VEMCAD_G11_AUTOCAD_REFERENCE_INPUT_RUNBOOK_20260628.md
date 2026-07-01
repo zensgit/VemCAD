@@ -63,6 +63,8 @@ python3 tools/render_regression/acad_reference_case.py \
   --source-dxf /tmp/vacadbatchinputs/B11.dxf \
   --acad-png /path/to/autocad_model_extents.png \
   --ours /path/to/G11_ours.png \
+  --capture-method plot-export \
+  --view-contract model-extents \
   --render-report /path/to/G11_report.json \
   --semantic-mask /path/to/G11_semantic_mask.png \
   --semantic-report /path/to/G11_report.json \
