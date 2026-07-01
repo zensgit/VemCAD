@@ -163,6 +163,7 @@ def test_routes_prioritize_blocked_returned_reference_input_over_renderer_candid
         "compared_count": 1,
         "triage_bucket_counts": {"renderer-candidate": 1},
         "viewspace_status_counts": {"match": 1},
+        "viewspace_gate_evidence_counts": {"true": 1},
         "x3_band_counts": {"fail": 1},
         "artifacts": [
             {"kind": "summary_markdown", "path": "compare/summary.md"},
@@ -248,6 +249,10 @@ def test_routes_run_case_actions(tmp_path):
             "match": 1,
             "mismatch": 1,
         },
+        "route_viewspace_gate_evidence_counts": {
+            "false": 1,
+            "true": 1,
+        },
         "route_x3_band_counts": {
             "fallback": 1,
             "pass": 1,
@@ -320,6 +325,10 @@ def test_routes_run_case_actions(tmp_path):
         "match": 1,
         "mismatch": 1,
     }
+    assert payload["route_viewspace_gate_evidence_counts"] == {
+        "false": 1,
+        "true": 1,
+    }
     assert payload["route_x3_band_counts"] == {
         "fallback": 1,
         "pass": 1,
@@ -363,6 +372,7 @@ def test_routes_run_case_actions(tmp_path):
     assert "route_compare_case_count: 2" in text
     assert "route_triage_bucket_counts: matched-pass=1, recapture-required=1" in text
     assert "route_viewspace_status_counts: match=1, mismatch=1" in text
+    assert "route_viewspace_gate_evidence_counts: false=1, true=1" in text
     assert "route_x3_band_counts: fallback=1, pass=1" in text
     assert "route_compare_issue_code_counts: diagnostic_capture_method=1" in text
     assert "reference_request_validation_status: blocked" in text
@@ -394,6 +404,7 @@ def test_routes_run_case_actions(tmp_path):
     assert "- route_count: `3`" in markdown
     assert "- route_final_exit_code_counts: `0=2, 2=1`" in markdown
     assert "- route_triage_bucket_counts: `matched-pass=1, recapture-required=1`" in markdown
+    assert "- route_viewspace_gate_evidence_counts: `false=1, true=1`" in markdown
     assert "- route_compare_issue_code_counts: `diagnostic_capture_method=1`" in markdown
     assert "- reference_request_validation_errors: `1`" in markdown
     assert "- reference_request_validation_warnings: `0`" in markdown
@@ -2531,6 +2542,7 @@ def test_routes_compare_renderer_candidate_before_recapture(tmp_path):
             "renderer-candidate": 1,
         },
         "viewspace_status_counts": {"match": 1, "mismatch": 1},
+        "viewspace_gate_evidence_counts": {"false": 1, "true": 1},
         "x3_band_counts": {"fail": 1, "fallback": 1},
         "issue_code_counts": {"diagnostic_capture_method": 1},
         "artifacts": [],
@@ -2547,17 +2559,20 @@ def test_routes_compare_renderer_candidate_before_recapture(tmp_path):
     assert payload["recommended_next_action"]["domain"] == "renderer-candidate"
     assert payload["triage_bucket_counts"]["renderer-candidate"] == 1
     assert payload["viewspace_status_counts"] == {"match": 1, "mismatch": 1}
+    assert payload["viewspace_gate_evidence_counts"] == {"false": 1, "true": 1}
     assert payload["x3_band_counts"] == {"fail": 1, "fallback": 1}
     assert payload["compare_issue_code_counts"] == {"diagnostic_capture_method": 1}
     assert "case_count: 2" in text
     assert "compared_count: 2" in text
     assert "compare_issue_code_counts: diagnostic_capture_method=1" in text
     assert "viewspace_status_counts: match=1, mismatch=1" in text
+    assert "viewspace_gate_evidence_counts: false=1, true=1" in text
     assert "x3_band_counts: fail=1, fallback=1" in text
     assert "- case_count: `2`" in markdown
     assert "- compared_count: `2`" in markdown
     assert "- compare_issue_code_counts: `diagnostic_capture_method=1`" in markdown
     assert "- viewspace_status_counts: `match=1, mismatch=1`" in markdown
+    assert "- viewspace_gate_evidence_counts: `false=1, true=1`" in markdown
     assert "- x3_band_counts: `fail=1, fallback=1`" in markdown
 
 
@@ -2611,6 +2626,7 @@ def test_batch_route_prioritizes_input_repairs_before_renderer_candidates(tmp_pa
         "compared_count": 1,
         "triage_bucket_counts": {"renderer-candidate": 1},
         "viewspace_status_counts": {"match": 1},
+        "viewspace_gate_evidence_counts": {"true": 1},
         "x3_band_counts": {"fail": 1},
         "issue_code_counts": {"candidate_case_missing": 1},
         "artifacts": [],
@@ -2635,6 +2651,7 @@ def test_batch_route_prioritizes_input_repairs_before_renderer_candidates(tmp_pa
     assert payload["compared_count"] == 1
     assert payload["triage_bucket_counts"] == {"renderer-candidate": 1}
     assert payload["viewspace_status_counts"] == {"match": 1}
+    assert payload["viewspace_gate_evidence_counts"] == {"true": 1}
     assert payload["x3_band_counts"] == {"fail": 1}
     assert payload["compare_issue_code_counts"] == {"candidate_case_missing": 1}
     assert "compare_case_count: 1" in text
@@ -2642,12 +2659,14 @@ def test_batch_route_prioritizes_input_repairs_before_renderer_candidates(tmp_pa
     assert "compare_issue_code_counts: candidate_case_missing=1" in text
     assert "triage_bucket_counts: renderer-candidate=1" in text
     assert "viewspace_status_counts: match=1" in text
+    assert "viewspace_gate_evidence_counts: true=1" in text
     assert "x3_band_counts: fail=1" in text
     assert "- compare_case_count: `1`" in markdown
     assert "- compared_count: `1`" in markdown
     assert "- compare_issue_code_counts: `candidate_case_missing=1`" in markdown
     assert "- triage_bucket_counts: `renderer-candidate=1`" in markdown
     assert "- viewspace_status_counts: `match=1`" in markdown
+    assert "- viewspace_gate_evidence_counts: `true=1`" in markdown
     assert "- x3_band_counts: `fail=1`" in markdown
 
 
