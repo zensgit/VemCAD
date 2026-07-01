@@ -48,6 +48,14 @@ def _markdown_block_after(markdown: str, marker: str) -> str:
     return markdown[start:end]
 
 
+def _command_flag_lines(block: str) -> list[str]:
+    return [
+        line.strip().rstrip("\\").strip()
+        for line in block.splitlines()[1:]
+        if line.strip()
+    ]
+
+
 def _readme_route_example_block() -> str:
     readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
     return _markdown_block_after(
@@ -159,6 +167,30 @@ def test_readme_recapture_route_example_documents_handoff_guards():
         "--require-action-artifact-exists",
     ]:
         assert expected in block
+
+
+def test_readme_strict_route_example_matches_generated_request_command(tmp_path):
+    acad = _png(tmp_path / "acad.png", size=(760, 570), box=[20, 15, 740, 555])
+    ours = _png(tmp_path / "ours.png", size=(760, 570), box=[20, 15, 740, 555])
+    dxf = _dxf(tmp_path / "B11.dxf")
+    harness._write_reference_request(tmp_path, [{
+        "id": "G11",
+        "drawing_id": "G11/B11",
+        "source_dxf": dxf,
+        "acad_png": acad,
+        "ours": ours,
+        "expected_size": {"width": 760, "height": 570},
+        "viewspace_status": "mismatch",
+        "x3_summary": {"band": "fallback", "ink_iou": 0.5},
+    }], candidate_cases="candidate_cases.json")
+
+    request_md = (tmp_path / "reference_request.md").read_text(encoding="utf-8")
+    generated_block = _markdown_block_after(
+        request_md,
+        "python3 tools/render_regression/acad_artifact_route.py <next-run-dir> \\",
+    )
+
+    assert _command_flag_lines(_readme_route_example_block()) == _command_flag_lines(generated_block)
 
 
 def test_readme_recapture_request_run_example_documents_input_review_guard():
