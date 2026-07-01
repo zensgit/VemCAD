@@ -1399,6 +1399,11 @@ def main(argv: list[str] | None = None) -> int:
                         help="exit 2 unless routed artifact kind counts include this artifact kind; may repeat")
     parser.add_argument("--forbid-artifact-kind", action="append", default=[],
                         help="exit 2 if routed artifact kind counts include this artifact kind; may repeat")
+    parser.add_argument("--require-artifact-kind-count", action="append", default=[],
+                        help=(
+                            "exit 2 unless routed artifact kind counts contain kind=count; "
+                            "may repeat"
+                        ))
     parser.add_argument("--require-route-count", type=int,
                         help="exit 2 unless the routed artifact-index count exactly matches this value")
     parser.add_argument("--require-compare-case-count", type=int,
@@ -1497,6 +1502,9 @@ def main(argv: list[str] | None = None) -> int:
         ]
         final_exit_code_count_expectations = [
             _parse_count_expectation(item) for item in args.require_final_exit_code_count
+        ]
+        artifact_kind_count_expectations = [
+            _parse_count_expectation(item) for item in args.require_artifact_kind_count
         ]
         issue_code_count_expectations = [
             _parse_count_expectation(item) for item in args.require_issue_code_count
@@ -1723,13 +1731,30 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
-    if args.require_artifact_kind or args.forbid_artifact_kind:
+    if args.require_artifact_kind or args.forbid_artifact_kind or artifact_kind_count_expectations:
         counts = _artifact_kind_counts(payload)
         missing = [kind for kind in args.require_artifact_kind if not counts.get(kind, 0)]
         if missing:
             print(
                 "acad_artifact_route: required artifact kind missing: "
                 + ", ".join(missing),
+                file=sys.stderr,
+            )
+            print(
+                "acad_artifact_route: artifact kind counts: "
+                + _format_counts(counts),
+                file=sys.stderr,
+            )
+            return 2
+        failures = _check_count_guards(
+            label="artifact kind",
+            counts=counts,
+            required=artifact_kind_count_expectations,
+            forbidden=[],
+        )
+        if failures:
+            print(
+                "acad_artifact_route: " + "; ".join(failures),
                 file=sys.stderr,
             )
             print(

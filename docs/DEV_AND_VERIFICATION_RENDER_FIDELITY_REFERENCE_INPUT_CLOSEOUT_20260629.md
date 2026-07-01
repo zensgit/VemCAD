@@ -1551,6 +1551,52 @@ python3 -m pytest \
 # 25 passed
 ```
 
+## Follow-Up Strict Artifact-Kind Distribution Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Let route checks assert exact handoff artifact-kind counts, not only artifact
+  kind presence.
+- Make generated post-return strict route commands fail closed on stale,
+  duplicated, or incomplete operator artifact bundles.
+
+Changes:
+
+- `acad_artifact_route.py` adds repeatable
+  `--require-artifact-kind-count <kind=count>`.
+- Generated `reference_request.md` strict route commands now require:
+  - `reference_request_validation_tsv=2`;
+  - `reference_intake_tsv=2`;
+  - `case_actions_tsv=1`;
+  - `summary_tsv=1`.
+- The counts match the existing strict handoff surface:
+  input batch and wrapper both surface validation/intake TSVs, while
+  case-actions and compare summary TSVs appear once.
+- README and strict helper tests now carry the same exact artifact-kind
+  distribution.
+
+Boundary:
+
+- Route assertion / generated operator command hardening only.
+- No artifact schema change.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_artifact_route.py \
+  tools/render_regression/tests/test_acad_manifest_compare.py \
+  tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 104 passed
+```
+
 ## Follow-Up Strict Action-Domain Distribution Guard
 
 Status: implemented in this branch.
