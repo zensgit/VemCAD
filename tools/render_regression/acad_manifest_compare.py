@@ -42,8 +42,18 @@ REFERENCE_REQUEST_BOUNDARY = {
 }
 
 
+def _nonnegative_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return None
+
+
 def _artifact_index_boundary(report: dict[str, Any] | None) -> dict[str, bool]:
-    compared_count = int((report or {}).get("compared_count") or 0)
+    compared_count = _nonnegative_int((report or {}).get("compared_count")) or 0
     return {
         "renders_dxf": False,
         "compares_renders": compared_count > 0,
