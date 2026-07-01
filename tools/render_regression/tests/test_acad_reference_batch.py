@@ -641,6 +641,21 @@ def test_batch_generator_warns_when_current_acad_png_is_declared_but_missing(tmp
         "current_acad_png_missing": 1,
     }
 
+    fail_out = tmp_path / "fail-out"
+    assert batch.main([
+        "--validate-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--fail-on-input-review",
+        "--out-dir", str(fail_out),
+    ]) == 2
+    fail_artifact_index = json.loads((fail_out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert fail_artifact_index["status"] == "review"
+    assert fail_artifact_index["final_exit_code"] == 2
+    assert fail_artifact_index["fail_on_input_review"] is True
+    assert fail_artifact_index["reference_request_validation_issue_code_counts"] == {
+        "current_acad_png_missing": 1,
+    }
+
 
 def test_batch_generator_warns_when_current_acad_matches_candidate_png(tmp_path):
     source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
