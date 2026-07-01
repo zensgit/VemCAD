@@ -97,7 +97,10 @@ def _manifest(
 
 
 def test_readme_recapture_route_example_documents_handoff_guards():
+    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
     block = _readme_route_example_block()
+    assert "For a partial return that uses repeated `--case-id <ID>`" in readme
+    assert "number of selected returned cases" in readme
     for expected in [
         "--require-source-boundary autocad_equivalence_claim=false",
         "--require-request-boundary autocad_equivalence_claim=false",
@@ -600,6 +603,8 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     ]:
         assert expected in route_block
     assert f"--candidate-cases {candidates}" in request_md
+    assert "For a partial return, repeat `--case-id <ID>`" in request_md
+    assert "with the number of selected returned cases" in request_md
     assert "viewspace_mismatch` still exits `2`" in request_md
     assert "`mismatch`" in request_md
     assert "`fallback`" in request_md
