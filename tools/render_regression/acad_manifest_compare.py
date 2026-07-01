@@ -771,6 +771,7 @@ def _write_reference_request(
         "  --require-artifact-kind-count summary_tsv=1 \\",
         "  --require-route-count 3 \\",
         "  --require-final-exit-code-count 0=2 \\",
+        "  --forbid-final-exit-code 2 \\",
         "  --require-action-artifact-exists",
         "```",
         "",

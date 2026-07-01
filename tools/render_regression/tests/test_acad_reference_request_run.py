@@ -225,6 +225,8 @@ def _strict_post_return_route_args(out: Path) -> list[str]:
         "3",
         "--require-final-exit-code-count",
         "0=2",
+        "--forbid-final-exit-code",
+        "2",
         "--require-action-artifact-exists",
     ]
 
