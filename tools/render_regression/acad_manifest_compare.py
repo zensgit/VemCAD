@@ -791,12 +791,13 @@ def _write_reference_request(
 
 def _triage_bucket(row: dict[str, Any]) -> str:
     status = _str(row.get("viewspace_status"))
+    gate_evidence = bool(row.get("viewspace_gate_evidence"))
     band = _str((row.get("x3_summary") or {}).get("band"))
-    if status == "match" and band != "pass":
+    if status == "match" and gate_evidence and band != "pass":
         return "renderer-candidate"
     if status == "mismatch":
         return "recapture-required"
-    if status == "match":
+    if status == "match" and gate_evidence:
         return "matched-pass"
     return "input-review"
 
@@ -885,6 +886,8 @@ def _compare_case(case: dict[str, Any], candidate: dict[str, Any], out_dir: Path
         "overlay": str(overlay) if overlay.is_file() else "",
         "viewspace_report": str(viewspace),
         "viewspace_status": view_payload["status"],
+        "viewspace_gate_mode": view_payload.get("gate_mode", ""),
+        "viewspace_gate_evidence": bool(view_payload.get("gate_evidence")),
         "viewspace_reason": view_payload["reason"],
         "recommended_action": view_payload["recommended_action"],
         "x3_summary": view_payload["x3_summary"],
