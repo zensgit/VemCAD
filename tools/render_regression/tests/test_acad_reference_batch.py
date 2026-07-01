@@ -588,6 +588,60 @@ def test_batch_generator_validates_current_acad_png_provenance_when_available(tm
     assert _sha256(current) in validation_tsv
 
 
+def test_batch_generator_warns_when_current_acad_matches_candidate_png(tmp_path):
+    source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
+    ours = Path(_png(tmp_path / "ours" / "G11.png", (760, 570), box=[20, 15, 740, 555]))
+    current = tmp_path / "acad" / "G11_rejected.png"
+    current.parent.mkdir(parents=True, exist_ok=True)
+    current.write_bytes(ours.read_bytes())
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "source_dxf_sha256": _sha256(source),
+            "current_acad_png": "acad/G11_rejected.png",
+            "current_acad_png_sha256": _sha256(current),
+            "current_acad_png_size_bytes": current.stat().st_size,
+            "candidate_png_sha256": _sha256(ours),
+            "candidate_png_size_bytes": ours.stat().st_size,
+            "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_capture_method": "plot-export",
+            "requested_view_contract": "model-extents",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--validate-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--out-dir", str(out),
+    ]) == 0
+
+    validation = json.loads((out / "reference_request_validation.json").read_text(encoding="utf-8"))
+    assert validation["status"] == "review"
+    assert validation["error_count"] == 0
+    assert validation["warning_count"] == 1
+    assert validation["issue_code_counts"] == {"current_acad_matches_candidate_png": 1}
+    issue = validation["cases"][0]["issues"][0]
+    assert issue["severity"] == "warning"
+    assert issue["code"] == "current_acad_matches_candidate_png"
+    validation_md = (out / "reference_request_validation.md").read_text(encoding="utf-8")
+    assert "warning:current_acad_matches_candidate_png" in validation_md
+    validation_tsv = (out / "reference_request_validation.tsv").read_text(encoding="utf-8")
+    assert "warning:current_acad_matches_candidate_png" in validation_tsv
+    artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
+    assert artifact_index["status"] == "review"
+    assert artifact_index["warning_count"] == 1
+    assert artifact_index["reference_request_validation_issue_code_counts"] == {
+        "current_acad_matches_candidate_png": 1,
+    }
+
+
 def test_batch_generator_fulfills_reference_request(tmp_path):
     source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
     _png(tmp_path / "ours" / "G11.png", (760, 570), box=[20, 15, 740, 555])

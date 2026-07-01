@@ -895,6 +895,21 @@ def _write_reference_request_validation_report(
                         candidate_provenance["size_bytes"],
                     ))
 
+        if (
+            current_acad_provenance is not None
+            and candidate_provenance is not None
+            and current_acad_provenance.get("sha256") == candidate_provenance.get("sha256")
+        ):
+            row_issues.append({
+                "severity": "warning",
+                "case_id": case_id,
+                "code": "current_acad_matches_candidate_png",
+                "message": (
+                    "current_acad_png is byte-identical to the VemCAD candidate PNG; "
+                    "verify the rejected AutoCAD reference was not bound to the candidate render"
+                ),
+            })
+
         expected_size = request.get("requested_expected_size") or request.get("expected_size")
         row_issues.extend(_expected_size_issues(case_id, expected_size))
         row_issues.extend(_capture_contract_issues(
