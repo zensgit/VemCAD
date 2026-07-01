@@ -419,6 +419,7 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path, capsys):
     assert artifact_index["triage_bucket_counts"] == {"matched-pass": 1}
     assert artifact_index["recommended_action_domain_counts"] == {"pass-review": 1}
     assert artifact_index["viewspace_status_counts"] == {"match": 1}
+    assert artifact_index["viewspace_gate_evidence_counts"] == {"true": 1}
     assert artifact_index["x3_band_counts"] == {"pass": 1}
     assert {item["kind"] for item in artifact_index["artifacts"]} >= {
         "summary_json",
@@ -515,6 +516,7 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert artifact_index["triage_bucket_counts"] == {"recapture-required": 1}
     assert artifact_index["recommended_action_domain_counts"] == {"input": 1}
     assert artifact_index["viewspace_status_counts"] == {"mismatch": 1}
+    assert artifact_index["viewspace_gate_evidence_counts"] == {"false": 1}
     assert artifact_index["x3_band_counts"] == {"fallback": 1}
     route_summary = json.loads((out / "route_summary.json").read_text(encoding="utf-8"))
     route_summary_md = (out / "route_summary.md").read_text(encoding="utf-8")
