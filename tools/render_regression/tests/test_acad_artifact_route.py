@@ -2098,6 +2098,31 @@ def test_cli_forbid_issue_code_fails_closed_when_present(tmp_path, capsys):
     assert "issue code counts: corner_background_not_white=2" in stderr
 
 
+def test_cli_forbid_current_acad_candidate_identity_warning(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "request_validation",
+        "status": "review",
+        "case_count": 1,
+        "reference_request_validation_issue_code_counts": {
+            "current_acad_matches_candidate_png": 1,
+        },
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        "--forbid-issue-code",
+        "current_acad_matches_candidate_png",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "forbidden issue code present: current_acad_matches_candidate_png=1" in stderr
+    assert "issue code counts: current_acad_matches_candidate_png=1" in stderr
+
+
 def test_cli_require_source_boundary_passes_when_all_routes_match(tmp_path):
     input_dir = tmp_path / "input"
     compare_dir = tmp_path / "compare"

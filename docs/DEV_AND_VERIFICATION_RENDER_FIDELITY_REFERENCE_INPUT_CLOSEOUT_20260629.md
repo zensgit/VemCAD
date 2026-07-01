@@ -1341,6 +1341,44 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 11 passed
 ```
 
+## Follow-Up Current AutoCAD Candidate Warning Route Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Prove the existing route-level issue-code guard can fail closed on the new
+  `current_acad_matches_candidate_png` request-validation warning.
+- Give CI jobs a direct guard form for rejecting request packages that appear
+  to bind the VemCAD candidate PNG as the current/rejected AutoCAD reference.
+
+Changes:
+
+- `test_cli_forbid_current_acad_candidate_identity_warning` asserts
+  `acad_artifact_route.py --forbid-issue-code
+  current_acad_matches_candidate_png` exits `2` and reports the exact issue
+  count when that warning appears in routed request-validation counts.
+- The README documents the strict guard example.
+
+Boundary:
+
+- Guard coverage/documentation only; `--forbid-issue-code` already existed.
+- No route priority change.
+- No renderer change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# 74 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 203 passed
+```
+
 ## Follow-Up Current AutoCAD Candidate Identity Warning
 
 Status: implemented in this branch.
