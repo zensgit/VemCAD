@@ -105,6 +105,35 @@ def _candidates(path: Path, *, case_id="G11") -> Path:
     return path
 
 
+def test_case_evidence_ignores_non_integer_size_fields():
+    evidence = runner._case_evidence(
+        {
+            "source_dxf_provenance": {"sha256": "a" * 64, "size_bytes": True},
+            "current_acad_png_provenance": {"sha256": "b" * 64, "size_bytes": -1},
+            "candidate_png_provenance": {"sha256": "c" * 64, "size_bytes": "12"},
+            "recommended_output_name": "G11_autocad_model_extents.png",
+        },
+        {
+            "inspection": {
+                "sha256": "d" * 64,
+                "size_bytes": 1.5,
+                "width": True,
+                "height": 1131,
+            },
+        },
+    )
+
+    assert evidence["candidate_png_size_bytes"] == 12
+    assert "source_dxf_size_bytes" not in evidence
+    assert "current_acad_png_size_bytes" not in evidence
+    assert "returned_png_size_bytes" not in evidence
+    assert "returned_png_size" not in evidence
+    assert "source=aaaaaaaaaaaa:" not in evidence["evidence"]
+    assert "current_acad=bbbbbbbbbbbb:" not in evidence["evidence"]
+    assert "candidate=cccccccccccc:12" in evidence["evidence"]
+    assert "returned=dddddddddddd:" not in evidence["evidence"]
+
+
 def _batch_request(path: Path) -> Path:
     path.write_text(json.dumps({
         "schema": "vemcad.acad_reference_request/v1",

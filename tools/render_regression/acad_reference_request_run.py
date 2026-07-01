@@ -364,6 +364,23 @@ def _artifact_resolution(artifact: str) -> dict[str, Any]:
     }
 
 
+def _nonnegative_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return None
+
+
+def _positive_int(value: Any) -> int | None:
+    value_int = _nonnegative_int(value)
+    if value_int is None or value_int <= 0:
+        return None
+    return value_int
+
+
 def _provenance_fields(prefix: str, provenance: Any) -> dict[str, Any]:
     if not isinstance(provenance, dict):
         return {}
@@ -372,8 +389,9 @@ def _provenance_fields(prefix: str, provenance: Any) -> dict[str, Any]:
     if sha:
         fields[f"{prefix}_sha256"] = sha
     size = provenance.get("size_bytes")
-    if isinstance(size, int):
-        fields[f"{prefix}_size_bytes"] = size
+    size_int = _nonnegative_int(size)
+    if size_int is not None:
+        fields[f"{prefix}_size_bytes"] = size_int
     return fields
 
 
@@ -386,12 +404,12 @@ def _case_evidence_text(action: dict[str, Any]) -> str:
         ("returned", "returned_png"),
     ):
         sha = str(action.get(f"{prefix}_sha256") or "")
-        size = action.get(f"{prefix}_size_bytes")
-        if sha and isinstance(size, int):
+        size = _nonnegative_int(action.get(f"{prefix}_size_bytes"))
+        if sha and size is not None:
             parts.append(f"{label}={sha[:12]}:{size}")
         elif sha:
             parts.append(f"{label}={sha[:12]}")
-        elif isinstance(size, int):
+        elif size is not None:
             parts.append(f"{label}=size:{size}")
     returned_size = str(action.get("returned_png_size") or "")
     if returned_size:
@@ -424,11 +442,12 @@ def _case_evidence(validation_row: Any, intake_row: Any) -> dict[str, Any]:
             if sha:
                 evidence["returned_png_sha256"] = sha
             size_bytes = inspection.get("size_bytes")
-            if isinstance(size_bytes, int):
-                evidence["returned_png_size_bytes"] = size_bytes
-            width = inspection.get("width")
-            height = inspection.get("height")
-            if isinstance(width, int) and isinstance(height, int):
+            size_bytes_int = _nonnegative_int(size_bytes)
+            if size_bytes_int is not None:
+                evidence["returned_png_size_bytes"] = size_bytes_int
+            width = _positive_int(inspection.get("width"))
+            height = _positive_int(inspection.get("height"))
+            if width is not None and height is not None:
                 evidence["returned_png_size"] = f"{width}x{height}"
             advisory = batch._identity_advisory_text(inspection.get("identity_advisory") or {})
             if advisory and advisory != "-":
