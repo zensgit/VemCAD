@@ -1424,6 +1424,46 @@ python3 -m pytest \
 # 41 passed
 ```
 
+## Follow-Up Validate-Request Input-Review Regression
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Directly prove that `acad_reference_batch.py --validate-request
+  --fail-on-input-review` exits `2` when request validation produces a
+  warning-only input-review finding.
+- Guard the generated strict pre-capture command added above against future
+  regressions in `_batch_final_exit_code` or validation artifact metadata.
+
+Changes:
+
+- `test_batch_generator_warns_when_current_acad_png_is_declared_but_missing`
+  now runs the same warning-only request package twice:
+  - default validation remains soft-review and exits `0`;
+  - flagged validation exits `2`.
+- The regression asserts the flagged `artifact_index.json` records:
+  - `status=review`;
+  - `final_exit_code=2`;
+  - `fail_on_input_review=true`;
+  - `current_acad_png_missing=1`.
+
+Boundary:
+
+- Test/evidence hardening only.
+- No command default behavior change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 29 passed
+```
+
 ## Follow-Up Strict Action-Domain Distribution Guard
 
 Status: implemented in this branch.
