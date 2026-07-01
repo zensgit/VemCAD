@@ -680,8 +680,22 @@ def _expected_size_issues(case_id: str, expected_size: Any) -> list[dict[str, st
 
 def _capture_contract_issues(case_id: str, capture_method: Any, view_contract: Any) -> list[dict[str, str]]:
     issues: list[dict[str, str]] = []
-    method = _str(capture_method or "plot-export").lower()
-    view = _str(view_contract or "model-extents").lower()
+    method = _str(capture_method).lower()
+    view = _str(view_contract).lower()
+    if not method:
+        issues.append({
+            "severity": "error",
+            "case_id": case_id,
+            "code": "missing_requested_capture_method",
+            "message": "requested_capture_method is required so AutoCAD capture trust is explicit",
+        })
+    if not view:
+        issues.append({
+            "severity": "error",
+            "case_id": case_id,
+            "code": "missing_requested_view_contract",
+            "message": "requested_view_contract is required so matched-view assumptions are explicit",
+        })
     if method in arm.DIAGNOSTIC_CAPTURE_METHODS:
         issues.append({
             "severity": "error",
@@ -954,8 +968,8 @@ def _write_reference_request_validation_report(
             "source_dxf": str(source_path) if source_path else "",
             "current_acad_png": str(current_acad_path) if current_acad_path else "",
             "candidate_png": str(candidate_path) if candidate_path else "",
-            "requested_capture_method": _str(request.get("requested_capture_method") or "plot-export").lower(),
-            "requested_view_contract": _str(request.get("requested_view_contract") or "model-extents").lower(),
+            "requested_capture_method": _str(request.get("requested_capture_method")).lower(),
+            "requested_view_contract": _str(request.get("requested_view_contract")).lower(),
             "requested_expected_size": _expected_size_text(expected_size),
             "source_dxf_provenance": source_provenance,
             "current_acad_png_provenance": current_acad_provenance,
@@ -1113,8 +1127,8 @@ def _fulfilled_cases(
             "source_dxf": str(source_dxf),
             "acad_png": str((reference_dir / output_name).resolve()),
             "ours": str(candidate_png),
-            "capture_method": _str(request.get("requested_capture_method") or "plot-export"),
-            "view_contract": _str(request.get("requested_view_contract") or "model-extents"),
+            "capture_method": _str(request.get("requested_capture_method")),
+            "view_contract": _str(request.get("requested_view_contract")),
         }
         expected_size = request.get("requested_expected_size") or request.get("expected_size")
         if expected_size is not None:
@@ -1155,8 +1169,8 @@ def _write_missing_references_report(
                 "current_acad_png_size_bytes": _str(request.get("current_acad_png_size_bytes")),
                 "recommended_output_name": output_name,
                 "expected_path": str(expected_path),
-                "requested_capture_method": _str(request.get("requested_capture_method") or "plot-export"),
-                "requested_view_contract": _str(request.get("requested_view_contract") or "model-extents"),
+                "requested_capture_method": _str(request.get("requested_capture_method")),
+                "requested_view_contract": _str(request.get("requested_view_contract")),
                 "requested_expected_size": _expected_size_text(expected_size),
             })
     if not missing:

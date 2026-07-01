@@ -286,12 +286,14 @@ request is input-blocked. The wrapper likewise surfaces
 and run-level artifact index when those nested input artifacts exist, keeping
 the one-command output complete enough for artifact upload jobs.
 The request validation report itself also requires and records the requested
-expected size per row, so operators can verify the capture-size contract before
-any returned AutoCAD PNG exists. If a hand-written or stale request omits it,
-validation blocks with `missing_requested_expected_size`; the tool never falls
-back to the returned PNG's own dimensions as the expected size. Its Markdown
-table also prints source DXF and candidate PNG provenance (`sha256` and size)
-beside the resolved paths, so reviewers can
+capture method, requested view contract, and requested expected size per row, so
+operators can verify the capture/view/size contract before any returned AutoCAD
+PNG exists. If a hand-written or stale request omits them, validation blocks with
+`missing_requested_capture_method`, `missing_requested_view_contract`, or
+`missing_requested_expected_size`; the tool never silently assumes
+`plot-export`/`model-extents` and never falls back to the returned PNG's own
+dimensions as the expected size. Its Markdown table also prints source DXF and
+candidate PNG provenance (`sha256` and size) beside the resolved paths, so reviewers can
 confirm which files were bound without opening JSON. The same validation pass
 also writes `reference_request_validation.tsv`, with one row per case and
 columns for the capture contract, source/candidate paths, source/candidate

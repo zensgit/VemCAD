@@ -144,12 +144,13 @@ python3 tools/render_regression/acad_reference_batch.py \
 ```
 
 The helper resolves the original candidate artifacts and enforces the
-request-declared `requested_expected_size`. It opens returned PNGs only to
-compare their actual dimensions with that declared size. Missing, unreadable, or
-wrong-sized returned PNGs fail closed. The helper never lets a returned PNG
-define its own expected size. It first writes and enforces a request-package
-validation report, then writes a returned-reference preflight beside the
-generated inputs:
+request-declared `requested_capture_method`, `requested_view_contract`, and
+`requested_expected_size`. It opens returned PNGs only to compare their actual
+dimensions with the request-declared `requested_expected_size`. Missing,
+unreadable, or wrong-sized returned PNGs fail closed. The helper never assumes a
+capture/view contract. The helper never lets a returned PNG define its own
+expected size. It first writes and enforces a request-package validation report,
+then writes a returned-reference preflight beside the generated inputs:
 
 - `$NEXT_DIR/input/reference_request_validation.json`
 - `$NEXT_DIR/input/reference_request_validation.md`
@@ -277,8 +278,9 @@ The validation writes:
 It checks request/candidate identity before any returned AutoCAD PNG exists:
 source DXF presence and declared hash/size, candidate PNG presence and declared
 hash/size, duplicate case/output names, plain-filename output names, and
-positive expected sizes. This is an input-package gate only; it does not compare
-renders and does not claim AutoCAD equivalence.
+explicit capture method, explicit matched-view contract, and positive expected
+sizes. This is an input-package gate only; it does not compare renders and does
+not claim AutoCAD equivalence.
 
 ```bash
 python3 tools/render_regression/acad_manifest_compare.py \
