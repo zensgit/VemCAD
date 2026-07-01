@@ -1382,6 +1382,48 @@ python3 -m pytest \
 # 24 passed
 ```
 
+## Follow-Up Strict Pre-Capture Validation Failure
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make generated pre-capture request-validation commands fail closed on
+  warning-only input-review findings before an operator spends time exporting
+  AutoCAD PNGs.
+- Keep request-validation sentinel warnings such as missing or
+  candidate-identical `current_acad_png` from being treated as a soft-green
+  preflight in generated handoffs.
+
+Changes:
+
+- Generated `reference_request.md` validation commands now include
+  `--fail-on-input-review`.
+- The README validation example carries the same flag and documents that the
+  generated pre-capture command fails on request-package warnings.
+- Tests now assert both generated command blocks:
+  - pre-capture validation carries `--fail-on-input-review`;
+  - post-return request-run still carries `--fail-on-input-review`.
+
+Boundary:
+
+- Generated operator command / documentation hardening only.
+- The underlying `acad_reference_batch.py --validate-request` default remains a
+  soft review unless the flag is passed.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_manifest_compare.py \
+  tools/render_regression/tests/test_acad_reference_batch.py -q
+# 41 passed
+```
+
 ## Follow-Up Strict Action-Domain Distribution Guard
 
 Status: implemented in this branch.

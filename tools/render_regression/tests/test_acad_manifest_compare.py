@@ -64,6 +64,14 @@ def _readme_request_run_example_block() -> str:
     )
 
 
+def _readme_validation_example_block() -> str:
+    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
+    return _markdown_block_after(
+        readme,
+        "python3 tools/render_regression/acad_reference_batch.py \\",
+    )
+
+
 def _manifest(
     path: Path,
     *,
@@ -125,6 +133,18 @@ def test_readme_recapture_route_example_documents_handoff_guards():
 def test_readme_recapture_request_run_example_documents_input_review_guard():
     block = _readme_request_run_example_block()
     for expected in [
+        "--require-request-boundary autocad_equivalence_claim=false",
+        "--require-request-boundary requires_returned_autocad_png=true",
+        "--require-request-boundary requires_viewspace_match=true",
+        "--fail-on-input-review",
+    ]:
+        assert expected in block
+
+
+def test_readme_validation_example_documents_input_review_guard():
+    block = _readme_validation_example_block()
+    for expected in [
+        "--validate-request <compare-dir>/reference_request.json",
         "--require-request-boundary autocad_equivalence_claim=false",
         "--require-request-boundary requires_returned_autocad_png=true",
         "--require-request-boundary requires_viewspace_match=true",
@@ -470,6 +490,10 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
         request_md,
         "python3 tools/render_regression/acad_reference_request_run.py \\",
     )
+    validation_block = _markdown_block_after(
+        request_md,
+        "python3 tools/render_regression/acad_reference_batch.py \\",
+    )
     route_block = _markdown_block_after(
         request_md,
         "python3 tools/render_regression/acad_artifact_route.py <next-run-dir> \\",
@@ -480,7 +504,7 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert request_md.count("--require-request-boundary autocad_equivalence_claim=false") == 3
     assert request_md.count("--require-request-boundary requires_returned_autocad_png=true") == 3
     assert request_md.count("--require-request-boundary requires_viewspace_match=true") == 3
-    assert request_md.count("--fail-on-input-review") == 1
+    assert request_md.count("--fail-on-input-review") == 2
     assert request_md.count("--forbid-action-domain input \\") == 1
     assert request_md.count("--forbid-action-domain input-review") == 1
     assert request_md.count("--forbid-action-domain renderer-candidate") == 1
@@ -511,6 +535,7 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
         "--fail-on-input-review",
     ]:
         assert expected in request_run_block
+        assert expected in validation_block
     for expected in [
         "--require-source-boundary autocad_equivalence_claim=false",
         "--require-request-boundary autocad_equivalence_claim=false",
