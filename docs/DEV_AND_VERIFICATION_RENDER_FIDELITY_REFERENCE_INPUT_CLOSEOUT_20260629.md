@@ -1341,6 +1341,49 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 11 passed
 ```
 
+## Follow-Up Route Case Action Evidence Visibility
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Keep top-level route reports useful for operator triage when the routed
+  artifact is a one-command request run.
+- Surface per-case action evidence, including compact `current_acad=...`
+  provenance, directly in route text/Markdown instead of requiring a reviewer
+  to open `run_summary.md` first.
+- Preserve the existing route decisions and counts while making the human
+  report carry the same evidence already present in route JSON.
+
+Changes:
+
+- `acad_artifact_route.py` now prints one `case_action:` line per request-run
+  action in text output.
+- Route Markdown now includes a per-route `Case Actions` table with action,
+  domain, source, issue codes, evidence, and artifact.
+- `test_routes_run_case_actions` now asserts that action evidence and artifacts
+  are visible in both text and Markdown route reports.
+- The README documents route-level case-action evidence visibility.
+
+Boundary:
+
+- Route-report visibility only.
+- No route priority change.
+- No renderer change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_artifact_route.py -q
+# 73 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 201 passed
+```
+
 ## Follow-Up Request Case Count Validation
 
 Status: implemented in this branch.
