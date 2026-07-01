@@ -299,6 +299,9 @@ also writes `reference_request_validation.tsv`, with one row per case and
 columns for the capture contract, source/candidate paths, source/candidate
 SHA256+size, and per-case issue codes, so unattended jobs can grep or upload the
 same provenance without parsing Markdown.
+The direct `--cases` batch-manifest generator follows the same capture-contract
+discipline: every case must provide `capture_method` and `view_contract`; it
+does not silently default them to `plot-export` / `model-extents`.
 Request validation, returned-reference intake, and compare reports print
 `issue_code_counts` at the top, so operators can see the issue classes without
 scanning per-case tables. Returned-reference intake also prints the requested

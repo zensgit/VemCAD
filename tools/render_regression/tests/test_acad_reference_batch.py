@@ -64,6 +64,8 @@ def test_batch_generator_writes_manifest_and_candidates(tmp_path, capsys):
             "source_dxf": "dxf/G01.dxf",
             "acad_png": "acad/G01.png",
             "ours": "ours/G01.png",
+            "capture_method": "plot-export",
+            "view_contract": "model-extents",
             "diagnostics": {"window_source": "extents"},
         },
         {
@@ -146,6 +148,8 @@ def test_batch_generator_rejects_non_integer_cases_expected_size(tmp_path, capsy
             "source_dxf": "dxf/G01.dxf",
             "acad_png": "acad/G01.png",
             "ours": "ours/G01.png",
+            "capture_method": "plot-export",
+            "view_contract": "model-extents",
             "expected_size": {"width": 1600.5, "height": True},
         },
     ]), encoding="utf-8")
@@ -155,6 +159,30 @@ def test_batch_generator_rejects_non_integer_cases_expected_size(tmp_path, capsy
     stderr = capsys.readouterr().err
 
     assert "case 1: expected_size must contain positive integer width and height" in stderr
+    assert not (out / "acad_manifest.json").exists()
+    assert not (out / "candidate_cases.json").exists()
+
+
+def test_batch_generator_requires_cases_capture_contract(tmp_path, capsys):
+    _png(tmp_path / "acad" / "G01.png", (320, 240))
+    _png(tmp_path / "ours" / "G01.png", (320, 240))
+    _dxf(tmp_path / "dxf" / "G01.dxf")
+    cases = tmp_path / "cases.json"
+    cases.write_text(json.dumps([
+        {
+            "id": "G01",
+            "drawing_id": "G01/source",
+            "source_dxf": "dxf/G01.dxf",
+            "acad_png": "acad/G01.png",
+            "ours": "ours/G01.png",
+        },
+    ]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main(["--cases", str(cases), "--out-dir", str(out)]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "case 1: missing required field capture_method" in stderr
     assert not (out / "acad_manifest.json").exists()
     assert not (out / "candidate_cases.json").exists()
 
