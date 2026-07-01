@@ -1341,6 +1341,47 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 11 passed
 ```
 
+## Follow-Up Strict Current AutoCAD Sentinel Guards
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make generated post-return strict route commands fail closed on the two
+  current/rejected AutoCAD sentinel warnings, not only on the broader
+  `input-review` action domain.
+- Keep the handoff robust if future routing logic changes an action domain but
+  the underlying request-validation issue code still identifies suspicious
+  current AutoCAD evidence.
+
+Changes:
+
+- Generated `reference_request.md` route commands now include:
+  - `--forbid-issue-code current_acad_png_missing`;
+  - `--forbid-issue-code current_acad_matches_candidate_png`.
+- The README strict route example now carries the same two issue-code guards
+  and documents that generated strict commands include them by default.
+- The request-run strict route helper in tests uses the same guards, keeping
+  generated handoff and local regression coverage aligned.
+
+Boundary:
+
+- Generated operator command / route-guard hardening only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_manifest_compare.py \
+  tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 24 passed
+```
+
 ## Follow-Up Request Validation Review Routing
 
 Status: implemented in this branch.

@@ -174,6 +174,8 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --forbid-action-domain input \
   --forbid-action-domain input-review \
   --forbid-action-domain renderer-candidate \
+  --forbid-issue-code current_acad_png_missing \
+  --forbid-issue-code current_acad_matches_candidate_png \
   --forbid-viewspace-status mismatch \
   --forbid-x3-band review \
   --forbid-x3-band fallback \
@@ -508,11 +510,12 @@ Use `--require-issue-code <code>` or `--forbid-issue-code <code>` when a CI
 route step must fail closed on specific request/intake/compare issue classes.
 These guards inspect only routed issue-code counts; they do not parse action
 codes or triage buckets.
-For example, a strict request-package job can add
-`--forbid-issue-code current_acad_matches_candidate_png` to reject a package
-where the current/rejected AutoCAD PNG is byte-identical to the VemCAD
-candidate PNG, or `--forbid-issue-code current_acad_png_missing` to reject a
-package whose declared rejected-reference PNG cannot be read.
+The generated strict post-return route command already forbids the two current
+AutoCAD sentinel warnings:
+`current_acad_matches_candidate_png`, which rejects a package where the
+current/rejected AutoCAD PNG is byte-identical to the VemCAD candidate PNG, and
+`current_acad_png_missing`, which rejects a package whose declared
+rejected-reference PNG cannot be read.
 Use `--require-issue-code-count <code=count>` when the job must pin the exact
 number of a known issue class, for example `returned_png_size_mismatch=1`.
 
