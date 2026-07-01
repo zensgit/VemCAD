@@ -96,8 +96,8 @@ jobs:
         # SCOPE: this is a TOOL plumbing/regression signal — the audit runs end-to-end and emits
         # a well-formed summary.json over the committed corpus — NOT a "view=sheet is ready to be
         # default" verdict: the golden set is render-regression material (it intentionally includes
-        # garbage_extents / degenerate fixtures), so a real readiness verdict needs a curated sheet
-        # corpus with known expectations (follow-up A1a-2; see the A1a DEV_AND_VERIFICATION doc).
+        # garbage_extents / degenerate fixtures). The synthetic A1a-2 verdict corpus exists as a
+        # fast gate; a real default-readiness verdict still needs operator/training drawing evidence.
         # Outage revert: restore `continue-on-error: true` here if a render/CI outage wedges the gate.
         run: |
           name=vemcad_sheet_audit
