@@ -548,6 +548,35 @@ def test_batch_generator_validation_blocks_drift_and_ambiguous_request_package(t
     } <= {item["kind"] for item in artifact_index["artifacts"]}
 
 
+def test_batch_generator_validation_rejects_non_integer_requested_expected_size(tmp_path):
+    _dxf(tmp_path / "dxf" / "G11.dxf")
+    _png(tmp_path / "ours" / "G11.png", (760, 570))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_expected_size": {"width": 1600.5, "height": True},
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--validate-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--out-dir", str(out),
+    ]) == 2
+
+    validation = json.loads((out / "reference_request_validation.json").read_text(encoding="utf-8"))
+    assert validation["issue_code_counts"] == {"invalid_requested_expected_size": 1}
+    assert validation["cases"][0]["requested_expected_size"] == "1600.5xTrue"
+
+
 def test_batch_generator_validation_blocks_missing_requested_expected_size(tmp_path):
     source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
     ours = Path(_png(tmp_path / "ours" / "G11.png", (760, 570)))

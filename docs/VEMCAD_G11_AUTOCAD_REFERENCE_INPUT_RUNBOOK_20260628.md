@@ -81,7 +81,8 @@ image size as manifest `expected_size`. If the PNG is unreadable, missing, or
 not gate-grade, it returns non-zero.
 
 If `acad_manifest.json` is hand-written or hand-edited, every case must keep an
-explicit `expected_size`; missing `expected_size` blocks manifest validation.
+explicit positive-integer `expected_size`; missing or non-integer
+`expected_size` blocks manifest validation.
 
 For an unattended or multi-drawing run, write a cases JSON list and use the batch
 helper:

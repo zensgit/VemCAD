@@ -84,8 +84,8 @@ def test_readme_describes_golden_e2e_as_shipped_ci_gate():
 def test_readme_documents_manifest_expected_size_as_required():
     readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
 
-    assert "每个 case 必须声明 `expected_size`" in readme
-    assert "manifest validation 会 fail closed" in readme
+    assert "每个 case 必须声明正整数 `expected_size`" in readme
+    assert "缺失或非整数时 manifest validation 会 fail closed" in readme
     assert "不会再从当前/返回 PNG 自行推导 expected size" in readme
 
 
