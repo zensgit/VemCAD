@@ -958,7 +958,16 @@ def test_reference_request_run_case_actions_include_current_acad_reuse_evidence(
 def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
     _dxf(tmp_path / "dxf" / "B11.dxf")
     _png(tmp_path / "ours" / "G11.png", box=[20, 15, 740, 555])
+    current = tmp_path / "acad" / "G11_rejected.png"
+    _png(current, size=(1600, 1131), box=[50, 40, 1500, 1060])
     request = _request(tmp_path / "reference_request.json")
+    payload = json.loads(request.read_text(encoding="utf-8"))
+    payload["cases"][0].update({
+        "current_acad_png": "acad/G11_rejected.png",
+        "current_acad_png_sha256": _sha256(current),
+        "current_acad_png_size_bytes": current.stat().st_size,
+    })
+    request.write_text(json.dumps(payload), encoding="utf-8")
     candidates = _candidates(tmp_path / "candidate_cases.json")
     out = tmp_path / "run"
 
@@ -1004,6 +1013,10 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
     assert artifact_index["case_actions"] == summary["case_actions"]
     assert artifact_index["case_action_counts"] == summary["case_action_counts"]
     assert artifact_index["case_action_domain_counts"] == summary["case_action_domain_counts"]
+    action = summary["case_actions"][0]
+    assert action["current_acad_png_sha256"] == _sha256(current)
+    assert action["current_acad_png_size_bytes"] == current.stat().st_size
+    assert "current_acad=" in action["evidence"]
     assert "recommended next action: provide-returned-autocad-pngs" in stdout
     assert "recommended next action domain: input" in stdout
     assert (
@@ -1041,6 +1054,11 @@ def test_reference_request_run_stops_on_missing_reference(tmp_path, capsys):
     case_actions_tsv = (out / "case_actions.tsv").read_text(encoding="utf-8")
     assert "G11\tG11/B11\tprovide-returned-autocad-pngs\tinput\tmissing_references" in case_actions_tsv
     assert f"{(out / 'input' / 'missing_references.md').resolve()}\tTrue" in case_actions_tsv
+    case_actions_lines = case_actions_tsv.splitlines()
+    case_action_row = _tsv_record(case_actions_lines[0], case_actions_lines[1])
+    assert case_action_row["current_acad_png_sha256"] == _sha256(current)
+    assert case_action_row["current_acad_png_size_bytes"] == str(current.stat().st_size)
+    assert "current_acad=" in case_action_row["evidence"]
 
 
 def test_reference_request_run_clears_stale_compare_artifacts_on_input_blocked_rerun(tmp_path):

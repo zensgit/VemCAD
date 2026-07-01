@@ -1249,6 +1249,53 @@ python3 -m pytest tools/render_regression/tests -q
 # 192 passed
 ```
 
+## Follow-Up Missing Reference Case Action Current AutoCAD Evidence
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Pin the one-command request-run `case_actions` output for the
+  missing-returned-reference path.
+- Ensure the top-level JSON/TSV/Markdown action rows preserve the
+  current/rejected AutoCAD PNG SHA/size evidence while telling the operator to
+  provide a fresh returned PNG.
+- Keep the pre-export handoff and the run-level operator action table aligned:
+  both surfaces identify the stale/rejected AutoCAD reference without requiring
+  a reviewer to open nested JSON first.
+
+Changes:
+
+- `test_reference_request_run_stops_on_missing_reference` now includes a
+  readable `current_acad_png` with matching SHA/size in the request package.
+- The test asserts `run_summary.json`, `case_actions.tsv`, and
+  `run_summary.md` all preserve the `current_acad_png_sha256`,
+  `current_acad_png_size_bytes`, and compact `current_acad=` evidence on the
+  `provide-returned-autocad-pngs` action.
+- `tools/render_regression/README.md` clarifies that per-case action evidence
+  is self-contained for missing-returned-reference handoffs as well as
+  rejected-reference reuse failures.
+
+Boundary:
+
+- Test/documentation hardening only; the existing implementation already
+  carried the evidence.
+- No renderer change.
+- No route priority change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 12 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 201 passed
+```
+
 ## Follow-Up Request-Run Final Exit Provenance
 
 Status: implemented in this branch.
