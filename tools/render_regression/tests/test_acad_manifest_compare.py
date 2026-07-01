@@ -106,6 +106,8 @@ def test_readme_recapture_route_example_documents_handoff_guards():
         "--forbid-action-domain input \\",
         "--forbid-action-domain input-review",
         "--forbid-action-domain renderer-candidate",
+        "--require-action-count continue-to-request-run=1",
+        "--require-action-count review-x3-pass=2",
         "--require-action-domain-count continue=1",
         "--require-action-domain-count pass-review=2",
         "--forbid-issue-code current_acad_png_missing",
@@ -509,6 +511,8 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert request_md.count("--forbid-action-domain input \\") == 1
     assert request_md.count("--forbid-action-domain input-review") == 1
     assert request_md.count("--forbid-action-domain renderer-candidate") == 1
+    assert request_md.count("--require-action-count continue-to-request-run=1") == 1
+    assert request_md.count("--require-action-count review-x3-pass=2") == 1
     assert request_md.count("--require-action-domain-count continue=1") == 1
     assert request_md.count("--require-action-domain-count pass-review=2") == 1
     assert request_md.count("--forbid-issue-code current_acad_png_missing") == 1
@@ -546,6 +550,8 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
         "--forbid-action-domain input \\",
         "--forbid-action-domain input-review",
         "--forbid-action-domain renderer-candidate",
+        "--require-action-count continue-to-request-run=1",
+        "--require-action-count review-x3-pass=2",
         "--require-action-domain-count continue=1",
         "--require-action-domain-count pass-review=2",
         "--forbid-issue-code current_acad_png_missing",
