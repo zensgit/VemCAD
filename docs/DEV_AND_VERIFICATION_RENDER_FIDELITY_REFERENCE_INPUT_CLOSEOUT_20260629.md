@@ -1341,6 +1341,48 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 11 passed
 ```
 
+## Follow-Up Missing Current AutoCAD Path Warning
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Prevent a declared `current_acad_png` path from silently weakening the
+  rejected-reference sentinel when the file is missing or unreadable.
+- Keep the signal at warning severity because `current_acad_png` is optional;
+  the warning tells operators the declared rejected-reference provenance could
+  not actually be checked.
+
+Changes:
+
+- Request validation now emits `warning:current_acad_png_missing` when
+  `current_acad_png` is present in the request package but the resolved file is
+  not readable.
+- `test_batch_generator_warns_when_current_acad_png_is_declared_but_missing`
+  covers the JSON, Markdown, TSV, and artifact-index surfaces.
+- The README documents the warning and its rejected-reference-sentinel
+  boundary.
+
+Boundary:
+
+- Request-validation hardening only.
+- Warning severity; no new hard block.
+- No renderer change.
+- No route priority change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 29 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 204 passed
+```
+
 ## Follow-Up Current AutoCAD Candidate Warning Route Guard
 
 Status: implemented in this branch.

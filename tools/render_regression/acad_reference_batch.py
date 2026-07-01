@@ -851,6 +851,16 @@ def _write_reference_request_validation_report(
                     request.get("current_acad_png_size_bytes"),
                     current_acad_provenance["size_bytes"],
                 ))
+            else:
+                row_issues.append({
+                    "severity": "warning",
+                    "case_id": case_id,
+                    "code": "current_acad_png_missing",
+                    "message": (
+                        "current_acad_png was declared but is not readable; "
+                        "rejected-reference provenance could not be verified"
+                    ),
+                })
 
         candidate = candidates.get(case_id)
         candidate_path = None
