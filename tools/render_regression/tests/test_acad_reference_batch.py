@@ -664,6 +664,43 @@ def test_batch_generator_validates_current_acad_png_provenance_when_available(tm
     assert _sha256(current) in validation_tsv
 
 
+def test_batch_generator_rejects_non_integer_size_byte_declarations(tmp_path):
+    source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
+    ours = Path(_png(tmp_path / "ours" / "G11.png", (760, 570)))
+    request = tmp_path / "reference_request.json"
+    request.write_text(json.dumps({
+        "schema": "vemcad.acad_reference_request/v1",
+        "cases": [{
+            "id": "G11",
+            "drawing_id": "G11/B11",
+            "source_dxf": "dxf/G11.dxf",
+            "source_dxf_sha256": _sha256(source),
+            "source_dxf_size_bytes": source.stat().st_size + 0.5,
+            "candidate_png_sha256": _sha256(ours),
+            "candidate_png_size_bytes": True,
+            "recommended_output_name": "G11_autocad_model_extents.png",
+            "requested_expected_size": {"width": 1600, "height": 1131},
+            "requested_capture_method": "plot-export",
+            "requested_view_contract": "model-extents",
+        }],
+    }), encoding="utf-8")
+    candidates = tmp_path / "candidate_cases.json"
+    candidates.write_text(json.dumps([{"id": "G11", "ours": "ours/G11.png"}]), encoding="utf-8")
+    out = tmp_path / "out"
+
+    assert batch.main([
+        "--validate-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--out-dir", str(out),
+    ]) == 2
+
+    validation = json.loads((out / "reference_request_validation.json").read_text(encoding="utf-8"))
+    assert validation["issue_code_counts"] == {
+        "candidate_png_size_invalid": 1,
+        "source_dxf_size_invalid": 1,
+    }
+
+
 def test_batch_generator_warns_when_current_acad_png_is_declared_but_missing(tmp_path):
     source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
     ours = Path(_png(tmp_path / "ours" / "G11.png", (760, 570), box=[20, 15, 740, 555]))
