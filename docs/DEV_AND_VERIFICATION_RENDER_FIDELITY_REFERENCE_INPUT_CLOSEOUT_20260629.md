@@ -1415,6 +1415,46 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
 # 24 passed
 ```
 
+## Follow-Up Missing Reference Current AutoCAD Evidence
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make `missing_references.*` handoffs carry the rejected/current AutoCAD PNG
+  sentinel when a recapture request has one.
+- Let the pre-export spreadsheet/Markdown handoff show not only the source DXF
+  SHA but also the old AutoCAD PNG SHA that must not be returned unchanged.
+
+Changes:
+
+- `missing_references.json` rows now include:
+  - `current_acad_png`
+  - `current_acad_png_sha256`
+  - `current_acad_png_size_bytes`
+- `missing_references.tsv` adds matching current AutoCAD columns.
+- `missing_references.md` adds `Current AutoCAD` and
+  `Current AutoCAD SHA256` columns.
+- The README documents the new rejected-reference sentinel in missing-reference
+  handoffs.
+
+Boundary:
+
+- Operator handoff evidence only.
+- No request/intake validation rule change.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 27 passed
+```
+
 ## Follow-Up Rejected Reference Reuse Guard
 
 Status: implemented in this branch.

@@ -1010,6 +1010,7 @@ def test_batch_generator_blocks_returned_png_size_mismatch_when_request_declares
 
 def test_batch_generator_blocks_request_without_returned_png(tmp_path, capsys):
     source = Path(_dxf(tmp_path / "dxf" / "G11.dxf"))
+    current = Path(_png(tmp_path / "acad" / "G11_rejected.png", (800, 600), box=[220, 165, 580, 435]))
     _png(tmp_path / "ours" / "G11.png", (760, 570))
     request = tmp_path / "reference_request.json"
     request.write_text(json.dumps({
@@ -1019,6 +1020,9 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path, capsys):
             "drawing_id": "G11/B11",
             "source_dxf": "dxf/G11.dxf",
             "source_dxf_sha256": _sha256(source),
+            "current_acad_png": "acad/G11_rejected.png",
+            "current_acad_png_sha256": _sha256(current),
+            "current_acad_png_size_bytes": current.stat().st_size,
             "recommended_output_name": "G11_autocad_model_extents.png",
             "requested_capture_method": "plot-export",
             "requested_view_contract": "model-extents",
@@ -1043,6 +1047,9 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path, capsys):
     assert missing["missing"][0]["id"] == "G11"
     assert missing["missing"][0]["source_dxf"].endswith("dxf/G11.dxf")
     assert missing["missing"][0]["source_dxf_sha256"] == _sha256(source)
+    assert missing["missing"][0]["current_acad_png"] == "acad/G11_rejected.png"
+    assert missing["missing"][0]["current_acad_png_sha256"] == _sha256(current)
+    assert missing["missing"][0]["current_acad_png_size_bytes"] == str(current.stat().st_size)
     assert missing["missing"][0]["recommended_output_name"] == "G11_autocad_model_extents.png"
     assert missing["missing"][0]["requested_capture_method"] == "plot-export"
     assert missing["missing"][0]["requested_view_contract"] == "model-extents"
@@ -1050,8 +1057,11 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path, capsys):
     missing_md = (out / "missing_references.md").read_text(encoding="utf-8")
     assert "Missing AutoCAD Reference PNGs" in missing_md
     assert "Source SHA256" in missing_md
+    assert "Current AutoCAD SHA256" in missing_md
     assert "dxf/G11.dxf" in missing_md
     assert _sha256(source) in missing_md
+    assert "acad/G11_rejected.png" in missing_md
+    assert _sha256(current) in missing_md
     assert "G11_autocad_model_extents.png" in missing_md
     assert "`plot-export`" in missing_md
     assert "`model-extents`" in missing_md
@@ -1059,12 +1069,14 @@ def test_batch_generator_blocks_request_without_returned_png(tmp_path, capsys):
     assert "missing_references_tsv" in missing_md
     missing_tsv = (out / "missing_references.tsv").read_text(encoding="utf-8").splitlines()
     assert missing_tsv[0] == (
-        "id\tdrawing_id\tsource_dxf\tsource_dxf_sha256\trecommended_output_name\texpected_path\t"
+        "id\tdrawing_id\tsource_dxf\tsource_dxf_sha256\tcurrent_acad_png\t"
+        "current_acad_png_sha256\tcurrent_acad_png_size_bytes\trecommended_output_name\texpected_path\t"
         "requested_capture_method\trequested_view_contract\trequested_expected_size"
     )
     assert missing_tsv[1].startswith("G11\tG11/B11\t")
     assert "dxf/G11.dxf" in missing_tsv[1]
     assert f"\t{_sha256(source)}\t" in missing_tsv[1]
+    assert f"\tacad/G11_rejected.png\t{_sha256(current)}\t{current.stat().st_size}\t" in missing_tsv[1]
     assert "\tG11_autocad_model_extents.png\t" in missing_tsv[1]
     assert missing_tsv[1].endswith("\tplot-export\tmodel-extents\t1600x1131")
     artifact_index = json.loads((out / "artifact_index.json").read_text(encoding="utf-8"))
@@ -1125,7 +1137,7 @@ def test_batch_generator_escapes_missing_reference_markdown_table_cells(tmp_path
     assert "G11\\|bearing cap" in row
     assert _sha256(source) in row
     assert "`G11\\|acad_model_extents.png`" in row
-    assert _unescaped_pipe_count(row) == 10
+    assert _unescaped_pipe_count(row) == 12
 
 
 def test_batch_generator_clears_stale_missing_reports_on_successful_rerun(tmp_path):
