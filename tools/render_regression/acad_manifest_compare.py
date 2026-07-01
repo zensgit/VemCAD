@@ -741,6 +741,8 @@ def _write_reference_request(
         "  --forbid-action-domain input \\",
         "  --forbid-action-domain input-review \\",
         "  --forbid-action-domain renderer-candidate \\",
+        "  --forbid-issue-code current_acad_png_missing \\",
+        "  --forbid-issue-code current_acad_matches_candidate_png \\",
         "  --forbid-viewspace-status mismatch \\",
         "  --forbid-x3-band review \\",
         "  --forbid-x3-band fallback \\",
