@@ -1,7 +1,8 @@
-"""End-to-end through regress.run(): prove the orchestrator (a) never sets
-comparable=False, (b) treats every baseline as gate-trust offscreen-render
-regardless of recorded capture_method, so a wrong-color or viewport-capture
-baseline still gates / still passes."""
+"""Diagnostic through regress.run(): keep the wrong-color baseline probe current.
+
+This intentionally exercises the full report row shape rather than acting as a
+pass/fail gate for render fidelity.
+"""
 import sys, tempfile, json
 from pathlib import Path
 from PIL import Image, ImageDraw
