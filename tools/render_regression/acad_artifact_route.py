@@ -262,6 +262,7 @@ def _route_run(payload: dict[str, Any]) -> dict[str, Any]:
         or payload.get("route_compare_case_count") is not None
         or payload.get("route_triage_bucket_counts")
         or payload.get("route_viewspace_status_counts")
+        or payload.get("route_viewspace_gate_evidence_counts")
         or payload.get("route_x3_band_counts")
         or payload.get("route_artifact_kind_counts")
         or payload.get("route_final_exit_code_counts")
@@ -281,6 +282,9 @@ def _route_run(payload: dict[str, Any]) -> dict[str, Any]:
             "route_compared_count": payload.get("route_compared_count"),
             "route_triage_bucket_counts": payload.get("route_triage_bucket_counts") or {},
             "route_viewspace_status_counts": payload.get("route_viewspace_status_counts") or {},
+            "route_viewspace_gate_evidence_counts": (
+                payload.get("route_viewspace_gate_evidence_counts") or {}
+            ),
             "route_x3_band_counts": payload.get("route_x3_band_counts") or {},
             "route_compare_issue_code_counts": payload.get("route_compare_issue_code_counts") or {},
         })
@@ -324,6 +328,7 @@ def _route_compare(payload: dict[str, Any]) -> dict[str, Any]:
         "compare_issue_code_counts": payload.get("issue_code_counts") or {},
         "triage_bucket_counts": triage,
         "viewspace_status_counts": payload.get("viewspace_status_counts") or {},
+        "viewspace_gate_evidence_counts": payload.get("viewspace_gate_evidence_counts") or {},
         "x3_band_counts": payload.get("x3_band_counts") or {},
         "recommended_next_action": action,
     }
@@ -458,6 +463,10 @@ def _route_batch_summary(routes: list[dict[str, Any]]) -> dict[str, Any]:
             "compared_count": _sum_int_field(compare_routes, "compared_count"),
             "triage_bucket_counts": _sum_count_maps(compare_routes, "triage_bucket_counts"),
             "viewspace_status_counts": _sum_count_maps(compare_routes, "viewspace_status_counts"),
+            "viewspace_gate_evidence_counts": _sum_count_maps(
+                compare_routes,
+                "viewspace_gate_evidence_counts",
+            ),
             "x3_band_counts": _sum_count_maps(compare_routes, "x3_band_counts"),
         })
     elif request_run_routes:
@@ -466,6 +475,10 @@ def _route_batch_summary(routes: list[dict[str, Any]]) -> dict[str, Any]:
             "compared_count": _sum_int_field(request_run_routes, "route_compared_count"),
             "triage_bucket_counts": _sum_count_maps(request_run_routes, "route_triage_bucket_counts"),
             "viewspace_status_counts": _sum_count_maps(request_run_routes, "route_viewspace_status_counts"),
+            "viewspace_gate_evidence_counts": _sum_count_maps(
+                request_run_routes,
+                "route_viewspace_gate_evidence_counts",
+            ),
             "x3_band_counts": _sum_count_maps(request_run_routes, "route_x3_band_counts"),
             "compare_issue_code_counts": _sum_count_maps(
                 request_run_routes,
@@ -704,6 +717,11 @@ def _write_text(route: dict[str, Any]) -> str:
         lines.append(f"route_triage_bucket_counts: {_format_counts(route['route_triage_bucket_counts'])}")
     if route.get("route_viewspace_status_counts"):
         lines.append(f"route_viewspace_status_counts: {_format_counts(route['route_viewspace_status_counts'])}")
+    if route.get("route_viewspace_gate_evidence_counts"):
+        lines.append(
+            "route_viewspace_gate_evidence_counts: "
+            + _format_counts(route["route_viewspace_gate_evidence_counts"])
+        )
     if route.get("route_x3_band_counts"):
         lines.append(f"route_x3_band_counts: {_format_counts(route['route_x3_band_counts'])}")
     if route.get("route_compare_issue_code_counts"):
@@ -749,6 +767,11 @@ def _write_text(route: dict[str, Any]) -> str:
         lines.append(f"triage_bucket_counts: {_format_counts(route['triage_bucket_counts'])}")
     if route.get("viewspace_status_counts"):
         lines.append(f"viewspace_status_counts: {_format_counts(route['viewspace_status_counts'])}")
+    if route.get("viewspace_gate_evidence_counts"):
+        lines.append(
+            "viewspace_gate_evidence_counts: "
+            + _format_counts(route["viewspace_gate_evidence_counts"])
+        )
     if route.get("x3_band_counts"):
         lines.append(f"x3_band_counts: {_format_counts(route['x3_band_counts'])}")
     return "\n".join(lines)
@@ -780,6 +803,11 @@ def _write_batch_text(payload: dict[str, Any]) -> str:
         summary.append("triage_bucket_counts: " + _format_counts(payload["triage_bucket_counts"]))
     if payload.get("viewspace_status_counts"):
         summary.append("viewspace_status_counts: " + _format_counts(payload["viewspace_status_counts"]))
+    if payload.get("viewspace_gate_evidence_counts"):
+        summary.append(
+            "viewspace_gate_evidence_counts: "
+            + _format_counts(payload["viewspace_gate_evidence_counts"])
+        )
     if payload.get("x3_band_counts"):
         summary.append("x3_band_counts: " + _format_counts(payload["x3_band_counts"]))
     if payload.get("reference_request_validation_issue_code_counts"):
@@ -906,6 +934,11 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         lines.append(f"- route_triage_bucket_counts: {_md_code_cell(_format_counts(route['route_triage_bucket_counts']))}")
     if route.get("route_viewspace_status_counts"):
         lines.append(f"- route_viewspace_status_counts: {_md_code_cell(_format_counts(route['route_viewspace_status_counts']))}")
+    if route.get("route_viewspace_gate_evidence_counts"):
+        lines.append(
+            "- route_viewspace_gate_evidence_counts: "
+            f"{_md_code_cell(_format_counts(route['route_viewspace_gate_evidence_counts']))}"
+        )
     if route.get("route_x3_band_counts"):
         lines.append(f"- route_x3_band_counts: {_md_code_cell(_format_counts(route['route_x3_band_counts']))}")
     if route.get("route_compare_issue_code_counts"):
@@ -950,6 +983,11 @@ def _write_markdown_route(route: dict[str, Any], *, heading: str) -> str:
         lines.append(f"- triage_bucket_counts: {_md_code_cell(_format_counts(route['triage_bucket_counts']))}")
     if route.get("viewspace_status_counts"):
         lines.append(f"- viewspace_status_counts: {_md_code_cell(_format_counts(route['viewspace_status_counts']))}")
+    if route.get("viewspace_gate_evidence_counts"):
+        lines.append(
+            "- viewspace_gate_evidence_counts: "
+            f"{_md_code_cell(_format_counts(route['viewspace_gate_evidence_counts']))}"
+        )
     if route.get("x3_band_counts"):
         lines.append(f"- x3_band_counts: {_md_code_cell(_format_counts(route['x3_band_counts']))}")
     case_actions = [item for item in route.get("case_actions") or [] if isinstance(item, dict)]
@@ -1017,6 +1055,11 @@ def _write_markdown(payload: dict[str, Any]) -> str:
             lines.append(f"- triage_bucket_counts: {_md_code_cell(_format_counts(payload['triage_bucket_counts']))}")
         if payload.get("viewspace_status_counts"):
             lines.append(f"- viewspace_status_counts: {_md_code_cell(_format_counts(payload['viewspace_status_counts']))}")
+        if payload.get("viewspace_gate_evidence_counts"):
+            lines.append(
+                "- viewspace_gate_evidence_counts: "
+                f"{_md_code_cell(_format_counts(payload['viewspace_gate_evidence_counts']))}"
+            )
         if payload.get("x3_band_counts"):
             lines.append(f"- x3_band_counts: {_md_code_cell(_format_counts(payload['x3_band_counts']))}")
         if (
@@ -1221,6 +1264,7 @@ def _count_map(payload: dict[str, Any], key: str) -> dict[str, int]:
         fallback_key = {
             "triage_bucket_counts": "route_triage_bucket_counts",
             "viewspace_status_counts": "route_viewspace_status_counts",
+            "viewspace_gate_evidence_counts": "route_viewspace_gate_evidence_counts",
             "x3_band_counts": "route_x3_band_counts",
         }.get(key)
         if fallback_key:
