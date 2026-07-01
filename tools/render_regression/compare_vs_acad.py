@@ -176,6 +176,10 @@ def main(argv=None) -> int:
     print("  aspect delta : %-7s [ok <=%.2f]  纵横比/缩放一致性" % (res.aspect_delta, cmp.ASPECT_TOL))
     print("  comparable   : %s" % res.comparable)
     print("  band         : %s" % res.band)
+    if args.require_viewspace_match:
+        print("  gate mode    : require-viewspace-match")
+    else:
+        print("  gate mode    : diagnostic-only (add --require-viewspace-match before gating)")
     print("  page-fill    : ref(x=%-6s y=%-6s) ours(x=%-6s y=%-6s)  页面填充比" % (
         framing["ref_fill_x"], framing["ref_fill_y"],
         framing["cand_fill_x"], framing["cand_fill_y"]))

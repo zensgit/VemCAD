@@ -32,6 +32,8 @@ def test_identical_renders_score_excellent(tmp_path, capsys):
     assert rc == 0
     txt = capsys.readouterr().out
     assert "ink IoU" in txt and "band" in txt and "verdict:" in txt
+    assert "gate mode" in txt
+    assert "diagnostic-only" in txt
     assert "EXCELLENT" in txt          # identical → pass band
     assert out.is_file()               # difference overlay written
 
@@ -212,7 +214,7 @@ def test_cli_clean_pair_keeps_normal_verdict(tmp_path, capsys):
     assert "EXCELLENT" in txt
 
 
-def test_cli_viewspace_contract_report_for_clean_pair(tmp_path):
+def test_cli_viewspace_contract_report_for_clean_pair(tmp_path, capsys):
     ref = _framed(tmp_path / "acad.png", (760, 570), [20, 15, 740, 555])
     ours = _framed(tmp_path / "ours.png", (760, 570), [20, 15, 740, 555])
     report = tmp_path / "viewspace.json"
@@ -220,6 +222,9 @@ def test_cli_viewspace_contract_report_for_clean_pair(tmp_path):
     rc = cva.main([ref, ours, "--viewspace-report", str(report), "--require-viewspace-match"])
 
     assert rc == 0
+    txt = capsys.readouterr().out
+    assert "gate mode" in txt
+    assert "require-viewspace-match" in txt
     payload = json.loads(report.read_text(encoding="utf-8"))
     assert payload["status"] == "match"
     assert payload["recommended_action"] == "score-render-fidelity"
