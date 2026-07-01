@@ -268,6 +268,12 @@ def _recommended_next_action(summary: dict[str, Any]) -> dict[str, str]:
             "Fix the request package before exporting or returning AutoCAD PNGs.",
             artifact=str(summary.get("reference_request_validation_markdown") or ""),
         )
+    if validation_status == "review" or summary.get("reference_request_validation_warning_count"):
+        return _action(
+            "inspect-request-package-warnings",
+            "Inspect request-package warnings before trusting returned AutoCAD PNG routing.",
+            artifact=str(summary.get("reference_request_validation_markdown") or ""),
+        )
     if status == "input_blocked" and summary.get("missing_references_markdown"):
         return _action(
             "provide-returned-autocad-pngs",
@@ -570,12 +576,19 @@ def _case_actions(summary: dict[str, Any]) -> list[dict[str, Any]]:
         case_id = str(row.get("id") or "")
         issues = [item for item in row.get("issues") or [] if item.get("severity") in {"error", "warning"}]
         if issues:
+            has_error = any(item.get("severity") == "error" for item in issues)
+            code = "fix-request-package" if has_error else "inspect-request-package-warnings"
+            message = (
+                "Fix request-package provenance or structure before exporting or returning AutoCAD PNGs."
+                if has_error
+                else "Inspect request-package warnings before trusting returned AutoCAD PNG routing."
+            )
             _put_case_action(
                 actions,
                 case_id,
                 drawing_id=str(row.get("drawing_id") or ""),
-                code="fix-request-package",
-                message="Fix request-package provenance or structure before exporting or returning AutoCAD PNGs.",
+                code=code,
+                message=message,
                 source="request_validation",
                 artifact=validation_artifact,
                 evidence=_case_evidence(row, intake_by_id.get(case_id)),

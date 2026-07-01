@@ -844,6 +844,81 @@ def test_reference_request_run_can_fail_closed_on_input_review_warnings(tmp_path
     assert "route_final_exit_code_counts: `0=1, 2=1`" in fail_summary_md
 
 
+def test_reference_request_run_surfaces_request_validation_review_warnings(tmp_path):
+    _dxf(tmp_path / "dxf" / "B11.dxf")
+    _png(
+        tmp_path / "ours" / "G11.png",
+        size=(1600, 1131),
+        box=[40, 30, 1560, 1100],
+    )
+    _png(
+        tmp_path / "returned" / "G11_autocad_model_extents.png",
+        size=(1600, 1131),
+        box=[40, 30, 1560, 1100],
+    )
+    request = _request(tmp_path / "reference_request.json")
+    payload = json.loads(request.read_text(encoding="utf-8"))
+    payload["cases"][0].update({
+        "current_acad_png": "acad/G11_missing.png",
+        "current_acad_png_sha256": "0" * 64,
+        "current_acad_png_size_bytes": 12345,
+    })
+    request.write_text(json.dumps(payload), encoding="utf-8")
+    candidates = _candidates(tmp_path / "candidate_cases.json")
+    default_out = tmp_path / "default-run"
+
+    assert runner.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--case-id", "G11",
+        "--out-dir", str(default_out),
+    ]) == 0
+
+    default_summary = json.loads((default_out / "run_summary.json").read_text(encoding="utf-8"))
+    assert default_summary["status"] == "pass"
+    assert default_summary["compare_exit_code"] == 0
+    assert default_summary["final_exit_code"] == 0
+    assert default_summary["fail_on_input_review"] is False
+    assert default_summary["reference_request_validation_status"] == "review"
+    assert default_summary["reference_request_validation_warning_count"] == 1
+    assert default_summary["reference_request_validation_issue_code_counts"] == {
+        "current_acad_png_missing": 1,
+    }
+    assert default_summary["recommended_next_action"]["code"] == "inspect-request-package-warnings"
+    assert default_summary["recommended_next_action"]["domain"] == "input-review"
+    assert default_summary["recommended_next_action"]["artifact"].endswith("reference_request_validation.md")
+    assert default_summary["case_action_domain_counts"] == {"input-review": 1}
+    action = default_summary["case_actions"][0]
+    assert action["code"] == "inspect-request-package-warnings"
+    assert action["source"] == "request_validation"
+    assert action["issue_codes"] == "warning:current_acad_png_missing"
+    default_summary_md = (default_out / "run_summary.md").read_text(encoding="utf-8")
+    assert "recommended_next_action: `inspect-request-package-warnings`" in default_summary_md
+    assert "`warning:current_acad_png_missing`" in default_summary_md
+
+    fail_out = tmp_path / "fail-run"
+    assert runner.main([
+        "--from-request", str(request),
+        "--candidate-cases", str(candidates),
+        "--reference-dir", str(tmp_path / "returned"),
+        "--case-id", "G11",
+        "--fail-on-input-review",
+        "--out-dir", str(fail_out),
+    ]) == 2
+
+    fail_summary = json.loads((fail_out / "run_summary.json").read_text(encoding="utf-8"))
+    assert fail_summary["status"] == "pass"
+    assert fail_summary["compare_exit_code"] == 0
+    assert fail_summary["final_exit_code"] == 2
+    assert fail_summary["fail_on_input_review"] is True
+    assert fail_summary["recommended_next_action"]["code"] == "inspect-request-package-warnings"
+    assert fail_summary["recommended_next_action"]["domain"] == "input-review"
+    fail_artifact_index = _run_artifact_index(fail_out)
+    assert fail_artifact_index["final_exit_code"] == 2
+    assert fail_artifact_index["fail_on_input_review"] is True
+
+
 def test_reference_request_run_routes_intake_blocked_to_fix_returned_input(tmp_path, capsys):
     _dxf(tmp_path / "dxf" / "B11.dxf")
     _png(tmp_path / "ours" / "G11.png", size=(760, 570), box=[20, 15, 740, 555])

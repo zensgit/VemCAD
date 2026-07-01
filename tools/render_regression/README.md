@@ -194,13 +194,13 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
 `case_action_domain_counts`, plus `recommended_next_action.domain`, so the run
 summary itself distinguishes input/recapture gates from renderer-candidate
 work before a separate route report is generated. The run summary and run-level
-artifact index keep returned-reference intake warnings visible even when the
-matched-view compare itself passes. By default those warnings remain a review
-lane rather than a hard failure; pass `--fail-on-input-review` when an
-unattended job should exit `2` if the run's recommended action is in the
-`input-review` domain. The run summary records `fail_on_input_review` and
-`final_exit_code`, so uploaded artifacts explain this opt-in failure even when
-the semantic run status remains `pass`.
+artifact index keep request-validation and returned-reference intake warnings
+visible even when the matched-view compare itself passes. By default those
+warnings remain a review lane rather than a hard failure; pass
+`--fail-on-input-review` when an unattended job should exit `2` if the run's
+recommended action is in the `input-review` domain. The run summary records
+`fail_on_input_review` and `final_exit_code`, so uploaded artifacts explain this
+opt-in failure even when the semantic run status remains `pass`.
 The lower-level `acad_reference_batch.py --from-request` path accepts the same
 `--fail-on-input-review` flag and records `fail_on_input_review` /
 `final_exit_code` in its `artifact_index.json`, so scripts that stop before the
