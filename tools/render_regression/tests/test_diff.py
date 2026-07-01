@@ -146,6 +146,14 @@ def test_view_space_mismatch_is_flagged(tmp_path):
     assert r.overlay_path is None and not out.exists()  # no misleading overlay
 
 
+def test_diff_module_docstring_describes_shipped_shared_view():
+    text = (Path(__file__).resolve().parents[1] / "diff.py").read_text(encoding="utf-8")
+    assert "common-window path renders both revisions in a" in text
+    assert "shared_view=True" in text
+    assert "common window so even" not in text
+    assert "is deferred; until then" not in text
+
+
 def test_minor_extent_change_still_diffs(tmp_path):
     # bbox aspect within ASPECT_TOL (~1.7% wider) → guard must NOT fire.
     a = _box(tmp_path / "a.png", x0=40, y0=100, x1=340, y1=200)   # 300x100

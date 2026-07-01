@@ -21,13 +21,14 @@ consequence to keep in mind when reading overlays: a within-tol line *thickening
 reads as no-change, while *thinning* reads as a small removal. That matches the
 tolerant philosophy (we suppress sub-tol jitter), and is fine for revision review.
 
-§5 view-space: the two renders must share view-space, not just bg/colour. We
-do NOT assume it — when the two ink bboxes disagree in aspect beyond ASPECT_TOL
-(a revision that changed the drawing's outer extents) we return
-comparable=False, skip_reason="view-space-mismatch" instead of stretching one
-onto the other. The honest follow-up (render both in a common window so even
-extents-changing revisions diff cleanly) is deferred; until then those pairs
-are flagged, never silently mis-diffed.
+§5 view-space: the two renders must share view-space, not just bg/colour. The
+legacy per-extents image path does NOT assume that — when the two ink bboxes
+disagree in aspect beyond ASPECT_TOL, it returns comparable=False with
+skip_reason="view-space-mismatch" instead of stretching one render onto the
+other. The service-level /diff common-window path renders both revisions in a
+shared world window and calls this engine with shared_view=True; that mode keeps
+the common pixel grid and supports extents-changing revisions without silently
+re-centering them.
 """
 
 from __future__ import annotations
