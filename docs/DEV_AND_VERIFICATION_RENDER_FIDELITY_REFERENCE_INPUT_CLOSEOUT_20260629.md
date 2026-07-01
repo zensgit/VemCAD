@@ -1382,6 +1382,49 @@ python3 -m pytest \
 # 24 passed
 ```
 
+## Follow-Up Strict Action-Domain Distribution Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make generated post-return strict route commands prove the expected successful
+  action-domain distribution, rather than only forbidding known bad domains.
+- Catch future route-domain drift where a new or renamed action domain is not
+  explicitly listed in the forbid set.
+
+Changes:
+
+- Generated `reference_request.md` route commands now include:
+  - `--require-action-domain-count continue=1`;
+  - `--require-action-domain-count pass-review=2`.
+- The required distribution describes the strict matched-view handoff shape:
+  input preparation continues to the request run, while the compare and wrapper
+  routes are matched-view pass artifacts that still require human review before
+  AutoCAD-equivalence wording.
+- The README strict route example and action-domain-count documentation now
+  record the same distribution.
+- The request-run strict route helper in tests uses the same requirements, so
+  generated handoffs and local regression coverage stay aligned.
+
+Boundary:
+
+- Generated operator command / route-domain assertion hardening only.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_manifest_compare.py \
+  tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 24 passed
+```
+
 ## Follow-Up Strict Route Status Guards
 
 Status: implemented in this branch.
