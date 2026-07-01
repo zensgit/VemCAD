@@ -644,7 +644,12 @@ def _safe_output_name_issues(case_id: str, output_name: str) -> list[dict[str, s
 
 def _expected_size_issues(case_id: str, expected_size: Any) -> list[dict[str, str]]:
     if expected_size is None:
-        return []
+        return [{
+            "severity": "error",
+            "case_id": case_id,
+            "code": "missing_requested_expected_size",
+            "message": "requested_expected_size/expected_size is required so returned PNG size can be checked",
+        }]
     width = None
     height = None
     if isinstance(expected_size, dict):

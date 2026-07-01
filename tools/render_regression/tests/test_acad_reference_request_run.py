@@ -73,7 +73,7 @@ def _dxf(path: Path) -> str:
     return str(path)
 
 
-def _request(path: Path, *, case_id="G11", expected_size=None) -> Path:
+def _request(path: Path, *, case_id="G11", expected_size=(1600, 1131)) -> Path:
     case = {
         "id": case_id,
         "drawing_id": f"{case_id}/B11",
@@ -118,6 +118,7 @@ def _batch_request(path: Path) -> Path:
                 "recommended_output_name": "G11_autocad_model_extents.png",
                 "requested_capture_method": "plot-export",
                 "requested_view_contract": "model-extents",
+                "requested_expected_size": {"width": 1600, "height": 1131},
             },
             {
                 "id": "G12",
@@ -126,6 +127,7 @@ def _batch_request(path: Path) -> Path:
                 "recommended_output_name": "G12_autocad_model_extents.png",
                 "requested_capture_method": "plot-export",
                 "requested_view_contract": "model-extents",
+                "requested_expected_size": {"width": 1600, "height": 1200},
             },
         ],
     }), encoding="utf-8")
@@ -494,6 +496,7 @@ def test_reference_request_run_escapes_markdown_case_action_cells(tmp_path):
             "recommended_output_name": "G11|acad_model_extents.png",
             "requested_capture_method": "plot-export",
             "requested_view_contract": "model-extents",
+            "requested_expected_size": {"width": 1600, "height": 1131},
         }],
     }), encoding="utf-8")
     candidates = tmp_path / "candidate_cases.json"
@@ -729,7 +732,7 @@ def test_reference_request_run_preserves_viewspace_mismatch_exit(tmp_path, capsy
         size=(1600, 1200),
         box=[400, 300, 1200, 900],
     )
-    request = _request(tmp_path / "reference_request.json")
+    request = _request(tmp_path / "reference_request.json", expected_size=(1600, 1200))
     candidates = _candidates(tmp_path / "candidate_cases.json")
     out = tmp_path / "run"
 
@@ -770,7 +773,7 @@ def test_reference_request_run_surfaces_intake_review_warnings(tmp_path):
         box=[220, 165, 580, 435],
         color=(12, 12, 12),
     )
-    request = _request(tmp_path / "reference_request.json")
+    request = _request(tmp_path / "reference_request.json", expected_size=(900, 600))
     candidates = _candidates(tmp_path / "candidate_cases.json")
     out = tmp_path / "run"
 
@@ -823,7 +826,7 @@ def test_reference_request_run_can_fail_closed_on_input_review_warnings(tmp_path
         size=(900, 600),
         box=[220, 165, 580, 435],
     )
-    request = _request(tmp_path / "reference_request.json")
+    request = _request(tmp_path / "reference_request.json", expected_size=(900, 600))
     candidates = _candidates(tmp_path / "candidate_cases.json")
     default_out = tmp_path / "default-run"
 
