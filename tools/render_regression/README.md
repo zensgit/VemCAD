@@ -204,6 +204,7 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --require-artifact-kind-count summary_tsv=1 \
   --require-route-count 3 \
   --require-final-exit-code-count 0=2 \
+  --forbid-final-exit-code 2 \
   --require-action-artifact-exists
 ```
 
@@ -468,6 +469,9 @@ Use `--require-final-exit-code <code>` /
 directly routed final-exit-code distribution. Use
 `--require-final-exit-code-count <code=count>` when the exact distribution
 matters, for example after an opt-in input-review hard gate:
+The generated strict post-return route command requires two zero exit-code
+artifacts and forbids `2`, so opt-in input-review hard failures cannot be mixed
+into a supposedly ready pass bundle.
 
 ```bash
 python3 tools/render_regression/acad_artifact_route.py <run-dir> \

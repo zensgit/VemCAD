@@ -1551,6 +1551,46 @@ python3 -m pytest \
 # 25 passed
 ```
 
+## Follow-Up Strict Final-Exit-Code Guard
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Make generated post-return strict route commands explicitly reject opt-in
+  hard-failure exit codes in addition to requiring the expected zero-exit-code
+  distribution.
+- Prevent an input-review hard failure (`final_exit_code=2`) from being mixed
+  into a supposedly ready matched-view pass bundle.
+
+Changes:
+
+- Generated `reference_request.md` strict route commands now include
+  `--forbid-final-exit-code 2` beside the existing
+  `--require-final-exit-code-count 0=2`.
+- The README strict route example and final-exit-code guard documentation now
+  describe this ready-bundle invariant.
+- The request-run strict route helper in tests carries the same forbid guard.
+
+Boundary:
+
+- Generated operator command / final-exit-code assertion hardening only.
+- No command default behavior change.
+- No route priority change.
+- No renderer change.
+- No private drawing or AutoCAD PNG committed.
+- No X3 scoring change.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest \
+  tools/render_regression/tests/test_acad_manifest_compare.py \
+  tools/render_regression/tests/test_acad_reference_request_run.py -q
+# 25 passed
+```
+
 ## Follow-Up Strict Artifact-Kind Distribution Guard
 
 Status: implemented in this branch.
