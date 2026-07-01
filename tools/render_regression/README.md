@@ -134,7 +134,9 @@ python3 tools/render_regression/compare_vs_acad.py acad.png ours.png \
 `status=match|mismatch|unavailable`、填充比、阈值、X3 summary 与建议动作。
 `--require-viewspace-match` 在 `mismatch`/`unavailable` 时返回 `2`，用于阻止
 把不同窗 AutoCAD PNG 的低分误当成 renderer fidelity 结论。默认不加该 flag 时，
-CLI 仍保持诊断用途并返回 `0`。
+CLI 仍保持诊断用途并返回 `0`，并在 stdout 标出
+`gate mode: diagnostic-only`。只有显式加上 `--require-viewspace-match` 的输出才可作为
+X3 门禁证据。
 
 > 实例 G11：填充比 HEIGHT 差 ~0.10 触发，而 aspect_delta 0.0569 仍 **低于**
 > ASPECT_TOL——即原 aspect 守卫静默、正是本检测要补的盲区。
