@@ -174,6 +174,8 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --forbid-action-domain input \
   --forbid-action-domain input-review \
   --forbid-action-domain renderer-candidate \
+  --require-action-domain-count continue=1 \
+  --require-action-domain-count pass-review=2 \
   --forbid-issue-code current_acad_png_missing \
   --forbid-issue-code current_acad_matches_candidate_png \
   --forbid-status blocked \
@@ -439,6 +441,10 @@ assert the exact routed action-domain distribution. This is useful when an
 operator gate must prove the route contains only the expected mix of `input`,
 `renderer-candidate`, `pass-review`, and `continue` work without enumerating
 every specific action code.
+The generated strict post-return route command requires `continue=1` and
+`pass-review=2`: the input-prep route may continue to the request run, while
+the compare and wrapper routes must be matched-view pass artifacts that still
+require human review before any AutoCAD-equivalence wording.
 
 Use `--require-final-exit-code <code>` /
 `--forbid-final-exit-code <code>` when a workflow needs to fail closed on the
