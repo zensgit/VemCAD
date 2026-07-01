@@ -175,6 +175,8 @@ def _strict_post_return_route_args(out: Path) -> list[str]:
         "current_acad_png_missing",
         "--forbid-issue-code",
         "current_acad_matches_candidate_png",
+        "--require-status-count",
+        "pass=3",
         "--forbid-status",
         "blocked",
         "--forbid-status",

@@ -110,6 +110,7 @@ def test_readme_recapture_route_example_documents_handoff_guards():
         "--require-action-domain-count pass-review=2",
         "--forbid-issue-code current_acad_png_missing",
         "--forbid-issue-code current_acad_matches_candidate_png",
+        "--require-status-count pass=3",
         "--forbid-status blocked",
         "--forbid-status review",
         "--forbid-status viewspace_mismatch",
@@ -512,6 +513,7 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     assert request_md.count("--require-action-domain-count pass-review=2") == 1
     assert request_md.count("--forbid-issue-code current_acad_png_missing") == 1
     assert request_md.count("--forbid-issue-code current_acad_matches_candidate_png") == 1
+    assert request_md.count("--require-status-count pass=3") == 1
     assert request_md.count("--forbid-status blocked") == 1
     assert request_md.count("--forbid-status review") == 1
     assert request_md.count("--forbid-status viewspace_mismatch") == 1
@@ -548,6 +550,7 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
         "--require-action-domain-count pass-review=2",
         "--forbid-issue-code current_acad_png_missing",
         "--forbid-issue-code current_acad_matches_candidate_png",
+        "--require-status-count pass=3",
         "--forbid-status blocked",
         "--forbid-status review",
         "--forbid-status viewspace_mismatch",

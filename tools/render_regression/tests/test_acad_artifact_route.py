@@ -1512,6 +1512,70 @@ def test_cli_require_status_fails_closed_when_missing(tmp_path, capsys):
     assert "status counts: pass=1" in stderr
 
 
+def test_cli_require_status_count_passes_for_exact_distribution(tmp_path):
+    input_dir = tmp_path / "input"
+    compare_dir = tmp_path / "compare"
+    run_dir = tmp_path / "run"
+    input_dir.mkdir()
+    compare_dir.mkdir()
+    run_dir.mkdir()
+    for directory, schema, kind in [
+        (input_dir, "vemcad.acad_reference_batch_artifact_index/v1", "batch"),
+        (compare_dir, "vemcad.acad_manifest_compare_artifact_index/v1", "compare"),
+        (run_dir, "vemcad.acad_reference_request_run_artifact_index/v1", "request_run"),
+    ]:
+        _write(directory / "artifact_index.json", {
+            "schema": schema,
+            "kind": kind,
+            "status": "pass",
+            "recommended_next_action": {
+                "code": "review-x3-pass",
+                "message": "review",
+                "domain": "pass-review",
+            },
+            "artifacts": [],
+        })
+
+    assert route.main([
+        str(input_dir),
+        str(compare_dir),
+        str(run_dir),
+        "--require-status-count",
+        "pass=3",
+    ]) == 0
+
+
+def test_cli_require_status_count_fails_closed_for_mismatch(tmp_path, capsys):
+    input_dir = tmp_path / "input"
+    compare_dir = tmp_path / "compare"
+    input_dir.mkdir()
+    compare_dir.mkdir()
+    _write(input_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_reference_batch_artifact_index/v1",
+        "stage": "reference_intake",
+        "status": "pass",
+        "case_count": 1,
+        "artifacts": [],
+    })
+    _write(compare_dir / "artifact_index.json", {
+        "schema": "vemcad.acad_manifest_compare_artifact_index/v1",
+        "status": "review",
+        "case_count": 1,
+        "artifacts": [],
+    })
+
+    assert route.main([
+        str(input_dir),
+        str(compare_dir),
+        "--require-status-count",
+        "pass=2",
+    ]) == 2
+    stderr = capsys.readouterr().err
+
+    assert "required status count mismatch: pass=2 (got 1)" in stderr
+    assert "status counts: pass=1, review=1" in stderr
+
+
 def test_cli_forbid_status_passes_when_absent(tmp_path):
     input_dir = tmp_path / "input"
     input_dir.mkdir()

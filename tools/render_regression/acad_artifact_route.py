@@ -1377,6 +1377,11 @@ def main(argv: list[str] | None = None) -> int:
                         help="exit 2 unless the routed status counts include this status; may repeat")
     parser.add_argument("--forbid-status", action="append", default=[],
                         help="exit 2 if the routed status counts include this status; may repeat")
+    parser.add_argument("--require-status-count", action="append", default=[],
+                        help=(
+                            "exit 2 unless routed status counts contain status=count; "
+                            "may repeat"
+                        ))
     parser.add_argument("--require-final-exit-code", action="append", default=[],
                         help="exit 2 unless routed final_exit_code counts include this code; may repeat")
     parser.add_argument("--forbid-final-exit-code", action="append", default=[],
@@ -1486,6 +1491,9 @@ def main(argv: list[str] | None = None) -> int:
         ]
         action_domain_count_expectations = [
             _parse_count_expectation(item) for item in args.require_action_domain_count
+        ]
+        status_count_expectations = [
+            _parse_count_expectation(item) for item in args.require_status_count
         ]
         final_exit_code_count_expectations = [
             _parse_count_expectation(item) for item in args.require_final_exit_code_count
@@ -1606,13 +1614,30 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 2
-    if args.require_status or args.forbid_status:
+    if args.require_status or args.forbid_status or status_count_expectations:
         counts = _status_counts(payload)
         missing = [status for status in args.require_status if not counts.get(status, 0)]
         if missing:
             print(
                 "acad_artifact_route: required status missing: "
                 + ", ".join(missing),
+                file=sys.stderr,
+            )
+            print(
+                "acad_artifact_route: status counts: "
+                + _format_counts(counts),
+                file=sys.stderr,
+            )
+            return 2
+        failures = _check_count_guards(
+            label="status",
+            counts=counts,
+            required=status_count_expectations,
+            forbidden=[],
+        )
+        if failures:
+            print(
+                "acad_artifact_route: " + "; ".join(failures),
                 file=sys.stderr,
             )
             print(

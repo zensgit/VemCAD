@@ -746,6 +746,7 @@ def _write_reference_request(
         "  --require-action-domain-count pass-review=2 \\",
         "  --forbid-issue-code current_acad_png_missing \\",
         "  --forbid-issue-code current_acad_matches_candidate_png \\",
+        "  --require-status-count pass=3 \\",
         "  --forbid-status blocked \\",
         "  --forbid-status review \\",
         "  --forbid-status viewspace_mismatch \\",
