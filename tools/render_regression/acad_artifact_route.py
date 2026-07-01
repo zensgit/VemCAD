@@ -1514,6 +1514,16 @@ def main(argv: list[str] | None = None) -> int:
                             "exit 2 if routed compare viewspace_status_counts "
                             "include this status; may repeat"
                         ))
+    parser.add_argument("--require-viewspace-gate-evidence", action="append", default=[],
+                        help=(
+                            "exit 2 unless routed compare viewspace_gate_evidence_counts "
+                            "contain true=count or false=count; may repeat"
+                        ))
+    parser.add_argument("--forbid-viewspace-gate-evidence", action="append", default=[],
+                        help=(
+                            "exit 2 if routed compare viewspace_gate_evidence_counts "
+                            "include true or false; may repeat"
+                        ))
     parser.add_argument("--require-x3-band", action="append", default=[],
                         help=(
                             "exit 2 unless routed compare x3_band_counts "
@@ -1565,6 +1575,9 @@ def main(argv: list[str] | None = None) -> int:
         ]
         viewspace_status_expectations = [
             _parse_count_expectation(item) for item in args.require_viewspace_status
+        ]
+        viewspace_gate_evidence_expectations = [
+            _parse_count_expectation(item) for item in args.require_viewspace_gate_evidence
         ]
         x3_band_expectations = [
             _parse_count_expectation(item) for item in args.require_x3_band
@@ -1913,6 +1926,12 @@ def main(argv: list[str] | None = None) -> int:
             _count_map(payload, "viewspace_status_counts"),
             viewspace_status_expectations,
             args.forbid_viewspace_status,
+        ),
+        (
+            "viewspace gate evidence",
+            _count_map(payload, "viewspace_gate_evidence_counts"),
+            viewspace_gate_evidence_expectations,
+            args.forbid_viewspace_gate_evidence,
         ),
         (
             "x3 band",
