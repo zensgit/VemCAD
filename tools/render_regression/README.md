@@ -144,6 +144,10 @@ CLI 仍保持诊断用途并返回 `0`。
 当一批候选图需要 fresh matched-view AutoCAD PNG 时，不直接从低 X3 分数开渲染器
 缺陷。先生成/履行 reference request，再用 artifact route 决定下一步：
 
+`acad_manifest.json` 的每个 case 必须声明 `expected_size`（`{width,height}`
+或 `[width,height]`）。缺失时 manifest validation 会 fail closed；后续
+recapture request 不会再从当前/返回 PNG 自行推导 expected size。
+
 ```bash
 python3 tools/render_regression/acad_manifest_compare.py \
   --manifest <acad_manifest.json> \

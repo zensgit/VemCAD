@@ -121,6 +121,25 @@ def test_manifest_rejects_expected_size_mismatch(tmp_path):
     assert report["issues"][0]["code"] == "expected_size_mismatch"
 
 
+def test_manifest_requires_expected_size(tmp_path):
+    acad = _png(tmp_path / "acad.png", (800, 600))
+    dxf = _dxf(tmp_path / "B11.dxf")
+    manifest = _manifest(tmp_path / "manifest.json", [{
+        "id": "G11",
+        "drawing_id": "G11/B11",
+        "source_dxf": dxf,
+        "acad_png": acad,
+        "capture_method": "plot-export",
+        "view_contract": "model-extents",
+    }])
+
+    report = arm.validate_manifest(manifest)
+
+    assert report["status"] == "blocked"
+    assert report["issues"][0]["code"] == "missing_expected_size"
+    assert report["cases"][0]["expected_size"] is None
+
+
 def test_manifest_rejects_unreadable_acad_png(tmp_path):
     acad = tmp_path / "acad.png"
     acad.write_text("not an image", encoding="utf-8")
