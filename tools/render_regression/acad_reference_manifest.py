@@ -65,11 +65,21 @@ def _expected_size(case: dict[str, Any]) -> tuple[int, int] | None:
         width, height = raw
     else:
         raise ValueError("expected_size must be {width,height} or [width,height]")
-    width_i = int(width)
-    height_i = int(height)
+    width_i = _positive_int(width)
+    height_i = _positive_int(height)
     if width_i <= 0 or height_i <= 0:
-        raise ValueError("expected_size values must be positive")
+        raise ValueError("expected_size values must be positive integers")
     return width_i, height_i
+
+
+def _positive_int(value: Any) -> int:
+    if isinstance(value, bool):
+        raise ValueError("expected_size values must be positive integers")
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    raise ValueError("expected_size values must be positive integers")
 
 
 def _image_size(path: Path) -> tuple[int, int] | None:

@@ -85,14 +85,23 @@ def _expected_size_dimensions(expected_size: Any) -> tuple[int, int] | None:
         width, height = expected_size
     else:
         return None
-    try:
-        width_int = int(width)
-        height_int = int(height)
-    except Exception:
+    width_int = _positive_int(width)
+    height_int = _positive_int(height)
+    if width_int is None or height_int is None:
         return None
     if width_int <= 0 or height_int <= 0:
         return None
     return width_int, height_int
+
+
+def _positive_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.strip().isdigit():
+        return int(value.strip())
+    return None
 
 
 def _provenance_text(provenance: Any) -> str:
@@ -657,18 +666,14 @@ def _expected_size_issues(case_id: str, expected_size: Any) -> list[dict[str, st
         height = expected_size.get("height")
     elif isinstance(expected_size, (list, tuple)) and len(expected_size) == 2:
         width, height = expected_size
-    try:
-        width_i = int(width)
-        height_i = int(height)
-    except Exception:
-        width_i = 0
-        height_i = 0
+    width_i = _positive_int(width) or 0
+    height_i = _positive_int(height) or 0
     if width_i <= 0 or height_i <= 0:
         return [{
             "severity": "error",
             "case_id": case_id,
             "code": "invalid_requested_expected_size",
-            "message": "requested_expected_size/expected_size must contain positive width and height",
+            "message": "requested_expected_size/expected_size must contain positive integer width and height",
         }]
     return []
 
