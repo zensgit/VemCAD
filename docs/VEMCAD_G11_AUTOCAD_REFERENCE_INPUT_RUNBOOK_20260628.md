@@ -76,9 +76,9 @@ The helper writes:
 - `$CASE_DIR/acad_manifest.json`
 - `$CASE_DIR/candidate_cases.json`
 
-It also validates the AutoCAD PNG and records the actual PNG size as
-`expected_size`. If the PNG is unreadable, missing, or not gate-grade, it returns
-non-zero.
+It also validates the AutoCAD reference PNG and records that accepted reference
+image size as manifest `expected_size`. If the PNG is unreadable, missing, or
+not gate-grade, it returns non-zero.
 
 For an unattended or multi-drawing run, write a cases JSON list and use the batch
 helper:
@@ -117,8 +117,9 @@ The batch helper writes the same two harness inputs:
 - `$BATCH_DIR/artifact_index.json`
 
 Relative paths inside `cases.json` resolve relative to the JSON file. Each
-AutoCAD PNG is opened to record `expected_size`; unreadable images or missing
-required fields fail closed before the comparison step.
+AutoCAD reference PNG is opened to record the accepted reference image size as
+manifest `expected_size`; unreadable images or missing required fields fail
+closed before the comparison step.
 
 ## Fulfill A Recapture Request
 
@@ -138,10 +139,13 @@ python3 tools/render_regression/acad_reference_batch.py \
   --out-dir "$NEXT_DIR/input"
 ```
 
-The helper resolves the original candidate artifacts, opens every returned PNG
-to record `expected_size`, and fails closed if any requested PNG is missing or
-unreadable. It first writes and enforces a request-package validation report,
-then writes a returned-reference preflight beside the generated inputs:
+The helper resolves the original candidate artifacts and enforces the
+request-declared `requested_expected_size`. It opens returned PNGs only to
+compare their actual dimensions with that declared size. Missing, unreadable, or
+wrong-sized returned PNGs fail closed. The helper never lets a returned PNG
+define its own expected size. It first writes and enforces a request-package
+validation report, then writes a returned-reference preflight beside the
+generated inputs:
 
 - `$NEXT_DIR/input/reference_request_validation.json`
 - `$NEXT_DIR/input/reference_request_validation.md`
