@@ -1341,6 +1341,49 @@ python3 -m pytest tools/render_regression/tests/test_acad_reference_request_run.
 # 11 passed
 ```
 
+## Follow-Up Current AutoCAD Candidate Identity Warning
+
+Status: implemented in this branch.
+
+Purpose:
+
+- Add a low-noise wrong-file signal to request validation before any returned
+  AutoCAD PNG exists.
+- Warn when the current/rejected AutoCAD PNG is byte-identical to the VemCAD
+  candidate PNG, because that usually means the request package bound the
+  candidate render as the AutoCAD reference.
+- Keep the signal at warning severity: it is operator evidence for suspicious
+  input provenance, not an AutoCAD-equivalence gate.
+
+Changes:
+
+- Request validation now emits
+  `warning:current_acad_matches_candidate_png` when readable
+  `current_acad_png` provenance and candidate PNG provenance have the same
+  SHA256.
+- `test_batch_generator_warns_when_current_acad_matches_candidate_png` covers
+  the JSON, Markdown, TSV, and artifact-index surfaces.
+- The README documents the warning and its non-equivalence boundary.
+
+Boundary:
+
+- Request-validation hardening only.
+- No renderer change.
+- No route priority change.
+- No X3 scoring change.
+- No private drawing or AutoCAD PNG committed.
+- No AutoCAD-equivalence claim.
+
+Verification:
+
+```bash
+python3 -m pytest tools/render_regression/tests/test_acad_reference_batch.py -q
+# 28 passed
+
+python3 -m pytest tools/render_regression/tests -q
+# 202 passed
+```
+
 ## Follow-Up Route Case Action Evidence Visibility
 
 Status: implemented in this branch.
