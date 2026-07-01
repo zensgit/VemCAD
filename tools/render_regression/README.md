@@ -152,6 +152,7 @@ python3 tools/render_regression/acad_reference_batch.py \
   --require-request-boundary autocad_equivalence_claim=false \
   --require-request-boundary requires_returned_autocad_png=true \
   --require-request-boundary requires_viewspace_match=true \
+  --fail-on-input-review \
   --out-dir <request-validation-dir>
 
 python3 tools/render_regression/acad_reference_request_run.py \
@@ -212,6 +213,9 @@ The lower-level `acad_reference_batch.py --from-request` path accepts the same
 `--fail-on-input-review` flag and records `fail_on_input_review` /
 `final_exit_code` in its `artifact_index.json`, so scripts that stop before the
 one-command wrapper can use the same opt-in hard gate.
+Generated pre-capture validation commands pass `--fail-on-input-review` too, so
+request-package warnings such as missing or candidate-identical
+`current_acad_png` fail before an operator spends time exporting AutoCAD PNGs.
 The run summary and run-level
 artifact index also surface route-level `route_count`, `route_kind_counts`,
 `route_artifact_kind_counts`, `route_status_counts`,
