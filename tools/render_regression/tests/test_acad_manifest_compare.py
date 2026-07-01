@@ -377,6 +377,8 @@ def test_manifest_harness_runs_compare_and_records_match(tmp_path, capsys):
     row = summary["rows"][0]
     assert summary["status"] == "pass"
     assert row["viewspace_status"] == "match"
+    assert row["viewspace_gate_mode"] == "require-viewspace-match"
+    assert row["viewspace_gate_evidence"] is True
     assert row["x3_summary"]["band"] == "pass"
     assert row["render_image_digest"] == "sha256:test"
     assert row["diagnostics"]["X-Diff-Window-Source"] == "content_bbox"
@@ -490,6 +492,8 @@ def test_manifest_harness_blocks_viewspace_mismatch_without_equivalence_claim(tm
     row = summary["rows"][0]
     assert summary["status"] == "viewspace_mismatch"
     assert row["viewspace_status"] == "mismatch"
+    assert row["viewspace_gate_mode"] == "require-viewspace-match"
+    assert row["viewspace_gate_evidence"] is False
     assert row["compare_exit_code"] == 2
     assert row["triage_rank"] == 1
     assert row["triage_bucket"] == "recapture-required"
@@ -809,6 +813,7 @@ def test_triage_rows_prioritize_matched_fail_then_recapture_then_pass():
         {
             "id": "C",
             "viewspace_status": "match",
+            "viewspace_gate_evidence": True,
             "x3_summary": {"band": "pass", "ink_iou": 0.99},
         },
         {
@@ -819,6 +824,7 @@ def test_triage_rows_prioritize_matched_fail_then_recapture_then_pass():
         {
             "id": "A",
             "viewspace_status": "match",
+            "viewspace_gate_evidence": True,
             "x3_summary": {"band": "fallback", "ink_iou": 0.40},
         },
     ]
@@ -836,3 +842,15 @@ def test_triage_rows_prioritize_matched_fail_then_recapture_then_pass():
         "input",
         "pass-review",
     ]
+
+
+def test_triage_does_not_treat_diagnostic_match_as_gate_evidence():
+    row = {
+        "id": "D",
+        "viewspace_status": "match",
+        "viewspace_gate_evidence": False,
+        "x3_summary": {"band": "fallback", "ink_iou": 0.40},
+    }
+
+    assert harness._triage_bucket(row) == "input-review"
+    assert harness._recommended_action_domain(row) == "input-review"
