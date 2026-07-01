@@ -146,10 +146,13 @@ def validate_case(case: dict[str, Any], *, manifest_dir: Path, index: int) -> tu
                 issue("error", "acad_png_missing", f"acad_png not found: {acad_png}")
 
     expected_size = None
+    raw_expected_size = case.get("expected_size")
     try:
         expected_size = _expected_size(case)
     except (TypeError, ValueError) as exc:
         issue("error", "invalid_expected_size", str(exc))
+    if raw_expected_size is None:
+        issue("error", "missing_expected_size", "expected_size is required")
 
     if actual_size is not None and expected_size is not None and actual_size != expected_size:
         issue(

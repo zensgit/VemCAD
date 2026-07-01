@@ -81,6 +81,14 @@ def test_readme_describes_golden_e2e_as_shipped_ci_gate():
     assert "render→compare shipped" in readme
 
 
+def test_readme_documents_manifest_expected_size_as_required():
+    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
+
+    assert "每个 case 必须声明 `expected_size`" in readme
+    assert "manifest validation 会 fail closed" in readme
+    assert "不会再从当前/返回 PNG 自行推导 expected size" in readme
+
+
 def _manifest(
     path: Path,
     *,
@@ -198,6 +206,29 @@ def test_reference_request_prefers_manifest_expected_size_over_current_png(tmp_p
     assert request["cases"][0]["requested_expected_size"] == {"width": 800, "height": 600}
     request_md = (out / "reference_request.md").read_text(encoding="utf-8")
     assert "`800x600`" in request_md
+    assert "`640x480`" not in request_md
+
+
+def test_reference_request_does_not_fallback_to_current_png_size(tmp_path):
+    acad = _png(tmp_path / "stale-current-acad.png", size=(640, 480), box=[20, 15, 620, 460])
+    ours = _png(tmp_path / "ours.png", size=(800, 600), box=[40, 30, 760, 570])
+    dxf = _dxf(tmp_path / "B11.dxf")
+    out = tmp_path / "out"
+    out.mkdir()
+
+    harness._write_reference_request(out, [{
+        "id": "G11",
+        "drawing_id": "G11/B11",
+        "source_dxf": dxf,
+        "acad_png": acad,
+        "ours": ours,
+        "viewspace_status": "mismatch",
+        "x3_summary": {"band": "fallback", "ink_iou": 0.5},
+    }])
+
+    request = json.loads((out / "reference_request.json").read_text(encoding="utf-8"))
+    assert "requested_expected_size" not in request["cases"][0]
+    request_md = (out / "reference_request.md").read_text(encoding="utf-8")
     assert "`640x480`" not in request_md
 
 

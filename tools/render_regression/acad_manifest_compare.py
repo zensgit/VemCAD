@@ -566,17 +566,6 @@ def _recapture_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [row for row in _triage_rows(rows) if _triage_bucket(row) == "recapture-required"]
 
 
-def _png_size(path: str) -> dict[str, int] | None:
-    if not path:
-        return None
-    try:
-        with Image.open(path) as image:
-            width, height = image.size
-    except Exception:
-        return None
-    return {"width": width, "height": height}
-
-
 def _expected_size_text(expected_size: Any) -> str:
     if isinstance(expected_size, dict):
         width = expected_size.get("width")
@@ -638,7 +627,7 @@ def _write_reference_request(
                 "monochrome off, no toolbar/chrome, long edge >= 1600px."
             ),
         }
-        expected_size = row.get("expected_size") or _png_size(_str(row.get("acad_png")))
+        expected_size = row.get("expected_size")
         if expected_size is not None:
             case["requested_expected_size"] = expected_size
         current_acad_provenance = _file_provenance(_str(row.get("acad_png")))
