@@ -333,6 +333,25 @@ def test_manifest_harness_clears_stale_compare_artifacts_on_dry_run_rerun(tmp_pa
     assert not (out / "reference_request.md").exists()
 
 
+def test_manifest_artifact_boundary_rejects_non_integer_compared_count():
+    for compared_count in (True, 1.5, -1, "1.5", "not-a-count"):
+        artifact_index = harness._artifact_index([], report={
+            "status": "pass",
+            "case_count": 1,
+            "compared_count": compared_count,
+            "issues": [],
+        })
+        assert artifact_index["boundary"]["compares_renders"] is False
+
+    artifact_index = harness._artifact_index([], report={
+        "status": "pass",
+        "case_count": 1,
+        "compared_count": "1",
+        "issues": [],
+    })
+    assert artifact_index["boundary"]["compares_renders"] is True
+
+
 def test_manifest_harness_runs_compare_and_records_match(tmp_path, capsys):
     acad = _png(tmp_path / "acad.png", box=[20, 15, 740, 555])
     ours = _png(tmp_path / "ours.png", box=[20, 15, 740, 555])
