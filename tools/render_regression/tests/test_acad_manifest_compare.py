@@ -72,6 +72,15 @@ def _readme_validation_example_block() -> str:
     )
 
 
+def test_readme_describes_golden_e2e_as_shipped_ci_gate():
+    readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
+
+    assert "D3 负责把 pytest + 端到端接入 CI" not in readme
+    assert "pytest + render_cli 端到端" in readme
+    assert "ci_e2e_check.py" in readme
+    assert "render→compare shipped" in readme
+
+
 def _manifest(
     path: Path,
     *,

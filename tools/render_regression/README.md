@@ -42,7 +42,9 @@
   渲染步骤可注入（合成图单测验证逻辑；端到端 render_cli 运行在 CI——本地
   Homebrew Qt 暂不可用）。
 - `golden/golden.json` —— D1 金样集 v1（2D 子集）；FIELD/ACAD_TABLE/XREF/天正
-  类列于 `deferred`（插件产出或 Phase 2）。D3 负责把 pytest + 端到端接入 CI。
+  类列于 `deferred`（插件产出或 Phase 2）。pytest + render_cli 端到端
+  已接入 CI；`ci_e2e_check.py` 是当前 golden 语料的 render→compare shipped
+  gate。
 
 **已知缺口（对冻结计划 §5 的诚实偏差）**：D2 仍没有
 reference-vs-candidate 的文字/几何分离门控。render_cli 已能输出
