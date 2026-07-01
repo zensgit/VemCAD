@@ -192,9 +192,13 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --require-kind compare \
   --require-kind request_run \
   --require-artifact-kind reference_request_validation_tsv \
+  --require-artifact-kind-count reference_request_validation_tsv=2 \
   --require-artifact-kind reference_intake_tsv \
+  --require-artifact-kind-count reference_intake_tsv=2 \
   --require-artifact-kind case_actions_tsv \
+  --require-artifact-kind-count case_actions_tsv=1 \
   --require-artifact-kind summary_tsv \
+  --require-artifact-kind-count summary_tsv=1 \
   --require-route-count 3 \
   --require-final-exit-code-count 0=2 \
   --require-action-artifact-exists
@@ -496,6 +500,11 @@ python3 tools/render_regression/acad_artifact_route.py <run-dir> \
   --require-artifact-kind reference_request_validation_tsv \
   --require-artifact-kind reference_intake_tsv
 ```
+
+Use `--require-artifact-kind-count <kind=count>` when stale or duplicated
+artifacts must fail closed. The generated strict command pins the expected TSV
+handoff distribution: validation and intake TSVs appear once in the input batch
+and once in the wrapper, while `case_actions_tsv` and `summary_tsv` appear once.
 
 Use `--require-route-count <n>` when a workflow also needs to prove the
 recursive route discovered the expected number of artifact indexes. This catches
