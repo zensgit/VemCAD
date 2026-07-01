@@ -395,6 +395,7 @@ def _artifact_index(
             "triage_bucket_counts": _count_values(rows, "triage_bucket"),
             "recommended_action_domain_counts": _count_values(rows, "recommended_action_domain"),
             "viewspace_status_counts": _count_values(rows, "viewspace_status"),
+            "viewspace_gate_evidence_counts": _count_gate_evidence(rows),
             "x3_band_counts": _count_x3_bands(rows),
         })
     return payload
@@ -406,6 +407,16 @@ def _count_values(rows: list[dict[str, Any]], key: str) -> dict[str, int]:
         value = _str(row.get(key))
         if value:
             counts[value] = counts.get(value, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _count_gate_evidence(rows: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        if "viewspace_gate_evidence" not in row:
+            continue
+        key = "true" if bool(row.get("viewspace_gate_evidence")) else "false"
+        counts[key] = counts.get(key, 0) + 1
     return dict(sorted(counts.items()))
 
 
