@@ -31,7 +31,7 @@ def draw_frame(path, *, bg=(255,255,255), ink=(0,0,0), size=(1200,850),
     return path
 
 def report(name, r, expect):
-    band = r.band; s = r.geometry_ink_iou
+    band = r.band; s = r.ink_iou
     verdict = "FALSE-PASS" if (expect=="fail" and band=="pass") else \
               ("FALSE-FAIL" if (expect=="pass" and band=="fallback") else "ok")
     print(f"[{verdict:11}] {name:38} iou={s:.4f} band={band:9} "
@@ -89,7 +89,7 @@ for missing in [1,2,4,6,8,10,15]:
     b = grid(TMP/"e5b.png", 40-missing)
     r = compare(a,b)
     tag = "FALSE-PASS" if r.band=="pass" else "ok"
-    print(f"[{tag:11}] E5 missing {missing:2}/40 inner lines           iou={r.geometry_ink_iou:.4f} band={r.band}")
+    print(f"[{tag:11}] E5 missing {missing:2}/40 inner lines           iou={r.ink_iou:.4f} band={r.band}")
 
 # ─────────────────────────────────────────────────────────────────────────
 # E6. BOTH-BLANK: a render bug producing blank for BOTH baseline and candidate.
