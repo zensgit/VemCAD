@@ -183,6 +183,8 @@ def test_cli_writes_viewspace_contract_report_for_framing_mismatch(tmp_path, cap
     assert rc == 0
     payload = json.loads(report.read_text(encoding="utf-8"))
     assert payload["schema"] == "vemcad.x3_viewspace_contract/v1"
+    assert payload["gate_mode"] == "diagnostic-only"
+    assert payload["gate_evidence"] is False
     assert payload["status"] == "mismatch"
     assert payload["reason"] == "page-fill/aspect divergence exceeds tolerance"
     assert "explicit matching --window" in payload["recommended_action"]
@@ -226,6 +228,8 @@ def test_cli_viewspace_contract_report_for_clean_pair(tmp_path, capsys):
     assert "gate mode" in txt
     assert "require-viewspace-match" in txt
     payload = json.loads(report.read_text(encoding="utf-8"))
+    assert payload["gate_mode"] == "require-viewspace-match"
+    assert payload["gate_evidence"] is True
     assert payload["status"] == "match"
     assert payload["recommended_action"] == "score-render-fidelity"
     assert payload["framing"]["framing_mismatch"] is False
