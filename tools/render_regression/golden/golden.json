@@ -1,7 +1,7 @@
 {
   "schema": "vemcad.render_golden",
   "schema_version": "0.1",
-  "note": "D1 golden set v1 (Phase 1, 2D subset). Vendor-free constructed DXF. FIELD / ACAD_TABLE / XREF / 天正 categories are plugin-produced or hand-unauthorable and are deferred (see deferred[]); the lines-text BOM stands in for the parts-list category, which is the dominant real-world 明细栏 form. KNOWN GAP vs §5: D2 v0 has NO text/geometry split (needs a renderer-supplied text mask, a B-line follow-up), so the gate metric `ink_iou` is text+geometry combined. To keep the gate honest during the font-substitution period, text-DOMINANT drawings are gate=false (a font substitution must not false-fail until the split exists); geometry-dominant drawings stay gate=true.",
+  "note": "D1 golden set v1 (Phase 1, 2D subset). Vendor-free constructed DXF. FIELD / ACAD_TABLE / XREF / 天正 categories are plugin-produced or hand-unauthorable and are deferred (see deferred[]); the lines-text BOM stands in for the parts-list category, which is the dominant real-world 明细栏 form. KNOWN GAP vs §5: D2 still gates on combined `ink_iou`. render_cli now emits candidate-side semantic class diagnostics, but there is still no reference/AutoCAD semantic mask or semantic pass/fail gate, so text-DOMINANT drawings remain gate=false during font-substitution work; geometry-dominant drawings stay gate=true.",
   "drawings": [
     {"name": "multi_frame", "category": "multi-frame",
      "render": {"width": 1600, "height": 1131, "bg": "white"},
@@ -10,7 +10,7 @@
     {"name": "lines_text_bom", "category": "parts-list-lines-text",
      "render": {"width": 1200, "height": 800, "bg": "white"},
      "expect": "non-blank", "gate": false,
-     "notes": "明细栏 as lines+text (not an ACAD_TABLE object) — the common form. gate=false: text-dominant, can't gate on the combined metric until the text/geometry split exists (else font substitution false-fails)."},
+     "notes": "明细栏 as lines+text (not an ACAD_TABLE object) — the common form. gate=false: text-dominant; candidate-side semantic diagnostics exist, but combined ink_iou can still false-fail on font substitution until a reference/AutoCAD semantic gate exists."},
     {"name": "cjk_text", "category": "cjk-text",
      "render": {"width": 1600, "height": 800, "bg": "white"},
      "expect": "non-blank", "gate": false,
@@ -18,7 +18,7 @@
        "forbid_resolved": ["DejaVu Sans"],
        "require_resolved_contains_any": ["Serif", "Song", "FangSong", "仿宋", "STFangsong", "Zhuque"]
      },
-     "notes": "Font resolution. gate=false until D2 has a text/geometry split — a Noto-vs-华文 substitution changes glyph shapes and would false-fail the combined metric; report-level gate still forbids the Linux headless regression where empty-style CJK resolves to DejaVu Sans."},
+     "notes": "Font resolution. gate=false for text-dominant ink: candidate-side semantic diagnostics exist, but a Noto-vs-华文 substitution can still false-fail the combined metric until a reference/AutoCAD semantic gate exists; report-level gate still forbids the Linux headless regression where empty-style CJK resolves to DejaVu Sans."},
     {"name": "garbage_extents", "category": "garbage-extents",
      "render": {"width": 1200, "height": 600, "bg": "white", "window": "0,0,200,100"},
      "expect": "non-blank", "gate": true,

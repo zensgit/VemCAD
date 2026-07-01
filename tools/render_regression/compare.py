@@ -10,11 +10,12 @@ regression) and uniform scale / aspect change (the bbox-crop normalizes it
 away). Both-blank is treated as a failure for a gated drawing, not a match.
 
 NOT done in v0 (honest gap vs §5's "文字区/几何区分开打分"): a true
-text/geometry SPLIT — that needs a renderer-supplied text mask (a B-line
-follow-up). Until then the combined metric is `ink_iou` (NOT named
-"geometry_*", which would imply a split that does not exist), and text-dense
-golden drawings are not gated on it (golden.json gate=false), so a font
-substitution does not false-fail the gate.
+reference-vs-candidate text/geometry pass/fail SPLIT. render_cli now provides
+candidate-side semantic class diagnostics, but AutoCAD/reference semantics are
+still unknown, so the combined metric remains `ink_iou` (NOT named
+"geometry_*", which would imply a gate that does not exist). Text-dense golden
+drawings are not gated on it (golden.json gate=false), so a font substitution
+does not false-fail the gate.
 
 Pure image-in / score-out: no rendering here. Unit-tested with synthetic PIL
 image pairs so alignment + scoring are verified without a live renderer.

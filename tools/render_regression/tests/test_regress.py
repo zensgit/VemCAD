@@ -92,6 +92,12 @@ def test_no_baseline_does_not_gate(tmp_path):
 def test_real_golden_manifest_loads_and_is_consistent():
     gpath = Path(__file__).resolve().parents[1] / "golden" / "golden.json"
     golden = json.loads(gpath.read_text("utf-8"))
+    manifest_text = json.dumps(golden, ensure_ascii=False)
+    assert "NO text/geometry split" not in manifest_text
+    assert "needs a renderer-supplied text mask" not in manifest_text
+    assert "until the text/geometry split exists" not in manifest_text
+    assert "candidate-side semantic" in golden["note"]
+    assert "no reference/AutoCAD semantic mask" in golden["note"]
     names = [d["name"] for d in golden["drawings"]]
     assert len(names) == len(set(names))  # unique
     gdir = gpath.parent
